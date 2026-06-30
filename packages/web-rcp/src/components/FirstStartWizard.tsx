@@ -11,7 +11,7 @@ export function markWizardDone(): void {
   localStorage.setItem(WIZARD_KEY, '1');
 }
 
-type CameraType = 'sony-tcp' | 'sony-serial' | 'lumix';
+type CameraType = 'sony-tcp' | 'sony-serial' | 'sony-usb' | 'lumix';
 
 interface Props {
   onComplete: (config: Partial<BridgeConfig>) => void;
@@ -41,6 +41,9 @@ export function FirstStartWizard({ onComplete }: Props) {
     }
     if (cameraType === 'sony-serial') {
       return { connectionMode: 'serial', serialPath, baudRate };
+    }
+    if (cameraType === 'sony-usb') {
+      return { connectionMode: 'sony-usb' };
     }
     return { connectionMode: 'lumix-http', lumixHost, lumixPort };
   }
@@ -161,6 +164,7 @@ function StepCameraType({ value, onChange }: { value: CameraType; onChange: (v: 
   const options: { id: CameraType; label: string; sub: string; badge?: string }[] = [
     { id: 'sony-tcp', label: 'Sony CCU – TCP / Netzwerk', sub: 'WIZ108SR Adapter oder direkte Netzwerkverbindung (700PTP)', badge: 'empfohlen' },
     { id: 'sony-serial', label: 'Sony CCU – RS-422 Seriell', sub: 'Direkte 8-Pin RS-422 Verbindung via COM-Port' },
+    { id: 'sony-usb', label: 'Sony Alpha / Cinema – USB', sub: 'FX3, FX6, FX9, A7 IV, A7S III, A1 … via Camera Remote SDK' },
     { id: 'lumix', label: 'Panasonic Lumix – WiFi / LAN', sub: 'HTTP CGI Protokoll (S1, S5, GH5, GH6, BGH1, BS1H…)' },
   ];
 
@@ -275,6 +279,22 @@ function StepConnection(p: StepConnectionProps) {
         </>
       )}
 
+      {p.cameraType === 'sony-usb' && (
+        <>
+          <p className="wizard-step__desc">
+            Verbinde die Kamera (z.B. FX3) per USB-C mit diesem Rechner und stelle sie
+            auf <strong>„PC Remote"</strong> (USB-Steuerung).
+          </p>
+          <p className="wizard-step__hint">
+            Die Kamera wird beim Verbinden automatisch per USB erkannt (Sony Vendor‑ID
+            0x054C). Die Steuerung läuft direkt über das Sony‑PTP‑Protokoll – kein
+            Sony‑SDK nötig, nur das optionale Modul <code>usb</code> auf dem Zielrechner
+            (<code>npm install usb --workspace=packages/bridge</code>). Iris, ISO/Gain,
+            Verschlusszeit, Farbtemperatur, Rec und Auto‑WB werden unterstützt.
+          </p>
+        </>
+      )}
+
       {p.cameraType === 'lumix' && (
         <>
           <p className="wizard-step__desc">
@@ -317,6 +337,7 @@ function StepDone({ cameraType, config }: { cameraType: CameraType; config: Part
   const label =
     cameraType === 'sony-tcp' ? 'Sony CCU via TCP'
     : cameraType === 'sony-serial' ? 'Sony CCU via RS-422'
+    : cameraType === 'sony-usb' ? 'Sony Alpha/Cinema via USB'
     : 'Panasonic Lumix WiFi';
 
   return (

@@ -19,12 +19,13 @@ import { createServer, IncomingMessage } from 'http';
 import { Rs422Transport } from './transport/Rs422Transport.js';
 import { CcuClient, CameraState } from './protocol/CcuClient.js';
 import { LumixClient } from './protocol/LumixClient.js';
+import { SonyPtpUsbClient, SonyPtpState, SonyPtpTarget } from './cameras/SonyPtpUsbClient.js';
 import { WiznetDiscovery, WiznetDevice, WiznetDeviceConfig } from './discovery/WiznetDiscovery.js';
 import { CompanionServer, TallyState } from './companion/CompanionServer.js';
 
 export interface BridgeConfig {
-  /** Connection mode: 'tcp', 'serial', or 'lumix-http' */
-  connectionMode?: 'tcp' | 'serial' | 'lumix-http';
+  /** Connection mode: 'tcp', 'serial', 'lumix-http', or 'sony-usb' */
+  connectionMode?: 'tcp' | 'serial' | 'lumix-http' | 'sony-usb';
   /** 700PTP TCP host */
   tcpHost?: string;
   /** 700PTP TCP port (default 7700) */
@@ -38,10 +39,14 @@ export interface BridgeConfig {
   lumixHost?: string;
   /** Lumix HTTP CGI: port (default 80) */
   lumixPort?: number;
+  /** Sony USB (CRSDK): id of the selected device, e.g. "usb:1.4" */
+  usbDeviceId?: string;
+  /** Sony USB (CRSDK): model name of the selected device */
+  usbDeviceModel?: string;
 }
 
 interface ClientMessage {
-  type: 'command' | 'connect' | 'disconnect' | 'listPorts' | 'getConfig' | 'setConfig' | 'discoverWiznet' | 'configureWiznet' | 'setTally' | 'getTally';
+  type: 'command' | 'connect' | 'disconnect' | 'listPorts' | 'getConfig' | 'setConfig' | 'discoverWiznet' | 'configureWiznet' | 'discoverSonyUsb' | 'setTally' | 'getTally';
   cmd?: string;
   params?: Record<string, unknown>;
   config?: BridgeConfig;
@@ -55,6 +60,7 @@ export class BridgeServer {
   private httpServer: ReturnType<typeof createServer>;
   private ccuClient: CcuClient | null = null;
   private lumixClient: LumixClient | null = null;
+  private sonyUsb: SonyPtpUsbClient | null = null;
   private rs422: Rs422Transport | null = null;
   private wiznetDiscovery = new WiznetDiscovery();
   private companion = new CompanionServer();
@@ -164,13 +170,17 @@ export class BridgeServer {
           await this.connectSerial();
         } else if (this.config.connectionMode === 'lumix-http') {
           await this.connectLumix();
+        } else if (this.config.connectionMode === 'sony-usb') {
+          await this.connectSonyUsb(ws);
         } else {
           await this.connectTcp();
         }
         break;
 
       case 'disconnect':
-        this.ccuClient?.disconnect();
+        this.disconnectCurrent();
+        this.broadcast({ type: 'disconnected' });
+        this.companion.setConnected(false);
         break;
 
       case 'command':
@@ -194,6 +204,15 @@ export class BridgeServer {
         console.log(`[BridgeServer] Configuring WIZ108SR at ${msg.deviceIp}...`);
         const ok = await this.wiznetDiscovery.configure(msg.deviceIp, msg.deviceConfig);
         ws.send(JSON.stringify({ type: 'wiznetConfigResult', success: ok, ip: msg.deviceIp }));
+        break;
+      }
+
+      case 'discoverSonyUsb': {
+        console.log('[BridgeServer] Scanning USB for Sony cameras...');
+        const { discoverSonyUsbCameras } = await import('./discovery/SonyUsbDiscovery.js');
+        const { devices, reason } = await discoverSonyUsbCameras();
+        console.log(`[BridgeServer] Found ${devices.length} Sony USB device(s)`);
+        ws.send(JSON.stringify({ type: 'sonyUsbDevices', devices, reason }));
         break;
       }
 
@@ -252,6 +271,72 @@ export class BridgeServer {
       this.lumixClient.disconnect();
     }
     this.lumixClient = null;
+    if (this.sonyUsb) {
+      void this.sonyUsb.disconnect();
+    }
+    this.sonyUsb = null;
+  }
+
+  // ─── Sony USB (PTP vendor extension) connection ───────────────────────
+
+  private async connectSonyUsb(ws: WebSocket): Promise<void> {
+    this.disconnectCurrent();
+
+    const { discoverSonyUsbCameras } = await import('./discovery/SonyUsbDiscovery.js');
+    const { devices, reason } = await discoverSonyUsbCameras();
+    if (devices.length === 0) {
+      throw new Error(
+        reason ?? 'Keine Sony-Kamera am USB gefunden. Kamera in den Modus „PC Remote" versetzen.',
+      );
+    }
+
+    const found = devices.find((d) => d.id === this.config.usbDeviceId) ?? devices[0];
+    const target: SonyPtpTarget = { id: found.id, model: found.model };
+    this.config = { ...this.config, usbDeviceId: target.id, usbDeviceModel: target.model };
+    this.broadcast({ type: 'config', config: this.config });
+
+    const client = new SonyPtpUsbClient();
+    this.sonyUsb = client;
+    this.wireSonyUsbEvents();
+    await client.connect(target);
+  }
+
+  private wireSonyUsbEvents(): void {
+    if (!this.sonyUsb) return;
+    const camNum = this.config.ccuId ?? 0;
+
+    this.sonyUsb.on('connected', (target: SonyPtpTarget) => {
+      console.log('[BridgeServer] Sony USB camera connected:', target);
+      this.broadcast({ type: 'connected', info: target });
+      this.companion.setConnected(true);
+    });
+
+    this.sonyUsb.on('stateChanged', (state: SonyPtpState) => {
+      const mapped = this.mapSonyUsbState(state);
+      const mergedState = { ...(this.cameraStates.get(camNum) ?? {}), ...mapped };
+      this.cameraStates.set(camNum, mergedState);
+      this.broadcast({ type: 'state', cameraNumber: camNum, state: mergedState });
+      this.companion.updateCameraStateFor(camNum, mergedState as Record<string, unknown>);
+    });
+
+    this.sonyUsb.on('disconnected', () => {
+      this.broadcast({ type: 'disconnected' });
+      this.companion.setConnected(false);
+    });
+
+    this.sonyUsb.on('error', (err: Error) => {
+      console.error('[BridgeServer] Sony USB error:', err);
+      this.broadcast({ type: 'error', message: err.message });
+    });
+  }
+
+  /** Map the PTP camera state onto the dashboard's CameraState shape. */
+  private mapSonyUsbState(state: SonyPtpState): Partial<CameraState> {
+    return {
+      iris: state.iris, // already on the 0-255 RCP scale
+      masterGain: state.masterGain,
+      shutterSpeed: state.shutterSpeed,
+    };
   }
 
   // ─── Lumix HTTP CGI connection ─────────────────────────────────────────
@@ -336,8 +421,9 @@ export class BridgeServer {
   ): Promise<void> {
     const isLumix = this.lumixClient?.connected ?? false;
     const isSony = this.ccuClient?.connected ?? false;
+    const isSonyUsb = this.sonyUsb?.isConnected ?? false;
 
-    if (!isLumix && !isSony) {
+    if (!isLumix && !isSony && !isSonyUsb) {
       this.sendError(ws, 'Not connected to any camera');
       return;
     }
@@ -349,7 +435,14 @@ export class BridgeServer {
     const currentState = this.cameraStates.get(targetCamera) ?? {};
     const stateUpdates: Partial<CameraState> = {};
 
-    if (isLumix) {
+    if (isSonyUsb) {
+      // ── Sony PTP routing (FX3/FX6/A7 via USB) ─────────────────────────────
+      // The client maps RCP commands to camera properties and emits
+      // `stateChanged`, which is broadcast back to the UI via wireSonyUsbEvents.
+      const handled = await this.sonyUsb!.handleRcpCommand(cmd, params);
+      if (!handled) this.sendError(ws, `'${cmd}' wird über Sony USB/PTP nicht unterstützt`);
+      return;
+    } else if (isLumix) {
       // ── Lumix command routing ─────────────────────────────────────────────
       const lx = this.lumixClient!;
       switch (cmd) {
