@@ -403,11 +403,16 @@ export function Dashboard({ bridgeConnected = false, remoteCameraStates = {}, on
     setTimeout(() => {
       setState((prev) => ({
         ...prev,
-        cameras: prev.cameras.map((c) =>
-          c.id === cameraId && c.status === 'connecting' && !BRIDGE_PROTOCOLS.has(c.protocol)
-            ? { ...c, status: 'connected' }
-            : c,
-        ),
+        cameras: prev.cameras.map((c) => {
+          if (c.id !== cameraId || c.status !== 'connecting') return c;
+          // Bridge-backed protocols resolve to 'connected' once the bridge
+          // reports state (see the remoteCameraStates effect) — don't fake it.
+          if (BRIDGE_PROTOCOLS.has(c.protocol)) return c;
+          // 'manual' is an explicit no-backend demo mode the user chose.
+          if (c.protocol === 'manual') return { ...c, status: 'connected' };
+          // Everything else has no wired backend yet — be honest, don't pretend.
+          return { ...c, status: 'error', error: 'Über Bridge nicht verbunden' };
+        }),
       }));
     }, 700);
   }, []);

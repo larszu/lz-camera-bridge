@@ -32,8 +32,8 @@ const PROTOCOLS: { value: CameraProtocol; label: string; description: string }[]
   },
   {
     value: 'sony-crsdk',
-    label: 'Sony Camera Remote SDK',
-    description: 'USB/WiFi control for FX3/FX6/A7/ZV series'
+    label: 'Sony USB (PTP)',
+    description: 'USB-Steuerung für FX3/FX6/FX9/A7/ZV via PTP – kein SDK nötig'
   },
   {
     value: 'sony-mnc',
@@ -300,25 +300,11 @@ export function CameraConfigPanel({
           )}
 
           {showUsb && (
-            <>
-              <div className="camera-config__field">
-                <label className="camera-config__label">USB Device</label>
-                <select
-                  className="camera-config__select"
-                  value={localState.settings.usbDeviceId || ''}
-                  onChange={(e) => updateSettings('usbDeviceId', e.target.value)}
-                >
-                  <option value="">-- Scan for devices --</option>
-                  <option value="demo">Demo: Sony FX3</option>
-                </select>
-                <button className="rcp-btn rcp-btn--sm" style={{ marginTop: 4 }}>
-                  Scan USB
-                </button>
-              </div>
-              <div className="camera-config__note">
-                Supported by Sony CRSDK: FX3, FX6, FX9, A7 IV, A7S III, A7R V, ZV-E1, A1
-              </div>
-            </>
+            <div className="camera-config__note">
+              Sony USB-Kameras (FX3, FX6, FX9, A7 IV, A7S III, A7R V, ZV-E1, A1) werden
+              beim Verbinden automatisch per USB erkannt (Vendor-ID 0x054C). Den Scan und
+              die Geräteauswahl findest du im Connection-Panel (Tab „Sony USB").
+            </div>
           )}
 
           {showWiznet && (
@@ -330,7 +316,6 @@ export function CameraConfigPanel({
                 onChange={(e) => updateSettings('wiznetMac', e.target.value)}
               >
                 <option value="">Direct connection</option>
-                <option value="demo">00:08:DC:XX:XX:XX (Demo)</option>
               </select>
             </div>
           )}
