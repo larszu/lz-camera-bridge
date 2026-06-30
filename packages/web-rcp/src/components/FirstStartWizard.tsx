@@ -287,9 +287,10 @@ function StepConnection(p: StepConnectionProps) {
           </p>
           <p className="wizard-step__hint">
             Die Kamera wird beim Verbinden automatisch per USB erkannt (Sony Vendor‑ID
-            0x054C). Im Connection‑Panel kannst du das gefundene Gerät auswählen und
-            erneut scannen. Für die volle Steuerung wird auf dem Zielrechner das
-            optionale Modul <code>usb</code> sowie das Sony Camera Remote SDK benötigt.
+            0x054C). Die Steuerung läuft direkt über das Sony‑PTP‑Protokoll – kein
+            Sony‑SDK nötig, nur das optionale Modul <code>usb</code> auf dem Zielrechner
+            (<code>npm install usb --workspace=packages/bridge</code>). Iris, ISO/Gain,
+            Verschlusszeit, Farbtemperatur, Rec und Auto‑WB werden unterstützt.
           </p>
         </>
       )}

@@ -19,7 +19,7 @@ import { createServer, IncomingMessage } from 'http';
 import { Rs422Transport } from './transport/Rs422Transport.js';
 import { CcuClient, CameraState } from './protocol/CcuClient.js';
 import { LumixClient } from './protocol/LumixClient.js';
-import { SonyCrsdkClient, CrsdkCameraState } from './cameras/SonyCrsdkClient.js';
+import { SonyPtpUsbClient, SonyPtpState, SonyPtpTarget } from './cameras/SonyPtpUsbClient.js';
 import { WiznetDiscovery, WiznetDevice, WiznetDeviceConfig } from './discovery/WiznetDiscovery.js';
 import { CompanionServer, TallyState } from './companion/CompanionServer.js';
 
@@ -60,7 +60,7 @@ export class BridgeServer {
   private httpServer: ReturnType<typeof createServer>;
   private ccuClient: CcuClient | null = null;
   private lumixClient: LumixClient | null = null;
-  private crsdkClient: SonyCrsdkClient | null = null;
+  private sonyUsb: SonyPtpUsbClient | null = null;
   private rs422: Rs422Transport | null = null;
   private wiznetDiscovery = new WiznetDiscovery();
   private companion = new CompanionServer();
@@ -271,78 +271,71 @@ export class BridgeServer {
       this.lumixClient.disconnect();
     }
     this.lumixClient = null;
-    if (this.crsdkClient) {
-      void this.crsdkClient.disconnect();
+    if (this.sonyUsb) {
+      void this.sonyUsb.disconnect();
     }
-    this.crsdkClient = null;
+    this.sonyUsb = null;
   }
 
-  // ─── Sony USB (Camera Remote SDK) connection ──────────────────────────
+  // ─── Sony USB (PTP vendor extension) connection ───────────────────────
 
   private async connectSonyUsb(ws: WebSocket): Promise<void> {
     this.disconnectCurrent();
 
-    const client = new SonyCrsdkClient();
-    this.crsdkClient = client;
-
-    // Surface scan diagnostics (missing native module, no camera, …) to the UI.
-    client.on('scanInfo', (reason: string) => this.sendError(ws, reason));
-
-    const devices = await client.scanUsbDevices();
+    const { discoverSonyUsbCameras } = await import('./discovery/SonyUsbDiscovery.js');
+    const { devices, reason } = await discoverSonyUsbCameras();
     if (devices.length === 0) {
-      this.crsdkClient = null;
       throw new Error(
-        'Keine Sony-Kamera am USB gefunden. Kamera in den Modus „PC Remote" versetzen.',
+        reason ?? 'Keine Sony-Kamera am USB gefunden. Kamera in den Modus „PC Remote" versetzen.',
       );
     }
 
-    const target =
-      devices.find((d) => d.id === this.config.usbDeviceId) ?? devices[0];
+    const found = devices.find((d) => d.id === this.config.usbDeviceId) ?? devices[0];
+    const target: SonyPtpTarget = { id: found.id, model: found.model };
     this.config = { ...this.config, usbDeviceId: target.id, usbDeviceModel: target.model };
     this.broadcast({ type: 'config', config: this.config });
 
-    this.wireCrsdkEvents();
+    const client = new SonyPtpUsbClient();
+    this.sonyUsb = client;
+    this.wireSonyUsbEvents();
     await client.connect(target);
   }
 
-  private wireCrsdkEvents(): void {
-    if (!this.crsdkClient) return;
+  private wireSonyUsbEvents(): void {
+    if (!this.sonyUsb) return;
     const camNum = this.config.ccuId ?? 0;
 
-    this.crsdkClient.on('connected', (device) => {
-      console.log('[BridgeServer] Sony USB camera connected:', device);
-      this.broadcast({ type: 'connected', info: device });
-      // Control runs through the Sony Camera Remote SDK; without the native
-      // binding present it operates in simulation. Tell the UI either way.
-      this.broadcast({ type: 'controlMode', mode: 'sony-crsdk' });
+    this.sonyUsb.on('connected', (target: SonyPtpTarget) => {
+      console.log('[BridgeServer] Sony USB camera connected:', target);
+      this.broadcast({ type: 'connected', info: target });
       this.companion.setConnected(true);
     });
 
-    this.crsdkClient.on('stateChanged', (state: CrsdkCameraState) => {
-      const mapped = this.mapCrsdkState(state);
+    this.sonyUsb.on('stateChanged', (state: SonyPtpState) => {
+      const mapped = this.mapSonyUsbState(state);
       const mergedState = { ...(this.cameraStates.get(camNum) ?? {}), ...mapped };
       this.cameraStates.set(camNum, mergedState);
       this.broadcast({ type: 'state', cameraNumber: camNum, state: mergedState });
       this.companion.updateCameraStateFor(camNum, mergedState as Record<string, unknown>);
     });
 
-    this.crsdkClient.on('disconnected', () => {
+    this.sonyUsb.on('disconnected', () => {
       this.broadcast({ type: 'disconnected' });
       this.companion.setConnected(false);
     });
 
-    this.crsdkClient.on('error', (err: Error) => {
+    this.sonyUsb.on('error', (err: Error) => {
       console.error('[BridgeServer] Sony USB error:', err);
       this.broadcast({ type: 'error', message: err.message });
     });
   }
 
-  /** Map the CRSDK camera state onto the dashboard's CameraState shape. */
-  private mapCrsdkState(state: CrsdkCameraState): Partial<CameraState> {
+  /** Map the PTP camera state onto the dashboard's CameraState shape. */
+  private mapSonyUsbState(state: SonyPtpState): Partial<CameraState> {
     return {
-      // iris is F-number*100 in CRSDK; dashboard uses a 0-255 scale (F1.4-F22).
-      iris: Math.round(((state.iris / 100 - 1.4) / 20.6) * 255),
-      bars: false,
+      iris: state.iris, // already on the 0-255 RCP scale
+      masterGain: state.masterGain,
+      shutterSpeed: state.shutterSpeed,
     };
   }
 
@@ -428,7 +421,7 @@ export class BridgeServer {
   ): Promise<void> {
     const isLumix = this.lumixClient?.connected ?? false;
     const isSony = this.ccuClient?.connected ?? false;
-    const isSonyUsb = this.crsdkClient !== null;
+    const isSonyUsb = this.sonyUsb?.isConnected ?? false;
 
     if (!isLumix && !isSony && !isSonyUsb) {
       this.sendError(ws, 'Not connected to any camera');
@@ -443,10 +436,11 @@ export class BridgeServer {
     const stateUpdates: Partial<CameraState> = {};
 
     if (isSonyUsb) {
-      // ── Sony Camera Remote SDK routing (FX3/FX6/A7 via USB) ───────────────
+      // ── Sony PTP routing (FX3/FX6/A7 via USB) ─────────────────────────────
       // The client maps RCP commands to camera properties and emits
-      // `stateChanged`, which is broadcast back to the UI via wireCrsdkEvents.
-      await this.crsdkClient!.handleRcpCommand(cmd, params);
+      // `stateChanged`, which is broadcast back to the UI via wireSonyUsbEvents.
+      const handled = await this.sonyUsb!.handleRcpCommand(cmd, params);
+      if (!handled) this.sendError(ws, `'${cmd}' wird über Sony USB/PTP nicht unterstützt`);
       return;
     } else if (isLumix) {
       // ── Lumix command routing ─────────────────────────────────────────────
