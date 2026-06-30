@@ -25,6 +25,7 @@ export default function App() {
     ports,
     wiznetDevices,
     sonyUsbDevices,
+    sonyMncDevices,
     tally,
     errorMsg,
     send,
@@ -35,6 +36,7 @@ export default function App() {
     discoverWiznet,
     configureWiznet,
     discoverSonyUsb,
+    discoverSonyMnc,
     setTally,
   } = useBridge();
 
@@ -115,9 +117,11 @@ export default function App() {
             config={config}
             ports={ports}
             sonyUsbDevices={sonyUsbDevices}
+            sonyMncDevices={sonyMncDevices}
             onSetConfig={setConfig}
             onListPorts={listPorts}
             onDiscoverSonyUsb={discoverSonyUsb}
+            onDiscoverSonyMnc={discoverSonyMnc}
             onConnect={connectCamera}
             onDisconnect={disconnectCamera}
             cameraConnected={cameraConnected}

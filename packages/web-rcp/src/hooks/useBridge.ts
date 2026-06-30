@@ -3,7 +3,7 @@
  */
 
 import { useEffect, useRef, useCallback, useState } from 'react';
-import type { CameraState, CameraStatesByNumber, BridgeConfig, WiznetDevice, SonyUsbDevice, TallyState } from '../types.ts';
+import type { CameraState, CameraStatesByNumber, BridgeConfig, WiznetDevice, SonyUsbDevice, SonyMncDevice, TallyState } from '../types.ts';
 
 export type ConnectionStatus = 'idle' | 'connecting' | 'connected' | 'error' | 'disconnected';
 
@@ -16,6 +16,7 @@ interface UseBridgeReturn {
   ports: string[];
   wiznetDevices: WiznetDevice[];
   sonyUsbDevices: SonyUsbDevice[];
+  sonyMncDevices: SonyMncDevice[];
   tally: TallyState;
   errorMsg: string | null;
   send: (type: string, payload?: Record<string, unknown>) => void;
@@ -26,6 +27,7 @@ interface UseBridgeReturn {
   discoverWiznet: () => void;
   configureWiznet: (deviceIp: string, deviceConfig: Record<string, unknown>) => void;
   discoverSonyUsb: () => void;
+  discoverSonyMnc: () => void;
   setTally: (tally: Partial<TallyState>) => void;
 }
 
@@ -48,6 +50,7 @@ export function useBridge(): UseBridgeReturn {
   const [ports, setPorts] = useState<string[]>([]);
   const [wiznetDevices, setWiznetDevices] = useState<WiznetDevice[]>([]);
   const [sonyUsbDevices, setSonyUsbDevices] = useState<SonyUsbDevice[]>([]);
+  const [sonyMncDevices, setSonyMncDevices] = useState<SonyMncDevice[]>([]);
   const [tally, setTallyState] = useState<TallyState>({ program: false, preview: false, isoRec: false });
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -112,6 +115,9 @@ export function useBridge(): UseBridgeReturn {
               setErrorMsg(null);
             }
             break;
+          case 'sonyMncDevices':
+            setSonyMncDevices(msg.devices as SonyMncDevice[]);
+            break;
           case 'wiznetConfigResult':
             if (msg.success) {
               setErrorMsg(null);
@@ -167,10 +173,11 @@ export function useBridge(): UseBridgeReturn {
   }, [send]);
 
   const discoverSonyUsb = useCallback(() => send('discoverSonyUsb'), [send]);
+  const discoverSonyMnc = useCallback(() => send('discoverSonyMnc'), [send]);
 
   const setTally = useCallback((t: Partial<TallyState>) => {
     send('setTally', { tally: t });
   }, [send]);
 
-  return { status, cameraConnected, state, cameraStates, config, ports, wiznetDevices, sonyUsbDevices, tally, errorMsg, send, connectCamera, disconnectCamera, listPorts, setConfig, discoverWiznet, configureWiznet, discoverSonyUsb, setTally };
+  return { status, cameraConnected, state, cameraStates, config, ports, wiznetDevices, sonyUsbDevices, sonyMncDevices, tally, errorMsg, send, connectCamera, disconnectCamera, listPorts, setConfig, discoverWiznet, configureWiznet, discoverSonyUsb, discoverSonyMnc, setTally };
 }
