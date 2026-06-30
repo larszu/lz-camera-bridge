@@ -3,7 +3,7 @@
  */
 
 import { useEffect, useRef, useCallback, useState } from 'react';
-import type { CameraState, CameraStatesByNumber, BridgeConfig, WiznetDevice, SonyUsbDevice, SonyMncDevice, TallyState } from '../types.ts';
+import type { CameraState, CameraStatesByNumber, BridgeConfig, WiznetDevice, SonyUsbDevice, SonyMncDevice, HidDevice, TallyState } from '../types.ts';
 
 export type ConnectionStatus = 'idle' | 'connecting' | 'connected' | 'error' | 'disconnected';
 
@@ -17,6 +17,8 @@ interface UseBridgeReturn {
   wiznetDevices: WiznetDevice[];
   sonyUsbDevices: SonyUsbDevice[];
   sonyMncDevices: SonyMncDevice[];
+  hidDevices: HidDevice[];
+  controlSurfaceActive: boolean;
   tally: TallyState;
   errorMsg: string | null;
   send: (type: string, payload?: Record<string, unknown>) => void;
@@ -28,6 +30,9 @@ interface UseBridgeReturn {
   configureWiznet: (deviceIp: string, deviceConfig: Record<string, unknown>) => void;
   discoverSonyUsb: () => void;
   discoverSonyMnc: () => void;
+  listHidDevices: () => void;
+  enableControlSurface: (surface: Record<string, unknown>) => void;
+  disableControlSurface: () => void;
   setTally: (tally: Partial<TallyState>) => void;
 }
 
@@ -51,6 +56,8 @@ export function useBridge(): UseBridgeReturn {
   const [wiznetDevices, setWiznetDevices] = useState<WiznetDevice[]>([]);
   const [sonyUsbDevices, setSonyUsbDevices] = useState<SonyUsbDevice[]>([]);
   const [sonyMncDevices, setSonyMncDevices] = useState<SonyMncDevice[]>([]);
+  const [hidDevices, setHidDevices] = useState<HidDevice[]>([]);
+  const [controlSurfaceActive, setControlSurfaceActive] = useState(false);
   const [tally, setTallyState] = useState<TallyState>({ program: false, preview: false, isoRec: false });
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -118,6 +125,13 @@ export function useBridge(): UseBridgeReturn {
           case 'sonyMncDevices':
             setSonyMncDevices(msg.devices as SonyMncDevice[]);
             break;
+          case 'hidDevices':
+            setHidDevices(msg.devices as HidDevice[]);
+            if ((msg.devices as HidDevice[]).length === 0 && msg.reason) setErrorMsg(msg.reason as string);
+            break;
+          case 'controlSurface':
+            setControlSurfaceActive(Boolean(msg.active));
+            break;
           case 'wiznetConfigResult':
             if (msg.success) {
               setErrorMsg(null);
@@ -174,10 +188,13 @@ export function useBridge(): UseBridgeReturn {
 
   const discoverSonyUsb = useCallback(() => send('discoverSonyUsb'), [send]);
   const discoverSonyMnc = useCallback(() => send('discoverSonyMnc'), [send]);
+  const listHidDevices = useCallback(() => send('listHidDevices'), [send]);
+  const enableControlSurface = useCallback((surface: Record<string, unknown>) => send('enableControlSurface', { surface }), [send]);
+  const disableControlSurface = useCallback(() => send('disableControlSurface'), [send]);
 
   const setTally = useCallback((t: Partial<TallyState>) => {
     send('setTally', { tally: t });
   }, [send]);
 
-  return { status, cameraConnected, state, cameraStates, config, ports, wiznetDevices, sonyUsbDevices, sonyMncDevices, tally, errorMsg, send, connectCamera, disconnectCamera, listPorts, setConfig, discoverWiznet, configureWiznet, discoverSonyUsb, discoverSonyMnc, setTally };
+  return { status, cameraConnected, state, cameraStates, config, ports, wiznetDevices, sonyUsbDevices, sonyMncDevices, hidDevices, controlSurfaceActive, tally, errorMsg, send, connectCamera, disconnectCamera, listPorts, setConfig, discoverWiznet, configureWiznet, discoverSonyUsb, discoverSonyMnc, listHidDevices, enableControlSurface, disableControlSurface, setTally };
 }

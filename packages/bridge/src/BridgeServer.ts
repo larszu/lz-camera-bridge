@@ -23,12 +23,24 @@ import { SonyPtpUsbClient, SonyPtpState, SonyPtpTarget } from './cameras/SonyPtp
 import { BMDeviceClient, BMCameraState } from './cameras/BMDeviceClient.js';
 import { SonyMncClient, MncCameraState } from './cameras/SonyMncClient.js';
 import { CanonCcapiClient } from './cameras/CanonCcapiClient.js';
+import { GenericCameraClient } from './cameras/GenericCameraClient.js';
+import { ZCamClient } from './cameras/ZCamClient.js';
+import { PanasonicPtzClient } from './cameras/PanasonicPtzClient.js';
+import { ViscaClient } from './cameras/ViscaClient.js';
+import { JvcClient } from './cameras/JvcClient.js';
+import { BirddogClient } from './cameras/BirddogClient.js';
+import { HidControlSurface, HidSurfaceConfig } from './input/HidControlSurface.js';
 import { WiznetDiscovery, WiznetDevice, WiznetDeviceConfig } from './discovery/WiznetDiscovery.js';
 import { CompanionServer, TallyState } from './companion/CompanionServer.js';
 
+/** Connection modes routed through the GenericCameraClient code path. */
+const GENERIC_MODES = ['zcam', 'panasonic-ptz', 'visca', 'jvc', 'birddog'] as const;
+type GenericMode = (typeof GENERIC_MODES)[number];
+
 export interface BridgeConfig {
   /** Connection mode */
-  connectionMode?: 'tcp' | 'serial' | 'lumix-http' | 'sony-usb' | 'blackmagic' | 'sony-mnc' | 'canon-ccapi';
+  connectionMode?: 'tcp' | 'serial' | 'lumix-http' | 'sony-usb' | 'blackmagic' | 'sony-mnc' | 'canon-ccapi'
+    | 'zcam' | 'panasonic-ptz' | 'visca' | 'jvc' | 'birddog';
   /** 700PTP TCP host */
   tcpHost?: string;
   /** 700PTP TCP port (default 7700) */
@@ -58,15 +70,20 @@ export interface BridgeConfig {
   canonHost?: string;
   /** Canon CCAPI: port (default 8080) */
   canonPort?: number;
+  /** Generic network camera (Z CAM / Panasonic PTZ / VISCA / JVC / BirdDog): IP */
+  camHost?: string;
+  /** Generic network camera: port (mode-specific default applied if unset) */
+  camPort?: number;
 }
 
 interface ClientMessage {
-  type: 'command' | 'connect' | 'disconnect' | 'listPorts' | 'getConfig' | 'setConfig' | 'discoverWiznet' | 'configureWiznet' | 'discoverSonyUsb' | 'discoverSonyMnc' | 'setTally' | 'getTally';
+  type: 'command' | 'connect' | 'disconnect' | 'listPorts' | 'getConfig' | 'setConfig' | 'discoverWiznet' | 'configureWiznet' | 'discoverSonyUsb' | 'discoverSonyMnc' | 'listHidDevices' | 'enableControlSurface' | 'disableControlSurface' | 'setTally' | 'getTally';
   cmd?: string;
   params?: Record<string, unknown>;
   config?: BridgeConfig;
   deviceIp?: string;
   deviceConfig?: WiznetDeviceConfig;
+  surface?: HidSurfaceConfig;
   tally?: Partial<TallyState>;
 }
 
@@ -79,6 +96,8 @@ export class BridgeServer {
   private bmClient: BMDeviceClient | null = null;
   private sonyMnc: SonyMncClient | null = null;
   private canon: CanonCcapiClient | null = null;
+  private generic: GenericCameraClient | null = null;
+  private hidSurface: HidControlSurface | null = null;
   private rs422: Rs422Transport | null = null;
   private wiznetDiscovery = new WiznetDiscovery();
   private companion = new CompanionServer();
@@ -121,8 +140,8 @@ export class BridgeServer {
   }
 
   stop(): void {
-    this.ccuClient?.disconnect();
-    this.lumixClient?.disconnect();
+    this.disableControlSurface();
+    this.disconnectCurrent();
     this.rs422?.close();
     this.companion.stop();
     this.wss.close();
@@ -196,6 +215,8 @@ export class BridgeServer {
           await this.connectSonyMnc();
         } else if (this.config.connectionMode === 'canon-ccapi') {
           await this.connectCanon();
+        } else if (GENERIC_MODES.includes(this.config.connectionMode as GenericMode)) {
+          await this.connectGeneric(this.config.connectionMode as GenericMode);
         } else {
           await this.connectTcp();
         }
@@ -247,6 +268,26 @@ export class BridgeServer {
         ws.send(JSON.stringify({ type: 'sonyMncDevices', devices }));
         break;
       }
+
+      case 'listHidDevices': {
+        const { listHidDevices } = await import('./input/HidControlSurface.js');
+        const { devices, reason } = await listHidDevices();
+        ws.send(JSON.stringify({ type: 'hidDevices', devices, reason }));
+        break;
+      }
+
+      case 'enableControlSurface': {
+        if (!msg.surface) {
+          this.sendError(ws, 'Missing control-surface config');
+          break;
+        }
+        await this.enableControlSurface(msg.surface);
+        break;
+      }
+
+      case 'disableControlSurface':
+        this.disableControlSurface();
+        break;
 
       case 'setTally': {
         if (msg.tally) {
@@ -319,6 +360,86 @@ export class BridgeServer {
       this.canon.disconnect();
     }
     this.canon = null;
+    if (this.generic) {
+      void this.generic.disconnect();
+    }
+    this.generic = null;
+  }
+
+  // ─── Generic network camera (Z CAM / Panasonic PTZ / VISCA / JVC / BirdDog) ──
+
+  private async connectGeneric(mode: GenericMode): Promise<void> {
+    const host = this.config.camHost;
+    if (!host) throw new Error('Keine Kamera-IP konfiguriert');
+    this.disconnectCurrent();
+
+    const defaultPort: Record<GenericMode, number> = {
+      zcam: 80,
+      'panasonic-ptz': 80,
+      visca: 1259,
+      jvc: 80,
+      birddog: 8080,
+    };
+    const port = this.config.camPort ?? defaultPort[mode];
+
+    const client: GenericCameraClient =
+      mode === 'zcam' ? new ZCamClient(host, port)
+      : mode === 'panasonic-ptz' ? new PanasonicPtzClient(host, port)
+      : mode === 'visca' ? new ViscaClient(host, port)
+      : mode === 'jvc' ? new JvcClient(host, port)
+      : new BirddogClient(host, port);
+
+    this.generic = client;
+    const camNum = this.config.ccuId ?? 0;
+
+    client.on('connected', (info) => {
+      console.log(`[BridgeServer] ${mode} camera connected`);
+      this.broadcast({ type: 'connected', info });
+      this.companion.setConnected(true);
+    });
+    client.on('stateChanged', (state: Partial<CameraState>) => {
+      const merged = { ...(this.cameraStates.get(camNum) ?? {}), ...state };
+      this.cameraStates.set(camNum, merged);
+      this.broadcast({ type: 'state', cameraNumber: camNum, state: merged });
+      this.companion.updateCameraStateFor(camNum, merged as Record<string, unknown>);
+    });
+    client.on('disconnected', () => {
+      this.broadcast({ type: 'disconnected' });
+      this.companion.setConnected(false);
+    });
+    client.on('error', (err: Error) => {
+      console.error(`[BridgeServer] ${mode} error:`, err);
+      this.broadcast({ type: 'error', message: err.message });
+    });
+
+    await client.connect();
+  }
+
+  // ─── HID control surface (e.g. a Blackmagic USB-C control panel) ────────
+
+  private async enableControlSurface(surface: HidSurfaceConfig): Promise<void> {
+    this.disableControlSurface();
+    const hid = new HidControlSurface(surface);
+    this.hidSurface = hid;
+
+    // Panel input drives the bridge's command bus → controls whatever camera
+    // is currently connected, regardless of brand.
+    hid.on('command', ({ cmd, params }: { cmd: string; params: Record<string, unknown> }) => {
+      const dummyWs = { readyState: WebSocket.OPEN, send: () => {} } as unknown as WebSocket;
+      void this.dispatchCameraCommand(dummyWs, cmd, params);
+    });
+    hid.on('started', (info) => this.broadcast({ type: 'controlSurface', active: true, info }));
+    hid.on('stopped', () => this.broadcast({ type: 'controlSurface', active: false }));
+    hid.on('error', (err: Error) => this.broadcast({ type: 'error', message: `Control surface: ${err.message}` }));
+
+    await hid.start();
+  }
+
+  private disableControlSurface(): void {
+    if (this.hidSurface) {
+      this.hidSurface.stop();
+      this.hidSurface = null;
+    }
   }
 
   // ─── Blackmagic REST connection ────────────────────────────────────────
@@ -591,8 +712,9 @@ export class BridgeServer {
     const isBlackmagic = this.bmClient?.isConnected ?? false;
     const isSonyMnc = this.sonyMnc?.isConnected ?? false;
     const isCanon = this.canon?.isConnected ?? false;
+    const isGeneric = this.generic?.isConnected ?? false;
 
-    if (!isLumix && !isSony && !isSonyUsb && !isBlackmagic && !isSonyMnc && !isCanon) {
+    if (!isLumix && !isSony && !isSonyUsb && !isBlackmagic && !isSonyMnc && !isCanon && !isGeneric) {
       this.sendError(ws, 'Not connected to any camera');
       return;
     }
@@ -624,6 +746,11 @@ export class BridgeServer {
     } else if (isSonyMnc) {
       // ── Sony Monitor & Control (WiFi) routing ─────────────────────────────
       await this.sonyMnc!.handleRcpCommand(cmd, params);
+      return;
+    } else if (isGeneric) {
+      // ── Generic network camera routing (Z CAM / Panasonic PTZ / VISCA / JVC / BirdDog) ──
+      const handled = await this.generic!.handleRcpCommand(cmd, params);
+      if (!handled) this.sendError(ws, `'${cmd}' wird von dieser Kamera nicht unterstützt`);
       return;
     } else if (isLumix) {
       // ── Lumix command routing ─────────────────────────────────────────────

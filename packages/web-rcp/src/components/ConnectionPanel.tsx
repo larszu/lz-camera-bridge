@@ -1,24 +1,38 @@
 import React, { useState, useEffect } from 'react';
-import type { BridgeConfig, SonyUsbDevice, SonyMncDevice } from '../types.ts';
+import type { BridgeConfig, ConnectionMode, SonyUsbDevice, SonyMncDevice, HidDevice } from '../types.ts';
 
-type ConnMode = 'tcp' | 'serial' | 'lumix-http' | 'sony-usb' | 'blackmagic' | 'sony-mnc' | 'canon-ccapi';
+type ConnMode = ConnectionMode;
+
+/** Generic network-camera modes that share the camHost/camPort fields. */
+const GENERIC_MODES: { id: ConnMode; label: string; port: number; hint: string }[] = [
+  { id: 'zcam', label: 'Z CAM', port: 80, hint: 'Z CAM E2 / F-Serie – HTTP-Control-API' },
+  { id: 'panasonic-ptz', label: 'Panasonic PTZ', port: 80, hint: 'AW-UE/HE-Serie – HTTP CGI (AW-Protokoll)' },
+  { id: 'visca', label: 'VISCA over IP', port: 1259, hint: 'PTZOptics, Marshall, AVer, Sony/Pana PTZ … (UDP)' },
+  { id: 'jvc', label: 'JVC ConnectedCam', port: 80, hint: 'GY-HC/HM-Serie – HTTP-API' },
+  { id: 'birddog', label: 'BirdDog', port: 8080, hint: 'BirdDog NDI PTZ – REST-API' },
+];
 
 interface Props {
   config: BridgeConfig;
   ports: string[];
   sonyUsbDevices: SonyUsbDevice[];
   sonyMncDevices: SonyMncDevice[];
+  hidDevices: HidDevice[];
+  controlSurfaceActive: boolean;
   onSetConfig: (cfg: Partial<BridgeConfig>) => void;
   onListPorts: () => void;
   onDiscoverSonyUsb: () => void;
   onDiscoverSonyMnc: () => void;
+  onListHidDevices: () => void;
+  onEnableControlSurface: (surface: Record<string, unknown>) => void;
+  onDisableControlSurface: () => void;
   onConnect: () => void;
   onDisconnect: () => void;
   cameraConnected: boolean;
   wsStatus: string;
 }
 
-export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices, onSetConfig, onListPorts, onDiscoverSonyUsb, onDiscoverSonyMnc, onConnect, onDisconnect, cameraConnected, wsStatus }: Props) {
+export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices, hidDevices, controlSurfaceActive, onSetConfig, onListPorts, onDiscoverSonyUsb, onDiscoverSonyMnc, onListHidDevices, onEnableControlSurface, onDisableControlSurface, onConnect, onDisconnect, cameraConnected, wsStatus }: Props) {
   const [mode, setMode] = useState<ConnMode>(config.connectionMode ?? 'tcp');
   const [host, setHost] = useState(config.tcpHost ?? '192.168.1.10');
   const [port, setPort] = useState(String(config.tcpPort ?? 7700));
@@ -33,6 +47,11 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices,
   const [mncPort, setMncPort] = useState(String(config.mncPort ?? 10000));
   const [canonHost, setCanonHost] = useState(config.canonHost ?? '192.168.1.2');
   const [canonPort, setCanonPort] = useState(String(config.canonPort ?? 8080));
+  const [camHost, setCamHost] = useState(config.camHost ?? '192.168.1.100');
+  const [camPort, setCamPort] = useState(String(config.camPort ?? 80));
+  const [hidSel, setHidSel] = useState('');
+
+  const genericMeta = GENERIC_MODES.find((g) => g.id === mode);
 
   useEffect(() => {
     if (mode === 'serial') onListPorts();
@@ -55,6 +74,8 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices,
     if (config.mncPort) setMncPort(String(config.mncPort));
     if (config.canonHost) setCanonHost(config.canonHost);
     if (config.canonPort) setCanonPort(String(config.canonPort));
+    if (config.camHost) setCamHost(config.camHost);
+    if (config.camPort) setCamPort(String(config.camPort));
   }, [config]);
 
   // Auto-select the first discovered camera when none is chosen yet.
@@ -63,6 +84,12 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices,
       setUsbDeviceId(sonyUsbDevices[0].id);
     }
   }, [sonyUsbDevices, mode, usbDeviceId]);
+
+  // Apply the mode's default port when switching into a generic camera tab.
+  useEffect(() => {
+    if (genericMeta) setCamPort(String(genericMeta.port));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode]);
 
   const applyAndConnect = () => {
     const cfg: Partial<BridgeConfig> = { connectionMode: mode };
@@ -87,6 +114,10 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices,
     } else if (mode === 'canon-ccapi') {
       cfg.canonHost = canonHost;
       cfg.canonPort = Number(canonPort);
+      cfg.ccuId = Number(ccuId);
+    } else if (genericMeta) {
+      cfg.camHost = camHost;
+      cfg.camPort = Number(camPort);
       cfg.ccuId = Number(ccuId);
     } else {
       cfg.serialPath = serialPath;
@@ -123,6 +154,15 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices,
         <button className={`mode-tab ${mode === 'sony-mnc' ? 'mode-tab--active' : ''}`} onClick={() => setMode('sony-mnc')}>
           Sony WiFi (M&C)
         </button>
+        {GENERIC_MODES.map((g) => (
+          <button
+            key={g.id}
+            className={`mode-tab ${mode === g.id ? 'mode-tab--active' : ''}`}
+            onClick={() => setMode(g.id)}
+          >
+            {g.label}
+          </button>
+        ))}
       </div>
 
       {mode === 'tcp' && (
@@ -288,12 +328,77 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices,
         </div>
       )}
 
+      {genericMeta && (
+        <div className="connection-row">
+          <div className="field">
+            <label>Kamera IP / Hostname</label>
+            <input value={camHost} onChange={(e) => setCamHost(e.target.value)} placeholder="192.168.1.100" />
+          </div>
+          <div className="field field--sm">
+            <label>Port</label>
+            <input value={camPort} onChange={(e) => setCamPort(e.target.value)} type="number" />
+          </div>
+          <div className="field field--sm">
+            <label>Kamera-Nr.</label>
+            <input value={ccuId} onChange={(e) => setCcuId(e.target.value)} placeholder="0" type="number" />
+          </div>
+          <div className="field" style={{ alignSelf: 'flex-end', paddingBottom: '0.25rem' }}>
+            <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>{genericMeta.hint}</span>
+          </div>
+        </div>
+      )}
+
       <div className="connection-actions">
         {cameraConnected ? (
           <button className="btn btn--danger" onClick={onDisconnect}>Disconnect</button>
         ) : (
           <button className="btn btn--primary" onClick={applyAndConnect}>Connect</button>
         )}
+      </div>
+
+      {/* ── Control surface (e.g. Blackmagic USB-C panel) ── */}
+      <div className="control-surface">
+        <div className="control-surface__head">
+          <span className="panel__subtitle">Bedienpult (USB-HID)</span>
+          <span className={`status-dot status-dot--${controlSurfaceActive ? 'ok' : 'err'}`} />
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+            {controlSurfaceActive ? 'aktiv' : 'inaktiv'}
+          </span>
+        </div>
+        <div className="serial-port-row">
+          <select value={hidSel} onChange={(e) => setHidSel(e.target.value)} className="select-group__select">
+            <option value="">– Gerät wählen –</option>
+            {hidDevices.map((d) => {
+              const id = `${d.vendorId}:${d.productId}:${d.path ?? ''}`;
+              return (
+                <option key={id} value={id}>
+                  {(d.product || 'HID') + (d.manufacturer ? ` (${d.manufacturer})` : '')} [{d.vendorId.toString(16)}:{d.productId.toString(16)}]
+                </option>
+              );
+            })}
+          </select>
+          <button className="btn btn--sm" onClick={onListHidDevices} title="HID-Geräte scannen">⟳</button>
+        </div>
+        <div className="connection-actions" style={{ marginTop: 6 }}>
+          {controlSurfaceActive ? (
+            <button className="btn btn--danger btn--sm" onClick={onDisableControlSurface}>Panel trennen</button>
+          ) : (
+            <button
+              className="btn btn--primary btn--sm"
+              disabled={!hidSel}
+              onClick={() => {
+                const d = hidDevices.find((x) => `${x.vendorId}:${x.productId}:${x.path ?? ''}` === hidSel);
+                if (d) onEnableControlSurface({ vendorId: d.vendorId, productId: d.productId, path: d.path, bindings: [] });
+              }}
+            >
+              Panel aktivieren
+            </button>
+          )}
+        </div>
+        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+          Das Pult steuert die aktuell verbundene Kamera (jede Marke). Default-Mapping
+          ggf. an dein Gerät anpassen.
+        </span>
       </div>
 
       <div className="status-row">
