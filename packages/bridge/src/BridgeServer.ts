@@ -20,12 +20,15 @@ import { Rs422Transport } from './transport/Rs422Transport.js';
 import { CcuClient, CameraState } from './protocol/CcuClient.js';
 import { LumixClient } from './protocol/LumixClient.js';
 import { SonyPtpUsbClient, SonyPtpState, SonyPtpTarget } from './cameras/SonyPtpUsbClient.js';
+import { BMDeviceClient, BMCameraState } from './cameras/BMDeviceClient.js';
+import { SonyMncClient, MncCameraState } from './cameras/SonyMncClient.js';
+import { CanonCcapiClient } from './cameras/CanonCcapiClient.js';
 import { WiznetDiscovery, WiznetDevice, WiznetDeviceConfig } from './discovery/WiznetDiscovery.js';
 import { CompanionServer, TallyState } from './companion/CompanionServer.js';
 
 export interface BridgeConfig {
-  /** Connection mode: 'tcp', 'serial', 'lumix-http', or 'sony-usb' */
-  connectionMode?: 'tcp' | 'serial' | 'lumix-http' | 'sony-usb';
+  /** Connection mode */
+  connectionMode?: 'tcp' | 'serial' | 'lumix-http' | 'sony-usb' | 'blackmagic' | 'sony-mnc' | 'canon-ccapi';
   /** 700PTP TCP host */
   tcpHost?: string;
   /** 700PTP TCP port (default 7700) */
@@ -43,10 +46,22 @@ export interface BridgeConfig {
   usbDeviceId?: string;
   /** Sony USB (CRSDK): model name of the selected device */
   usbDeviceModel?: string;
+  /** Blackmagic REST: camera hostname/IP (e.g. "192.168.1.50" or "Studio-Camera.local") */
+  bmHost?: string;
+  /** Blackmagic REST: use HTTPS (default false) */
+  bmHttps?: boolean;
+  /** Sony Monitor & Control (WiFi): camera IP */
+  mncHost?: string;
+  /** Sony Monitor & Control (WiFi): port (default 10000) */
+  mncPort?: number;
+  /** Canon CCAPI: camera IP */
+  canonHost?: string;
+  /** Canon CCAPI: port (default 8080) */
+  canonPort?: number;
 }
 
 interface ClientMessage {
-  type: 'command' | 'connect' | 'disconnect' | 'listPorts' | 'getConfig' | 'setConfig' | 'discoverWiznet' | 'configureWiznet' | 'discoverSonyUsb' | 'setTally' | 'getTally';
+  type: 'command' | 'connect' | 'disconnect' | 'listPorts' | 'getConfig' | 'setConfig' | 'discoverWiznet' | 'configureWiznet' | 'discoverSonyUsb' | 'discoverSonyMnc' | 'setTally' | 'getTally';
   cmd?: string;
   params?: Record<string, unknown>;
   config?: BridgeConfig;
@@ -61,6 +76,9 @@ export class BridgeServer {
   private ccuClient: CcuClient | null = null;
   private lumixClient: LumixClient | null = null;
   private sonyUsb: SonyPtpUsbClient | null = null;
+  private bmClient: BMDeviceClient | null = null;
+  private sonyMnc: SonyMncClient | null = null;
+  private canon: CanonCcapiClient | null = null;
   private rs422: Rs422Transport | null = null;
   private wiznetDiscovery = new WiznetDiscovery();
   private companion = new CompanionServer();
@@ -172,6 +190,12 @@ export class BridgeServer {
           await this.connectLumix();
         } else if (this.config.connectionMode === 'sony-usb') {
           await this.connectSonyUsb(ws);
+        } else if (this.config.connectionMode === 'blackmagic') {
+          await this.connectBlackmagic();
+        } else if (this.config.connectionMode === 'sony-mnc') {
+          await this.connectSonyMnc();
+        } else if (this.config.connectionMode === 'canon-ccapi') {
+          await this.connectCanon();
         } else {
           await this.connectTcp();
         }
@@ -213,6 +237,14 @@ export class BridgeServer {
         const { devices, reason } = await discoverSonyUsbCameras();
         console.log(`[BridgeServer] Found ${devices.length} Sony USB device(s)`);
         ws.send(JSON.stringify({ type: 'sonyUsbDevices', devices, reason }));
+        break;
+      }
+
+      case 'discoverSonyMnc': {
+        console.log('[BridgeServer] SSDP scan for Sony WiFi cameras...');
+        const { discoverSonyMncCameras } = await import('./cameras/SonyMncClient.js');
+        const devices = await discoverSonyMncCameras();
+        ws.send(JSON.stringify({ type: 'sonyMncDevices', devices }));
         break;
       }
 
@@ -275,6 +307,140 @@ export class BridgeServer {
       void this.sonyUsb.disconnect();
     }
     this.sonyUsb = null;
+    if (this.bmClient) {
+      this.bmClient.disconnect();
+    }
+    this.bmClient = null;
+    if (this.sonyMnc) {
+      void this.sonyMnc.disconnect();
+    }
+    this.sonyMnc = null;
+    if (this.canon) {
+      this.canon.disconnect();
+    }
+    this.canon = null;
+  }
+
+  // ─── Blackmagic REST connection ────────────────────────────────────────
+
+  private async connectBlackmagic(): Promise<void> {
+    if (!this.config.bmHost) throw new Error('Keine Blackmagic-Kamera-IP konfiguriert');
+    this.disconnectCurrent();
+
+    const client = new BMDeviceClient(this.config.bmHost, this.config.bmHttps ?? false);
+    this.bmClient = client;
+    const camNum = this.config.ccuId ?? 0;
+
+    client.on('connected', (info) => {
+      console.log('[BridgeServer] Blackmagic camera connected:', info);
+      this.broadcast({ type: 'connected', info });
+      this.companion.setConnected(true);
+    });
+    client.on('stateChanged', (state: Partial<BMCameraState>) => {
+      const mapped = this.mapBmState(state);
+      const merged = { ...(this.cameraStates.get(camNum) ?? {}), ...mapped };
+      this.cameraStates.set(camNum, merged);
+      this.broadcast({ type: 'state', cameraNumber: camNum, state: merged });
+      this.companion.updateCameraStateFor(camNum, merged as Record<string, unknown>);
+    });
+    client.on('disconnected', () => {
+      this.broadcast({ type: 'disconnected' });
+      this.companion.setConnected(false);
+    });
+    client.on('error', (err: Error) => {
+      console.error('[BridgeServer] Blackmagic error:', err);
+      this.broadcast({ type: 'error', message: err.message });
+    });
+
+    await client.connect();
+  }
+
+  private mapBmState(state: Partial<BMCameraState>): Partial<CameraState> {
+    const out: Partial<CameraState> = {};
+    if (state.iris && typeof state.iris.normalised === 'number') {
+      out.iris = Math.round(state.iris.normalised * 255);
+    }
+    if (typeof state.gainDb === 'number') out.masterGain = state.gainDb;
+    if (typeof state.shutterSpeed === 'number') out.shutterSpeed = state.shutterSpeed;
+    return out;
+  }
+
+  // ─── Sony Monitor & Control (WiFi) connection ──────────────────────────
+
+  private async connectSonyMnc(): Promise<void> {
+    if (!this.config.mncHost) throw new Error('Keine Sony-WiFi-Kamera-IP konfiguriert');
+    this.disconnectCurrent();
+
+    const client = new SonyMncClient(this.config.mncHost, this.config.mncPort ?? 10000);
+    this.sonyMnc = client;
+    const camNum = this.config.ccuId ?? 0;
+
+    client.on('connected', (info) => {
+      console.log('[BridgeServer] Sony WiFi camera connected:', info);
+      this.broadcast({ type: 'connected', info });
+      this.companion.setConnected(true);
+    });
+    client.on('stateChanged', (state: MncCameraState) => {
+      const mapped = this.mapMncState(state);
+      const merged = { ...(this.cameraStates.get(camNum) ?? {}), ...mapped };
+      this.cameraStates.set(camNum, merged);
+      this.broadcast({ type: 'state', cameraNumber: camNum, state: merged });
+      this.companion.updateCameraStateFor(camNum, merged as Record<string, unknown>);
+    });
+    client.on('disconnected', () => {
+      this.broadcast({ type: 'disconnected' });
+      this.companion.setConnected(false);
+    });
+    client.on('error', (err: Error) => {
+      console.error('[BridgeServer] Sony WiFi error:', err);
+      this.broadcast({ type: 'error', message: err.message });
+    });
+
+    await client.connect();
+  }
+
+  private mapMncState(state: MncCameraState): Partial<CameraState> {
+    return {
+      // MNC iris is F-number*100; dashboard uses a 0-255 scale (F1.4-F22).
+      iris: Math.round(((state.iris / 100 - 1.4) / 20.6) * 255),
+      ndFilter: state.ndFilter,
+    };
+  }
+
+  // ─── Canon CCAPI connection ────────────────────────────────────────────
+
+  private async connectCanon(): Promise<void> {
+    if (!this.config.canonHost) throw new Error('Keine Canon-Kamera-IP konfiguriert');
+    this.disconnectCurrent();
+
+    const client = new CanonCcapiClient({
+      host: this.config.canonHost,
+      port: this.config.canonPort ?? 8080,
+    });
+    this.canon = client;
+    const camNum = this.config.ccuId ?? 0;
+
+    client.on('connected', (info) => {
+      console.log('[BridgeServer] Canon camera connected:', info);
+      this.broadcast({ type: 'connected', info });
+      this.companion.setConnected(true);
+    });
+    client.on('stateChanged', (state: CameraState) => {
+      const merged = { ...(this.cameraStates.get(camNum) ?? {}), ...state };
+      this.cameraStates.set(camNum, merged);
+      this.broadcast({ type: 'state', cameraNumber: camNum, state: merged });
+      this.companion.updateCameraStateFor(camNum, merged as Record<string, unknown>);
+    });
+    client.on('disconnected', () => {
+      this.broadcast({ type: 'disconnected' });
+      this.companion.setConnected(false);
+    });
+    client.on('error', (err: Error) => {
+      console.error('[BridgeServer] Canon error:', err);
+      this.broadcast({ type: 'error', message: err.message });
+    });
+
+    await client.connect();
   }
 
   // ─── Sony USB (PTP vendor extension) connection ───────────────────────
@@ -422,8 +588,11 @@ export class BridgeServer {
     const isLumix = this.lumixClient?.connected ?? false;
     const isSony = this.ccuClient?.connected ?? false;
     const isSonyUsb = this.sonyUsb?.isConnected ?? false;
+    const isBlackmagic = this.bmClient?.isConnected ?? false;
+    const isSonyMnc = this.sonyMnc?.isConnected ?? false;
+    const isCanon = this.canon?.isConnected ?? false;
 
-    if (!isLumix && !isSony && !isSonyUsb) {
+    if (!isLumix && !isSony && !isSonyUsb && !isBlackmagic && !isSonyMnc && !isCanon) {
       this.sendError(ws, 'Not connected to any camera');
       return;
     }
@@ -441,6 +610,20 @@ export class BridgeServer {
       // `stateChanged`, which is broadcast back to the UI via wireSonyUsbEvents.
       const handled = await this.sonyUsb!.handleRcpCommand(cmd, params);
       if (!handled) this.sendError(ws, `'${cmd}' wird über Sony USB/PTP nicht unterstützt`);
+      return;
+    } else if (isBlackmagic) {
+      // ── Blackmagic REST routing ───────────────────────────────────────────
+      const handled = await this.bmClient!.handleRcpCommand(cmd, params);
+      if (!handled) this.sendError(ws, `'${cmd}' wird über die Blackmagic-API nicht unterstützt`);
+      return;
+    } else if (isCanon) {
+      // ── Canon CCAPI routing ───────────────────────────────────────────────
+      const handled = await this.canon!.handleRcpCommand(cmd, params);
+      if (!handled) this.sendError(ws, `'${cmd}' wird über Canon CCAPI nicht unterstützt`);
+      return;
+    } else if (isSonyMnc) {
+      // ── Sony Monitor & Control (WiFi) routing ─────────────────────────────
+      await this.sonyMnc!.handleRcpCommand(cmd, params);
       return;
     } else if (isLumix) {
       // ── Lumix command routing ─────────────────────────────────────────────

@@ -1,22 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import type { BridgeConfig, SonyUsbDevice } from '../types.ts';
+import type { BridgeConfig, SonyUsbDevice, SonyMncDevice } from '../types.ts';
 
-type ConnMode = 'tcp' | 'serial' | 'lumix-http' | 'sony-usb';
+type ConnMode = 'tcp' | 'serial' | 'lumix-http' | 'sony-usb' | 'blackmagic' | 'sony-mnc' | 'canon-ccapi';
 
 interface Props {
   config: BridgeConfig;
   ports: string[];
   sonyUsbDevices: SonyUsbDevice[];
+  sonyMncDevices: SonyMncDevice[];
   onSetConfig: (cfg: Partial<BridgeConfig>) => void;
   onListPorts: () => void;
   onDiscoverSonyUsb: () => void;
+  onDiscoverSonyMnc: () => void;
   onConnect: () => void;
   onDisconnect: () => void;
   cameraConnected: boolean;
   wsStatus: string;
 }
 
-export function ConnectionPanel({ config, ports, sonyUsbDevices, onSetConfig, onListPorts, onDiscoverSonyUsb, onConnect, onDisconnect, cameraConnected, wsStatus }: Props) {
+export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices, onSetConfig, onListPorts, onDiscoverSonyUsb, onDiscoverSonyMnc, onConnect, onDisconnect, cameraConnected, wsStatus }: Props) {
   const [mode, setMode] = useState<ConnMode>(config.connectionMode ?? 'tcp');
   const [host, setHost] = useState(config.tcpHost ?? '192.168.1.10');
   const [port, setPort] = useState(String(config.tcpPort ?? 7700));
@@ -26,11 +28,17 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, onSetConfig, on
   const [lumixHost, setLumixHost] = useState(config.lumixHost ?? '192.168.54.1');
   const [lumixPort, setLumixPort] = useState(String(config.lumixPort ?? 80));
   const [usbDeviceId, setUsbDeviceId] = useState(config.usbDeviceId ?? '');
+  const [bmHost, setBmHost] = useState(config.bmHost ?? '192.168.1.50');
+  const [mncHost, setMncHost] = useState(config.mncHost ?? '192.168.122.1');
+  const [mncPort, setMncPort] = useState(String(config.mncPort ?? 10000));
+  const [canonHost, setCanonHost] = useState(config.canonHost ?? '192.168.1.2');
+  const [canonPort, setCanonPort] = useState(String(config.canonPort ?? 8080));
 
   useEffect(() => {
     if (mode === 'serial') onListPorts();
     if (mode === 'sony-usb') onDiscoverSonyUsb();
-  }, [mode, onListPorts, onDiscoverSonyUsb]);
+    if (mode === 'sony-mnc') onDiscoverSonyMnc();
+  }, [mode, onListPorts, onDiscoverSonyUsb, onDiscoverSonyMnc]);
 
   useEffect(() => {
     if (config.connectionMode) setMode(config.connectionMode);
@@ -42,6 +50,11 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, onSetConfig, on
     if (config.lumixHost) setLumixHost(config.lumixHost);
     if (config.lumixPort) setLumixPort(String(config.lumixPort));
     if (config.usbDeviceId) setUsbDeviceId(config.usbDeviceId);
+    if (config.bmHost) setBmHost(config.bmHost);
+    if (config.mncHost) setMncHost(config.mncHost);
+    if (config.mncPort) setMncPort(String(config.mncPort));
+    if (config.canonHost) setCanonHost(config.canonHost);
+    if (config.canonPort) setCanonPort(String(config.canonPort));
   }, [config]);
 
   // Auto-select the first discovered camera when none is chosen yet.
@@ -63,6 +76,17 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, onSetConfig, on
     } else if (mode === 'sony-usb') {
       cfg.usbDeviceId = usbDeviceId;
       cfg.usbDeviceModel = sonyUsbDevices.find((d) => d.id === usbDeviceId)?.model;
+      cfg.ccuId = Number(ccuId);
+    } else if (mode === 'blackmagic') {
+      cfg.bmHost = bmHost;
+      cfg.ccuId = Number(ccuId);
+    } else if (mode === 'sony-mnc') {
+      cfg.mncHost = mncHost;
+      cfg.mncPort = Number(mncPort);
+      cfg.ccuId = Number(ccuId);
+    } else if (mode === 'canon-ccapi') {
+      cfg.canonHost = canonHost;
+      cfg.canonPort = Number(canonPort);
       cfg.ccuId = Number(ccuId);
     } else {
       cfg.serialPath = serialPath;
@@ -89,6 +113,15 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, onSetConfig, on
         </button>
         <button className={`mode-tab ${mode === 'lumix-http' ? 'mode-tab--active' : ''}`} onClick={() => setMode('lumix-http')}>
           Lumix (WiFi/LAN)
+        </button>
+        <button className={`mode-tab ${mode === 'canon-ccapi' ? 'mode-tab--active' : ''}`} onClick={() => setMode('canon-ccapi')}>
+          Canon (CCAPI)
+        </button>
+        <button className={`mode-tab ${mode === 'blackmagic' ? 'mode-tab--active' : ''}`} onClick={() => setMode('blackmagic')}>
+          Blackmagic (REST)
+        </button>
+        <button className={`mode-tab ${mode === 'sony-mnc' ? 'mode-tab--active' : ''}`} onClick={() => setMode('sony-mnc')}>
+          Sony WiFi (M&C)
         </button>
       </div>
 
@@ -181,6 +214,75 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, onSetConfig, on
           <div className="field" style={{ alignSelf: 'flex-end', paddingBottom: '0.25rem' }}>
             <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
               S1, S1R, S1H, S5, S5II, GH5, GH6, BGH1, BS1H
+            </span>
+          </div>
+        </div>
+      )}
+
+      {mode === 'canon-ccapi' && (
+        <div className="connection-row">
+          <div className="field">
+            <label>Canon Kamera IP (CCAPI)</label>
+            <input value={canonHost} onChange={(e) => setCanonHost(e.target.value)} placeholder="192.168.1.2" />
+          </div>
+          <div className="field field--sm">
+            <label>Port</label>
+            <input value={canonPort} onChange={(e) => setCanonPort(e.target.value)} placeholder="8080" type="number" />
+          </div>
+          <div className="field" style={{ alignSelf: 'flex-end', paddingBottom: '0.25rem' }}>
+            <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+              EOS R5/R6/R7/R8/R10… – CCAPI vorher per EOS Utility aktivieren
+            </span>
+          </div>
+        </div>
+      )}
+
+      {mode === 'blackmagic' && (
+        <div className="connection-row">
+          <div className="field">
+            <label>Blackmagic Kamera IP / Hostname</label>
+            <input value={bmHost} onChange={(e) => setBmHost(e.target.value)} placeholder="192.168.1.50" />
+          </div>
+          <div className="field field--sm">
+            <label>Kamera-Nr.</label>
+            <input value={ccuId} onChange={(e) => setCcuId(e.target.value)} placeholder="0" type="number" />
+          </div>
+          <div className="field" style={{ alignSelf: 'flex-end', paddingBottom: '0.25rem' }}>
+            <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+              REST-API (Firmware 8.6+): Pocket 4K/6K, Cinema 6K, Studio/URSA
+            </span>
+          </div>
+        </div>
+      )}
+
+      {mode === 'sony-mnc' && (
+        <div className="connection-row">
+          <div className="field">
+            <label>Sony Kamera IP (WiFi)</label>
+            <div className="serial-port-row">
+              <input value={mncHost} onChange={(e) => setMncHost(e.target.value)} placeholder="192.168.122.1" />
+              <button className="btn btn--sm" onClick={onDiscoverSonyMnc} title="Netzwerk (SSDP) scannen">⟳</button>
+            </div>
+            {sonyMncDevices.length > 0 && (
+              <select
+                className="select-group__select"
+                style={{ marginTop: 4 }}
+                value={mncHost}
+                onChange={(e) => setMncHost(e.target.value)}
+              >
+                {sonyMncDevices.map((d) => (
+                  <option key={d.host} value={d.host}>{d.model} ({d.host})</option>
+                ))}
+              </select>
+            )}
+          </div>
+          <div className="field field--sm">
+            <label>Port</label>
+            <input value={mncPort} onChange={(e) => setMncPort(e.target.value)} placeholder="10000" type="number" />
+          </div>
+          <div className="field" style={{ alignSelf: 'flex-end', paddingBottom: '0.25rem' }}>
+            <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+              „Monitor &amp; Control" / Streaming-Modus an der Kamera aktivieren
             </span>
           </div>
         </div>

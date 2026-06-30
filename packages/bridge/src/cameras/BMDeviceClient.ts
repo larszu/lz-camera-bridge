@@ -99,6 +99,10 @@ export class BMDeviceClient extends EventEmitter {
     return `${protocol}://${this.hostname}/control/api/v1/event/websocket`;
   }
 
+  get isConnected(): boolean {
+    return this.connected;
+  }
+
   /**
    * Connect to the camera
    */
@@ -401,6 +405,96 @@ export class BMDeviceClient extends EventEmitter {
   async toggleRecording(): Promise<void> {
     const state = await this.GET('/transports/0/record') as { recording: boolean };
     await this.PUT('/transports/0/record', { recording: !state.recording });
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // RCP Command Mapping (dashboard/CCU-style controls → Blackmagic REST)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Map the bridge's CCU-style RCP commands onto the Blackmagic REST API.
+   *
+   * The CCU paradigm (master black / gamma / white balance) maps naturally
+   * onto Blackmagic's colour-correction blocks:
+   *   master black   → lift   (shadows)
+   *   master gamma   → gamma  (midtones)
+   *   white balance  → gain   (highlights)
+   *   black balance  → lift R/G/B
+   * Iris uses the 0-255 RCP scale → normalised 0-1; saturation → colour
+   * saturation 0-2; colour temperature is set in Kelvin directly.
+   *
+   * Returns false for commands Blackmagic has no equivalent for, so the
+   * bridge can report them honestly instead of silently dropping them.
+   */
+  async handleRcpCommand(cmd: string, params: Record<string, unknown>): Promise<boolean> {
+    const num = (k: string, d = 0) => Number(params[k] ?? d);
+    // 0-255 (centre 128) → -1..1 around the colour-correction neutral point.
+    const bipolar = (v: number) => Math.max(-1, Math.min(1, (v - 128) / 128));
+
+    switch (cmd) {
+      case 'setIris':
+        await this.setIris(Math.max(0, Math.min(1, num('value') / 255)));
+        return true;
+      case 'setMasterGain':
+        // Treat the gain index as a dB value (Blackmagic gain is in dB).
+        await this.setGain(num('value'));
+        return true;
+      case 'setShutterSpeed':
+        await this.setShutterSpeed(num('value'));
+        return true;
+      case 'setNdFilter':
+        await this.setNdFilter(num('value'));
+        return true;
+      case 'setColorTemp':
+        await this.setWhiteBalance(num('value', 5600));
+        return true;
+      case 'autoWhiteBalance':
+        await this.doAutoWhiteBalance();
+        return true;
+      case 'autoFocus':
+        await this.doAutoFocus();
+        return true;
+      case 'setFocus':
+        await this.setFocus(Math.max(0, Math.min(1, num('value') / 255)));
+        return true;
+      case 'setZoom':
+        await this.setZoom(Math.max(0, Math.min(1, num('value') / 255)));
+        return true;
+      case 'setSaturation':
+        // 0-255 → 0-2 saturation, preserving current hue.
+        await this.setColor(0, Math.max(0, Math.min(2, num('value') / 128)));
+        return true;
+      case 'setMasterBlack':
+        await this.setLift({ red: 0, green: 0, blue: 0, luma: bipolar(num('value')) });
+        return true;
+      case 'setBlackBalance':
+        await this.setLift({
+          red: bipolar(num('r', 128)),
+          green: bipolar(num('g', 128)),
+          blue: bipolar(num('b', 128)),
+          luma: 0,
+        });
+        return true;
+      case 'setMasterGamma':
+        await this.setGamma({ red: 0, green: 0, blue: 0, luma: bipolar(num('value')) });
+        return true;
+      case 'setWhiteBalance':
+        // RGB white-balance trim → highlights (gain) colour, centred on 1.0.
+        await this.setGainCC({
+          red: 1 + bipolar(num('r', 128)),
+          green: 1 + bipolar(num('g', 128)),
+          blue: 1 + bipolar(num('b', 128)),
+          luma: 1,
+        });
+        return true;
+      case 'setRecording':
+        await (Boolean(params['on']) ? this.startRecording() : this.stopRecording());
+        return true;
+      default:
+        // bars, character, camera power, detail level, etc. — no BM equivalent.
+        console.log(`[BMDevice] '${cmd}' wird über die Blackmagic REST-API nicht unterstützt`);
+        return false;
+    }
   }
 
   // ═══════════════════════════════════════════════════════════════════════════

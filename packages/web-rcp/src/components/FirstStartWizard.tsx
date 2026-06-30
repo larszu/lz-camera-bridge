@@ -11,7 +11,7 @@ export function markWizardDone(): void {
   localStorage.setItem(WIZARD_KEY, '1');
 }
 
-type CameraType = 'sony-tcp' | 'sony-serial' | 'sony-usb' | 'lumix';
+type CameraType = 'sony-tcp' | 'sony-serial' | 'sony-usb' | 'lumix' | 'canon' | 'blackmagic' | 'sony-mnc';
 
 interface Props {
   onComplete: (config: Partial<BridgeConfig>) => void;
@@ -35,6 +35,17 @@ export function FirstStartWizard({ onComplete }: Props) {
   const [lumixHost, setLumixHost] = useState('192.168.54.1');
   const [lumixPort, setLumixPort] = useState(80);
 
+  // Canon CCAPI
+  const [canonHost, setCanonHost] = useState('192.168.1.2');
+  const [canonPort, setCanonPort] = useState(8080);
+
+  // Blackmagic REST
+  const [bmHost, setBmHost] = useState('192.168.1.50');
+
+  // Sony WiFi (Monitor & Control)
+  const [mncHost, setMncHost] = useState('192.168.122.1');
+  const [mncPort, setMncPort] = useState(10000);
+
   function buildConfig(): Partial<BridgeConfig> {
     if (cameraType === 'sony-tcp') {
       return { connectionMode: 'tcp', tcpHost, tcpPort };
@@ -44,6 +55,15 @@ export function FirstStartWizard({ onComplete }: Props) {
     }
     if (cameraType === 'sony-usb') {
       return { connectionMode: 'sony-usb' };
+    }
+    if (cameraType === 'canon') {
+      return { connectionMode: 'canon-ccapi', canonHost, canonPort };
+    }
+    if (cameraType === 'blackmagic') {
+      return { connectionMode: 'blackmagic', bmHost };
+    }
+    if (cameraType === 'sony-mnc') {
+      return { connectionMode: 'sony-mnc', mncHost, mncPort };
     }
     return { connectionMode: 'lumix-http', lumixHost, lumixPort };
   }
@@ -90,6 +110,11 @@ export function FirstStartWizard({ onComplete }: Props) {
               baudRate={baudRate} setBaudRate={setBaudRate}
               lumixHost={lumixHost} setLumixHost={setLumixHost}
               lumixPort={lumixPort} setLumixPort={setLumixPort}
+              canonHost={canonHost} setCanonHost={setCanonHost}
+              canonPort={canonPort} setCanonPort={setCanonPort}
+              bmHost={bmHost} setBmHost={setBmHost}
+              mncHost={mncHost} setMncHost={setMncHost}
+              mncPort={mncPort} setMncPort={setMncPort}
             />
           )}
           {step === 3 && <StepDone cameraType={cameraType} config={buildConfig()} />}
@@ -164,8 +189,11 @@ function StepCameraType({ value, onChange }: { value: CameraType; onChange: (v: 
   const options: { id: CameraType; label: string; sub: string; badge?: string }[] = [
     { id: 'sony-tcp', label: 'Sony CCU – TCP / Netzwerk', sub: 'WIZ108SR Adapter oder direkte Netzwerkverbindung (700PTP)', badge: 'empfohlen' },
     { id: 'sony-serial', label: 'Sony CCU – RS-422 Seriell', sub: 'Direkte 8-Pin RS-422 Verbindung via COM-Port' },
-    { id: 'sony-usb', label: 'Sony Alpha / Cinema – USB', sub: 'FX3, FX6, FX9, A7 IV, A7S III, A1 … via Camera Remote SDK' },
+    { id: 'sony-usb', label: 'Sony Alpha / Cinema – USB', sub: 'FX3, FX6, FX9, A7 IV, A7S III, A1 … via PTP (kein SDK nötig)' },
+    { id: 'sony-mnc', label: 'Sony – WiFi (Monitor & Control)', sub: 'FX3/FX6/FX9 im Streaming-Modus über WLAN/LAN' },
+    { id: 'canon', label: 'Canon EOS – CCAPI', sub: 'R5, R6, R7, R8, R10, R50, 1D X III … via HTTP (CCAPI)' },
     { id: 'lumix', label: 'Panasonic Lumix – WiFi / LAN', sub: 'HTTP CGI Protokoll (S1, S5, GH5, GH6, BGH1, BS1H…)' },
+    { id: 'blackmagic', label: 'Blackmagic – REST', sub: 'Pocket 4K/6K, Cinema 6K, Studio/URSA (Firmware 8.6+)' },
   ];
 
   return (
@@ -205,6 +233,11 @@ interface StepConnectionProps {
   baudRate: number; setBaudRate: (v: number) => void;
   lumixHost: string; setLumixHost: (v: string) => void;
   lumixPort: number; setLumixPort: (v: number) => void;
+  canonHost: string; setCanonHost: (v: string) => void;
+  canonPort: number; setCanonPort: (v: number) => void;
+  bmHost: string; setBmHost: (v: string) => void;
+  mncHost: string; setMncHost: (v: string) => void;
+  mncPort: number; setMncPort: (v: number) => void;
 }
 
 function StepConnection(p: StepConnectionProps) {
@@ -328,6 +361,97 @@ function StepConnection(p: StepConnectionProps) {
           </p>
         </>
       )}
+
+      {p.cameraType === 'canon' && (
+        <>
+          <p className="wizard-step__desc">
+            Gib die IP-Adresse und den Port der Canon-Kamera (CCAPI) ein.
+          </p>
+          <div className="wizard-form">
+            <label className="wizard-label">
+              Kamera IP-Adresse
+              <input
+                className="wizard-input"
+                value={p.canonHost}
+                onChange={e => p.setCanonHost(e.target.value)}
+                placeholder="192.168.1.2"
+              />
+            </label>
+            <label className="wizard-label wizard-label--small">
+              Port
+              <input
+                className="wizard-input"
+                type="number"
+                value={p.canonPort}
+                onChange={e => p.setCanonPort(Number(e.target.value))}
+                placeholder="8080"
+              />
+            </label>
+          </div>
+          <p className="wizard-step__hint">
+            Die <strong>CCAPI</strong> muss einmalig per Canon <em>EOS Utility</em> aktiviert
+            werden. Danach zeigt die Kamera IP und Port im Netzwerk-Menü an.
+            Unterstützt: Iris, ISO, Verschluss, Farbtemperatur, Rec.
+          </p>
+        </>
+      )}
+
+      {p.cameraType === 'blackmagic' && (
+        <>
+          <p className="wizard-step__desc">
+            Gib die IP-Adresse oder den Hostnamen der Blackmagic-Kamera ein.
+          </p>
+          <div className="wizard-form">
+            <label className="wizard-label">
+              IP-Adresse / Hostname
+              <input
+                className="wizard-input"
+                value={p.bmHost}
+                onChange={e => p.setBmHost(e.target.value)}
+                placeholder="192.168.1.50"
+              />
+            </label>
+          </div>
+          <p className="wizard-step__hint">
+            Erfordert Blackmagic-Kameras mit <strong>REST-API</strong> (Firmware 8.6+).
+            CCU-Regler werden auf die Farbkorrektur (Lift/Gamma/Gain) gemappt.
+          </p>
+        </>
+      )}
+
+      {p.cameraType === 'sony-mnc' && (
+        <>
+          <p className="wizard-step__desc">
+            Gib die IP-Adresse der Sony-Kamera (WiFi/LAN) ein oder nutze den
+            Netzwerk-Scan im Connection-Panel.
+          </p>
+          <div className="wizard-form">
+            <label className="wizard-label">
+              Kamera IP-Adresse
+              <input
+                className="wizard-input"
+                value={p.mncHost}
+                onChange={e => p.setMncHost(e.target.value)}
+                placeholder="192.168.122.1"
+              />
+            </label>
+            <label className="wizard-label wizard-label--small">
+              Port
+              <input
+                className="wizard-input"
+                type="number"
+                value={p.mncPort}
+                onChange={e => p.setMncPort(Number(e.target.value))}
+                placeholder="10000"
+              />
+            </label>
+          </div>
+          <p className="wizard-step__hint">
+            Aktiviere an der Kamera den <strong>„Monitor &amp; Control"</strong>- bzw.
+            Streaming-Modus. Erkennung im Netzwerk erfolgt per SSDP.
+          </p>
+        </>
+      )}
     </div>
   );
 }
@@ -338,6 +462,9 @@ function StepDone({ cameraType, config }: { cameraType: CameraType; config: Part
     cameraType === 'sony-tcp' ? 'Sony CCU via TCP'
     : cameraType === 'sony-serial' ? 'Sony CCU via RS-422'
     : cameraType === 'sony-usb' ? 'Sony Alpha/Cinema via USB'
+    : cameraType === 'sony-mnc' ? 'Sony WiFi (Monitor & Control)'
+    : cameraType === 'canon' ? 'Canon EOS (CCAPI)'
+    : cameraType === 'blackmagic' ? 'Blackmagic (REST)'
     : 'Panasonic Lumix WiFi';
 
   return (
@@ -369,6 +496,24 @@ function StepDone({ cameraType, config }: { cameraType: CameraType; config: Part
           <div className="wizard-summary__row">
             <span className="wizard-summary__key">Adresse</span>
             <span className="wizard-summary__val">{config.lumixHost}:{config.lumixPort}</span>
+          </div>
+        )}
+        {config.canonHost && (
+          <div className="wizard-summary__row">
+            <span className="wizard-summary__key">Adresse</span>
+            <span className="wizard-summary__val">{config.canonHost}:{config.canonPort}</span>
+          </div>
+        )}
+        {config.bmHost && (
+          <div className="wizard-summary__row">
+            <span className="wizard-summary__key">Adresse</span>
+            <span className="wizard-summary__val">{config.bmHost}</span>
+          </div>
+        )}
+        {config.mncHost && (
+          <div className="wizard-summary__row">
+            <span className="wizard-summary__key">Adresse</span>
+            <span className="wizard-summary__val">{config.mncHost}:{config.mncPort}</span>
           </div>
         )}
       </div>

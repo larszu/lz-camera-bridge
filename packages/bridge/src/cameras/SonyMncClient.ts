@@ -10,6 +10,7 @@
 
 import { EventEmitter } from 'events';
 import http from 'http';
+import dgram from 'dgram';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Types
@@ -51,6 +52,10 @@ export class SonyMncClient extends EventEmitter {
     super();
     this.host = host;
     this.port = port;
+  }
+
+  get isConnected(): boolean {
+    return this.connected;
   }
 
   /**
@@ -316,19 +321,97 @@ export class SonyMncClient extends EventEmitter {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Discovery
+// Discovery (SSDP)
 // ═══════════════════════════════════════════════════════════════════════════
 
+export interface MncDiscoveredCamera {
+  /** IP address parsed from the SSDP LOCATION header */
+  host: string;
+  /** Friendly model string from the SSDP SERVER/USN header, if present */
+  model: string;
+  /** Full device-description URL advertised in LOCATION */
+  location: string;
+}
+
+const SSDP_ADDRESS = '239.255.255.250';
+const SSDP_PORT = 1900;
+// Sony's "Smart Remote"/ScalarWebAPI service. We also accept ssdp:all and
+// filter Sony devices out of the responses, so cameras that advertise a
+// slightly different ST are still found.
+const SONY_SEARCH_TARGETS = [
+  'urn:schemas-sony-com:service:ScalarWebAPI:1',
+  'urn:schemas-upnp-org:device:MediaServer:1',
+];
+
 /**
- * Discover Sony cameras on the network
- * Uses SSDP (Simple Service Discovery Protocol)
+ * Discover Sony cameras on the local network via SSDP M-SEARCH.
+ *
+ * Sends an M-SEARCH datagram to the SSDP multicast group and collects unicast
+ * responses for `timeoutMs`. Responses whose SERVER/USN/LOCATION look like a
+ * Sony device are returned. This is real UDP discovery — it resolves to an
+ * empty list (not a fake device) when nothing answers.
  */
-export async function discoverSonyMncCameras(): Promise<MncCameraInfo[]> {
-  // SSDP discovery implementation
-  // Sony cameras advertise as "urn:schemas-sony-com:service:Camera:1"
-  
-  console.log('[MNC] Discovering cameras...');
-  
-  // Placeholder - in production, send M-SEARCH to 239.255.255.250:1900
-  return [];
+export async function discoverSonyMncCameras(timeoutMs = 3000): Promise<MncDiscoveredCamera[]> {
+  console.log('[MNC] SSDP discovery (M-SEARCH)…');
+
+  const found = new Map<string, MncDiscoveredCamera>();
+  const socket = dgram.createSocket({ type: 'udp4', reuseAddr: true });
+
+  const parseResponse = (msg: Buffer, rinfo: dgram.RemoteInfo) => {
+    const text = msg.toString('utf8');
+    const headers: Record<string, string> = {};
+    for (const line of text.split(/\r?\n/)) {
+      const idx = line.indexOf(':');
+      if (idx > 0) headers[line.slice(0, idx).trim().toUpperCase()] = line.slice(idx + 1).trim();
+    }
+    const blob = `${headers['SERVER'] ?? ''} ${headers['USN'] ?? ''} ${headers['ST'] ?? ''} ${headers['LOCATION'] ?? ''}`.toLowerCase();
+    if (!blob.includes('sony')) return;
+
+    const location = headers['LOCATION'] ?? '';
+    let host = rinfo.address;
+    try {
+      if (location) host = new URL(location).hostname;
+    } catch {
+      /* keep rinfo.address */
+    }
+    found.set(host, { host, model: headers['SERVER'] || 'Sony Camera', location });
+  };
+
+  return new Promise<MncDiscoveredCamera[]>((resolve) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      try {
+        socket.close();
+      } catch {
+        /* ignore */
+      }
+      console.log(`[MNC] SSDP found ${found.size} Sony device(s)`);
+      resolve([...found.values()]);
+    };
+
+    socket.on('message', parseResponse);
+    socket.on('error', () => finish());
+
+    socket.bind(() => {
+      try {
+        socket.setBroadcast(true);
+      } catch {
+        /* ignore */
+      }
+      for (const st of SONY_SEARCH_TARGETS) {
+        const msearch = Buffer.from(
+          'M-SEARCH * HTTP/1.1\r\n' +
+            `HOST: ${SSDP_ADDRESS}:${SSDP_PORT}\r\n` +
+            'MAN: "ssdp:discover"\r\n' +
+            'MX: 2\r\n' +
+            `ST: ${st}\r\n\r\n`,
+        );
+        socket.send(msearch, 0, msearch.length, SSDP_PORT, SSDP_ADDRESS);
+      }
+    });
+
+    setTimeout(finish, timeoutMs);
+  });
 }
