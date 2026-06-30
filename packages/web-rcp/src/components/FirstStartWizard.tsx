@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { BridgeConfig } from '../types.ts';
 
 const WIZARD_KEY = 'scb.wizardDone';
@@ -11,7 +11,17 @@ export function markWizardDone(): void {
   localStorage.setItem(WIZARD_KEY, '1');
 }
 
-type CameraType = 'sony-tcp' | 'sony-serial' | 'sony-usb' | 'lumix' | 'canon' | 'blackmagic' | 'sony-mnc';
+type CameraType = 'sony-tcp' | 'sony-serial' | 'sony-usb' | 'lumix' | 'canon' | 'blackmagic' | 'sony-mnc'
+  | 'zcam' | 'panasonic-ptz' | 'visca' | 'jvc' | 'birddog';
+
+// Generic network-camera types share the camHost/camPort fields.
+const GENERIC_WIZARD: Record<string, { port: number; label: string }> = {
+  zcam: { port: 80, label: 'Z CAM' },
+  'panasonic-ptz': { port: 80, label: 'Panasonic PTZ (AW)' },
+  visca: { port: 1259, label: 'VISCA over IP (PTZ)' },
+  jvc: { port: 80, label: 'JVC ConnectedCam' },
+  birddog: { port: 8080, label: 'BirdDog' },
+};
 
 interface Props {
   onComplete: (config: Partial<BridgeConfig>) => void;
@@ -46,7 +56,19 @@ export function FirstStartWizard({ onComplete }: Props) {
   const [mncHost, setMncHost] = useState('192.168.122.1');
   const [mncPort, setMncPort] = useState(10000);
 
+  // Generic network cameras (Z CAM / Panasonic PTZ / VISCA / JVC / BirdDog)
+  const [camHost, setCamHost] = useState('192.168.1.100');
+  const [camPort, setCamPort] = useState(80);
+
+  useEffect(() => {
+    const g = GENERIC_WIZARD[cameraType];
+    if (g) setCamPort(g.port);
+  }, [cameraType]);
+
   function buildConfig(): Partial<BridgeConfig> {
+    if (GENERIC_WIZARD[cameraType]) {
+      return { connectionMode: cameraType as BridgeConfig['connectionMode'], camHost, camPort };
+    }
     if (cameraType === 'sony-tcp') {
       return { connectionMode: 'tcp', tcpHost, tcpPort };
     }
@@ -115,6 +137,8 @@ export function FirstStartWizard({ onComplete }: Props) {
               bmHost={bmHost} setBmHost={setBmHost}
               mncHost={mncHost} setMncHost={setMncHost}
               mncPort={mncPort} setMncPort={setMncPort}
+              camHost={camHost} setCamHost={setCamHost}
+              camPort={camPort} setCamPort={setCamPort}
             />
           )}
           {step === 3 && <StepDone cameraType={cameraType} config={buildConfig()} />}
@@ -194,6 +218,11 @@ function StepCameraType({ value, onChange }: { value: CameraType; onChange: (v: 
     { id: 'canon', label: 'Canon EOS – CCAPI', sub: 'R5, R6, R7, R8, R10, R50, 1D X III … via HTTP (CCAPI)' },
     { id: 'lumix', label: 'Panasonic Lumix – WiFi / LAN', sub: 'HTTP CGI Protokoll (S1, S5, GH5, GH6, BGH1, BS1H…)' },
     { id: 'blackmagic', label: 'Blackmagic – REST', sub: 'Pocket 4K/6K, Cinema 6K, Studio/URSA (Firmware 8.6+)' },
+    { id: 'zcam', label: 'Z CAM – HTTP', sub: 'E2, E2-M4, E2-S6, E2-F6/F8 – HTTP-Control-API' },
+    { id: 'panasonic-ptz', label: 'Panasonic PTZ – AW', sub: 'AW-UE150/UE100/HE130… – HTTP CGI (AW-Protokoll)' },
+    { id: 'visca', label: 'VISCA over IP – PTZ', sub: 'PTZOptics, Marshall, AVer, Sony/Pana PTZ … (eine API, viele Marken)' },
+    { id: 'jvc', label: 'JVC ConnectedCam – HTTP', sub: 'GY-HC900/HC500, GY-HM250… – Web-API' },
+    { id: 'birddog', label: 'BirdDog – REST', sub: 'BirdDog NDI PTZ (P100/P200/P400, Maki, Eyes)' },
   ];
 
   return (
@@ -238,6 +267,8 @@ interface StepConnectionProps {
   bmHost: string; setBmHost: (v: string) => void;
   mncHost: string; setMncHost: (v: string) => void;
   mncPort: number; setMncPort: (v: number) => void;
+  camHost: string; setCamHost: (v: string) => void;
+  camPort: number; setCamPort: (v: number) => void;
 }
 
 function StepConnection(p: StepConnectionProps) {
@@ -452,6 +483,39 @@ function StepConnection(p: StepConnectionProps) {
           </p>
         </>
       )}
+
+      {GENERIC_WIZARD[p.cameraType] && (
+        <>
+          <p className="wizard-step__desc">
+            Gib IP-Adresse und Port der Kamera ein ({GENERIC_WIZARD[p.cameraType].label}).
+          </p>
+          <div className="wizard-form">
+            <label className="wizard-label">
+              IP-Adresse / Hostname
+              <input
+                className="wizard-input"
+                value={p.camHost}
+                onChange={e => p.setCamHost(e.target.value)}
+                placeholder="192.168.1.100"
+              />
+            </label>
+            <label className="wizard-label wizard-label--small">
+              Port
+              <input
+                className="wizard-input"
+                type="number"
+                value={p.camPort}
+                onChange={e => p.setCamPort(Number(e.target.value))}
+              />
+            </label>
+          </div>
+          <p className="wizard-step__hint">
+            {p.cameraType === 'visca'
+              ? 'VISCA over IP läuft meist über UDP (PTZOptics 1259, Sony 52381). Eine Implementierung steuert viele PTZ-Marken.'
+              : 'HTTP-/REST-API der Kamera. Iris, Gain, WB, Zoom/PTZ je nach Modell.'}
+          </p>
+        </>
+      )}
     </div>
   );
 }
@@ -465,6 +529,7 @@ function StepDone({ cameraType, config }: { cameraType: CameraType; config: Part
     : cameraType === 'sony-mnc' ? 'Sony WiFi (Monitor & Control)'
     : cameraType === 'canon' ? 'Canon EOS (CCAPI)'
     : cameraType === 'blackmagic' ? 'Blackmagic (REST)'
+    : GENERIC_WIZARD[cameraType] ? GENERIC_WIZARD[cameraType].label
     : 'Panasonic Lumix WiFi';
 
   return (
@@ -514,6 +579,12 @@ function StepDone({ cameraType, config }: { cameraType: CameraType; config: Part
           <div className="wizard-summary__row">
             <span className="wizard-summary__key">Adresse</span>
             <span className="wizard-summary__val">{config.mncHost}:{config.mncPort}</span>
+          </div>
+        )}
+        {config.camHost && (
+          <div className="wizard-summary__row">
+            <span className="wizard-summary__key">Adresse</span>
+            <span className="wizard-summary__val">{config.camHost}:{config.camPort}</span>
           </div>
         )}
       </div>
