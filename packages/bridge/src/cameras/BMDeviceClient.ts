@@ -431,6 +431,15 @@ export class BMDeviceClient extends EventEmitter {
     // 0-255 (centre 128) → -1..1 around the colour-correction neutral point.
     const bipolar = (v: number) => Math.max(-1, Math.min(1, (v - 128) / 128));
 
+    // Raw passthrough: the Blackmagic RCP panel sends native REST calls as
+    // { endpoint, data }. Forward them straight to the camera's REST API.
+    if (cmd === 'blackmagic') {
+      const endpoint = params.endpoint;
+      if (typeof endpoint !== 'string') return false;
+      await this.PUT(endpoint, (params.data ?? {}) as object);
+      return true;
+    }
+
     switch (cmd) {
       case 'setIris':
         await this.setIris(Math.max(0, Math.min(1, num('value') / 255)));
