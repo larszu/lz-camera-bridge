@@ -11,6 +11,7 @@
  */
 
 import { EventEmitter } from 'events';
+import { discoverSonyUsbCameras } from '../discovery/SonyUsbDiscovery.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Types
@@ -76,25 +77,29 @@ export class SonyCrsdkClient extends EventEmitter {
   }
 
   /**
-   * Scan for available Sony cameras via USB
-   * In production, this would use the native SDK bindings
+   * Scan for available Sony cameras via USB.
+   *
+   * Performs a real libusb enumeration (Sony vendor id 0x054C) through
+   * {@link discoverSonyUsbCameras}. When no camera is attached — or the
+   * optional native `usb` module is not installed — an empty list is
+   * returned and the reason is emitted via the `scanInfo` event, instead
+   * of the previous fake demo device.
    */
   async scanUsbDevices(): Promise<CrsdkDevice[]> {
-    // The actual SDK requires native bindings (C++ DLL/dylib)
-    // This is a placeholder showing the expected interface
     console.log('[CRSDK] Scanning for USB devices...');
-    
-    // In production, call native: CrSdkApi_EnumCameraObjects()
-    return [
-      // Demo device for development
-      {
-        id: 'usb:demo-fx3',
-        model: 'ILME-FX3',
-        serialNumber: 'DEMO123456',
-        connectionType: 'usb',
-        firmwareVersion: '2.00',
-      },
-    ];
+
+    const { devices, reason } = await discoverSonyUsbCameras();
+    if (reason) {
+      console.log(`[CRSDK] USB scan: ${reason}`);
+      this.emit('scanInfo', reason);
+    }
+
+    return devices.map((d) => ({
+      id: d.id,
+      model: d.model,
+      serialNumber: d.serialNumber,
+      connectionType: 'usb' as const,
+    }));
   }
 
   /**

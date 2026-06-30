@@ -21,7 +21,7 @@ export interface CameraState {
 export type CameraStatesByNumber = Record<number, CameraState>;
 
 export interface BridgeConfig {
-  connectionMode?: 'tcp' | 'serial' | 'lumix-http';
+  connectionMode?: 'tcp' | 'serial' | 'lumix-http' | 'sony-usb';
   tcpHost?: string;
   tcpPort?: number;
   serialPath?: string;
@@ -29,6 +29,18 @@ export interface BridgeConfig {
   ccuId?: number;
   lumixHost?: string;
   lumixPort?: number;
+  usbDeviceId?: string;
+  usbDeviceModel?: string;
+}
+
+export interface SonyUsbDevice {
+  id: string;
+  model: string;
+  serialNumber: string;
+  connectionType: 'usb';
+  vendorId: number;
+  productId: number;
+  supported: boolean;
 }
 
 export interface WiznetDevice {

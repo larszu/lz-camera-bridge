@@ -3,7 +3,7 @@
  */
 
 import { useEffect, useRef, useCallback, useState } from 'react';
-import type { CameraState, CameraStatesByNumber, BridgeConfig, WiznetDevice, TallyState } from '../types.ts';
+import type { CameraState, CameraStatesByNumber, BridgeConfig, WiznetDevice, SonyUsbDevice, TallyState } from '../types.ts';
 
 export type ConnectionStatus = 'idle' | 'connecting' | 'connected' | 'error' | 'disconnected';
 
@@ -15,6 +15,7 @@ interface UseBridgeReturn {
   config: BridgeConfig;
   ports: string[];
   wiznetDevices: WiznetDevice[];
+  sonyUsbDevices: SonyUsbDevice[];
   tally: TallyState;
   errorMsg: string | null;
   send: (type: string, payload?: Record<string, unknown>) => void;
@@ -24,6 +25,7 @@ interface UseBridgeReturn {
   setConfig: (config: Partial<BridgeConfig>) => void;
   discoverWiznet: () => void;
   configureWiznet: (deviceIp: string, deviceConfig: Record<string, unknown>) => void;
+  discoverSonyUsb: () => void;
   setTally: (tally: Partial<TallyState>) => void;
 }
 
@@ -45,6 +47,7 @@ export function useBridge(): UseBridgeReturn {
   const [config, setConfigState] = useState<BridgeConfig>({ connectionMode: 'tcp', tcpHost: '192.168.1.10', tcpPort: 7700, serialPath: '', baudRate: 38400, ccuId: 0 });
   const [ports, setPorts] = useState<string[]>([]);
   const [wiznetDevices, setWiznetDevices] = useState<WiznetDevice[]>([]);
+  const [sonyUsbDevices, setSonyUsbDevices] = useState<SonyUsbDevice[]>([]);
   const [tally, setTallyState] = useState<TallyState>({ program: false, preview: false, isoRec: false });
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -101,6 +104,14 @@ export function useBridge(): UseBridgeReturn {
           case 'wiznetDevices':
             setWiznetDevices(msg.devices as WiznetDevice[]);
             break;
+          case 'sonyUsbDevices':
+            setSonyUsbDevices(msg.devices as SonyUsbDevice[]);
+            if ((msg.devices as SonyUsbDevice[]).length === 0 && msg.reason) {
+              setErrorMsg(msg.reason as string);
+            } else {
+              setErrorMsg(null);
+            }
+            break;
           case 'wiznetConfigResult':
             if (msg.success) {
               setErrorMsg(null);
@@ -155,9 +166,11 @@ export function useBridge(): UseBridgeReturn {
     send('configureWiznet', { deviceIp, deviceConfig });
   }, [send]);
 
+  const discoverSonyUsb = useCallback(() => send('discoverSonyUsb'), [send]);
+
   const setTally = useCallback((t: Partial<TallyState>) => {
     send('setTally', { tally: t });
   }, [send]);
 
-  return { status, cameraConnected, state, cameraStates, config, ports, wiznetDevices, tally, errorMsg, send, connectCamera, disconnectCamera, listPorts, setConfig, discoverWiznet, configureWiznet, setTally };
+  return { status, cameraConnected, state, cameraStates, config, ports, wiznetDevices, sonyUsbDevices, tally, errorMsg, send, connectCamera, disconnectCamera, listPorts, setConfig, discoverWiznet, configureWiznet, discoverSonyUsb, setTally };
 }

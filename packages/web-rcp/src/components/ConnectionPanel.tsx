@@ -1,19 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import type { BridgeConfig } from '../types.ts';
+import type { BridgeConfig, SonyUsbDevice } from '../types.ts';
+
+type ConnMode = 'tcp' | 'serial' | 'lumix-http' | 'sony-usb';
 
 interface Props {
   config: BridgeConfig;
   ports: string[];
+  sonyUsbDevices: SonyUsbDevice[];
   onSetConfig: (cfg: Partial<BridgeConfig>) => void;
   onListPorts: () => void;
+  onDiscoverSonyUsb: () => void;
   onConnect: () => void;
   onDisconnect: () => void;
   cameraConnected: boolean;
   wsStatus: string;
 }
 
-export function ConnectionPanel({ config, ports, onSetConfig, onListPorts, onConnect, onDisconnect, cameraConnected, wsStatus }: Props) {
-  const [mode, setMode] = useState<'tcp' | 'serial' | 'lumix-http'>(config.connectionMode ?? 'tcp');
+export function ConnectionPanel({ config, ports, sonyUsbDevices, onSetConfig, onListPorts, onDiscoverSonyUsb, onConnect, onDisconnect, cameraConnected, wsStatus }: Props) {
+  const [mode, setMode] = useState<ConnMode>(config.connectionMode ?? 'tcp');
   const [host, setHost] = useState(config.tcpHost ?? '192.168.1.10');
   const [port, setPort] = useState(String(config.tcpPort ?? 7700));
   const [serialPath, setSerialPath] = useState(config.serialPath ?? '');
@@ -21,10 +25,12 @@ export function ConnectionPanel({ config, ports, onSetConfig, onListPorts, onCon
   const [ccuId, setCcuId] = useState(String(config.ccuId ?? 0));
   const [lumixHost, setLumixHost] = useState(config.lumixHost ?? '192.168.54.1');
   const [lumixPort, setLumixPort] = useState(String(config.lumixPort ?? 80));
+  const [usbDeviceId, setUsbDeviceId] = useState(config.usbDeviceId ?? '');
 
   useEffect(() => {
     if (mode === 'serial') onListPorts();
-  }, [mode, onListPorts]);
+    if (mode === 'sony-usb') onDiscoverSonyUsb();
+  }, [mode, onListPorts, onDiscoverSonyUsb]);
 
   useEffect(() => {
     if (config.connectionMode) setMode(config.connectionMode);
@@ -35,7 +41,15 @@ export function ConnectionPanel({ config, ports, onSetConfig, onListPorts, onCon
     if (config.ccuId !== undefined) setCcuId(String(config.ccuId));
     if (config.lumixHost) setLumixHost(config.lumixHost);
     if (config.lumixPort) setLumixPort(String(config.lumixPort));
+    if (config.usbDeviceId) setUsbDeviceId(config.usbDeviceId);
   }, [config]);
+
+  // Auto-select the first discovered camera when none is chosen yet.
+  useEffect(() => {
+    if (mode === 'sony-usb' && !usbDeviceId && sonyUsbDevices.length > 0) {
+      setUsbDeviceId(sonyUsbDevices[0].id);
+    }
+  }, [sonyUsbDevices, mode, usbDeviceId]);
 
   const applyAndConnect = () => {
     const cfg: Partial<BridgeConfig> = { connectionMode: mode };
@@ -46,6 +60,10 @@ export function ConnectionPanel({ config, ports, onSetConfig, onListPorts, onCon
     } else if (mode === 'lumix-http') {
       cfg.lumixHost = lumixHost;
       cfg.lumixPort = Number(lumixPort);
+    } else if (mode === 'sony-usb') {
+      cfg.usbDeviceId = usbDeviceId;
+      cfg.usbDeviceModel = sonyUsbDevices.find((d) => d.id === usbDeviceId)?.model;
+      cfg.ccuId = Number(ccuId);
     } else {
       cfg.serialPath = serialPath;
       cfg.baudRate = Number(baudRate);
@@ -65,6 +83,9 @@ export function ConnectionPanel({ config, ports, onSetConfig, onListPorts, onCon
         </button>
         <button className={`mode-tab ${mode === 'serial' ? 'mode-tab--active' : ''}`} onClick={() => setMode('serial')}>
           8-Pin RS-422 Seriell
+        </button>
+        <button className={`mode-tab ${mode === 'sony-usb' ? 'mode-tab--active' : ''}`} onClick={() => setMode('sony-usb')}>
+          Sony USB (FX3/FX6/A7)
         </button>
         <button className={`mode-tab ${mode === 'lumix-http' ? 'mode-tab--active' : ''}`} onClick={() => setMode('lumix-http')}>
           Lumix (WiFi/LAN)
@@ -94,7 +115,7 @@ export function ConnectionPanel({ config, ports, onSetConfig, onListPorts, onCon
             <label>Serial Port</label>
             <div className="serial-port-row">
               <select value={serialPath} onChange={(e) => setSerialPath(e.target.value)} className="select-group__select">
-                <option value="">— Port wählen —</option>
+                <option value="">ï¿½ Port wï¿½hlen ï¿½</option>
                 {ports.map((p) => (<option key={p} value={p}>{p}</option>))}
               </select>
               <button className="btn btn--sm" onClick={onListPorts} title="Ports neu laden">?</button>
@@ -111,6 +132,38 @@ export function ConnectionPanel({ config, ports, onSetConfig, onListPorts, onCon
           <div className="field field--sm">
             <label>CCU ID</label>
             <input value={ccuId} onChange={(e) => setCcuId(e.target.value)} placeholder="0" type="number" />
+          </div>
+        </div>
+      )}
+
+      {mode === 'sony-usb' && (
+        <div className="connection-row">
+          <div className="field">
+            <label>Kamera (USB)</label>
+            <div className="serial-port-row">
+              <select
+                value={usbDeviceId}
+                onChange={(e) => setUsbDeviceId(e.target.value)}
+                className="select-group__select"
+              >
+                {sonyUsbDevices.length === 0 && <option value="">â€“ keine Kamera gefunden â€“</option>}
+                {sonyUsbDevices.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.model}{d.serialNumber ? ` (${d.serialNumber})` : ''}
+                  </option>
+                ))}
+              </select>
+              <button className="btn btn--sm" onClick={onDiscoverSonyUsb} title="USB neu scannen">âŸ³</button>
+            </div>
+          </div>
+          <div className="field field--sm">
+            <label>Kamera-Nr.</label>
+            <input value={ccuId} onChange={(e) => setCcuId(e.target.value)} placeholder="0" type="number" />
+          </div>
+          <div className="field" style={{ alignSelf: 'flex-end', paddingBottom: '0.25rem' }}>
+            <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+              Kamera in â€žPC Remote" (USB-Steuerung) versetzen
+            </span>
           </div>
         </div>
       )}

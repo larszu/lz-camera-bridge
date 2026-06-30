@@ -13,6 +13,9 @@
     "serialport": "^12.0.0",
     "ws": "^8.18.0"
   },
+  "optionalDependencies": {
+    "usb": "^2.14.0"
+  },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "@types/ws": "^8.5.13",
