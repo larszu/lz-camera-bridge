@@ -17,7 +17,11 @@ const NONE: CameraCapabilities = {
 };
 
 const MODE_CAPS: Record<ConnectionMode, Partial<CameraCapabilities>> = {
-  // Sony CCU 700PTP (TCP + RS-422): full CCU paint, no AWB/ABB codes wired yet.
+  // Sony CCU 700PTP (TCP + RS-422): full CCU paint. AWB/ABB/Auto-Iris stay
+  // disabled deliberately: Sony's 700 protocol is NDA-only and no public
+  // source documents those auto-setup command codes (verified against the
+  // DelphiForBroadcasting/sony-700ptp-protocol reference, which only covers
+  // framing + paint). Enabling them needs a CNA-1 log or RCP traffic capture.
   tcp: {
     iris: true, masterBlack: true, blackBalance: true, whiteBalance: true,
     masterGain: true, masterGamma: true, saturation: true, ndFilter: true,

@@ -7,7 +7,7 @@ type ConnMode = ConnectionMode;
 const GENERIC_MODES: { id: ConnMode; label: string; port: number; hint: string }[] = [
   { id: 'zcam', label: 'Z CAM', port: 80, hint: 'Z CAM E2 / F-Serie – HTTP-Control-API' },
   { id: 'panasonic-ptz', label: 'Panasonic PTZ', port: 80, hint: 'AW-UE/HE-Serie – HTTP CGI (AW-Protokoll)' },
-  { id: 'visca', label: 'VISCA over IP', port: 1259, hint: 'PTZOptics, Marshall, AVer, Sony/Pana PTZ … (UDP)' },
+  { id: 'visca', label: 'VISCA over IP', port: 1259, hint: 'PTZOptics/Marshall/AVer: Port 1259 · Sony BRC/SRG: Port 52381 (Header automatisch)' },
   { id: 'jvc', label: 'JVC ConnectedCam', port: 80, hint: 'GY-HC/HM-Serie – HTTP-API' },
   { id: 'birddog', label: 'BirdDog', port: 8080, hint: 'BirdDog NDI PTZ – REST-API' },
 ];
