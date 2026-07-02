@@ -71,6 +71,20 @@ export class BirddogClient extends EventEmitter implements GenericCameraClient {
       case 'recallPreset':
         await this.post('/recall', { Preset: num('value') });
         return true;
+      case 'storePreset':
+        await this.post('/save', { Preset: num('value') });
+        return true;
+      case 'ptz': {
+        // Continuous pan/tilt drive; speeds -100..100 → BirdDog -255..255.
+        const scale = (v: number) => Math.round((v / 100) * 255);
+        await this.post('/ptz', { PanSpeed: scale(num('pan')), TiltSpeed: scale(num('tilt')) });
+        return true;
+      }
+      case 'setZoom': {
+        const scale = (v: number) => Math.round((v / 100) * 255);
+        await this.post('/ptz', { ZoomSpeed: scale(num('value')) });
+        return true;
+      }
       default:
         return false;
     }

@@ -99,6 +99,30 @@ export class ViscaClient extends EventEmitter implements GenericCameraClient {
         }
         return true;
       }
+      case 'ptz': {
+        // Pan/Tilt drive: 81 01 06 01 VV WW 0p 0q FF.
+        const pan = num('pan');
+        const tilt = num('tilt');
+        const panSpeed = Math.max(1, Math.round((Math.abs(pan) / 100) * 0x18));
+        const tiltSpeed = Math.max(1, Math.round((Math.abs(tilt) / 100) * 0x14));
+        const panDir = pan < 0 ? 0x01 : pan > 0 ? 0x02 : 0x03; // left : right : stop
+        const tiltDir = tilt > 0 ? 0x01 : tilt < 0 ? 0x02 : 0x03; // up : down : stop
+        await this.send([0x81, 0x01, 0x06, 0x01, panSpeed, tiltSpeed, panDir, tiltDir, 0xff]);
+        return true;
+      }
+      case 'setFocus': {
+        const v = num('value'); // -100..100 (far..near), 0 = stop
+        if (v === 0) await this.send([0x81, 0x01, 0x04, 0x08, 0x00, 0xff]);
+        else {
+          const speed = Math.max(0, Math.min(7, Math.round((Math.abs(v) / 100) * 7)));
+          const dir = v > 0 ? 0x20 : 0x30; // near (far) — 0x2p far, 0x3p near
+          await this.send([0x81, 0x01, 0x04, 0x08, dir | speed, 0xff]);
+        }
+        return true;
+      }
+      case 'storePreset':
+        await this.send([0x81, 0x01, 0x04, 0x3f, 0x01, num('value') & 0x7f, 0xff]);
+        return true;
       case 'autoFocus':
         // One-push AF trigger.
         await this.send([0x81, 0x01, 0x04, 0x18, 0x01, 0xff]);

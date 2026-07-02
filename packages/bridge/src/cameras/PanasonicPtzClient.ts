@@ -78,6 +78,21 @@ export class PanasonicPtzClient extends EventEmitter implements GenericCameraCli
         await this.ptz(`F${this.two(f)}`);
         return true;
       }
+      case 'ptz': {
+        // Pan/Tilt drive: #PTSppttt → PTS<panspeed><tiltspeed>, 50 = stop.
+        const p = 50 + Math.round((num('pan') / 100) * 49);
+        const t = 50 + Math.round((num('tilt') / 100) * 49);
+        await this.ptz(`PTS${this.two(p)}${this.two(t)}`);
+        return true;
+      }
+      case 'recallPreset':
+        // #R<xx> recalls preset 00-99.
+        await this.ptz(`R${this.two(num('value'))}`);
+        return true;
+      case 'storePreset':
+        // #M<xx> stores preset 00-99.
+        await this.ptz(`M${this.two(num('value'))}`);
+        return true;
       case 'autoFocus':
         await this.cam('OSE:69:1'); // one-touch AF
         return true;
