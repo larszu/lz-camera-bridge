@@ -6,10 +6,12 @@
  *
  *   POST http://<ip>/cgi-bin/api.cgi   body: { "Command": "...", "Params": {…} }
  *
- * JVC's web API is only lightly documented publicly. This client makes real
- * HTTP calls in the documented JSON shape, but the exact command names may
- * need adjustment against a specific body's API reference — hence each mapping
- * is marked best-effort and unsupported commands are reported, not faked.
+ * JVC publishes an official API reference: "JVC Camcorder Web API Reference"
+ * (pro.jvc.com → JvcCamcorderApiReferenceV118_public.pdf, covers GY-HC500/
+ * HC550/HM250 …). That document is the authority for endpoint paths and
+ * command names; this client's mappings are best-effort until aligned with
+ * it (the PDF is not reachable from this build environment). Unsupported or
+ * unconfirmed commands are reported, not faked.
  */
 import { EventEmitter } from 'events';
 import { CameraState } from '../protocol/CcuClient.js';
