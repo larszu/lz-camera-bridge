@@ -56,14 +56,15 @@ const MODE_CAPS: Record<ConnectionMode, Partial<CameraCapabilities>> = {
   'panasonic-ptz': { iris: true, bars: true, focus: true },
   // VISCA over IP.
   visca: { iris: true, masterGain: true, awb: true, focus: true },
-  // JVC ConnectedCam HTTP.
-  jvc: { iris: true, masterGain: true, colorTemp: true, awb: true, bars: true, record: true },
-  // BirdDog REST.
-  birddog: { iris: true, masterGain: true, colorTemp: true, awb: true },
+  // JVC web API (Session + Digest, verified command vocabulary). Iris/gain
+  // are step-based on this API; bars has no verified command.
+  jvc: { iris: true, masterGain: true, colorTemp: true, awb: true, focus: true, record: true },
+  // BirdDog: motion/optics via VISCA-over-IP (52381), setup via REST :8080.
+  birddog: { iris: true, masterGain: true, colorTemp: true, awb: true, focus: true },
 };
 
 /** Modes whose backend implements ptz/setZoom/setFocus/presets. */
-export const PTZ_MODES: ConnectionMode[] = ['panasonic-ptz', 'visca', 'birddog'];
+export const PTZ_MODES: ConnectionMode[] = ['panasonic-ptz', 'visca', 'birddog', 'jvc'];
 
 export function capabilitiesForMode(mode: ConnectionMode | undefined): CameraCapabilities {
   return { ...NONE, ...(mode ? MODE_CAPS[mode] ?? {} : {}) };

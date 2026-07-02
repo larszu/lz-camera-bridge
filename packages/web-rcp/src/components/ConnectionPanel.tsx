@@ -49,6 +49,8 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices,
   const [canonPort, setCanonPort] = useState(String(config.canonPort ?? 8080));
   const [camHost, setCamHost] = useState(config.camHost ?? '192.168.1.100');
   const [camPort, setCamPort] = useState(String(config.camPort ?? 80));
+  const [camUser, setCamUser] = useState(config.camUser ?? '');
+  const [camPass, setCamPass] = useState(config.camPass ?? '');
   const [hidSel, setHidSel] = useState('');
 
   const genericMeta = GENERIC_MODES.find((g) => g.id === mode);
@@ -119,6 +121,10 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices,
       cfg.camHost = camHost;
       cfg.camPort = Number(camPort);
       cfg.ccuId = Number(ccuId);
+      if (mode === 'jvc') {
+        cfg.camUser = camUser;
+        cfg.camPass = camPass;
+      }
     } else {
       cfg.serialPath = serialPath;
       cfg.baudRate = Number(baudRate);
@@ -342,6 +348,18 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices,
             <label>Kamera-Nr.</label>
             <input value={ccuId} onChange={(e) => setCcuId(e.target.value)} placeholder="0" type="number" />
           </div>
+          {mode === 'jvc' && (
+            <>
+              <div className="field field--sm">
+                <label>Benutzer</label>
+                <input value={camUser} onChange={(e) => setCamUser(e.target.value)} placeholder="jvc" autoComplete="off" />
+              </div>
+              <div className="field field--sm">
+                <label>Passwort</label>
+                <input value={camPass} onChange={(e) => setCamPass(e.target.value)} type="password" autoComplete="new-password" />
+              </div>
+            </>
+          )}
           <div className="field" style={{ alignSelf: 'flex-end', paddingBottom: '0.25rem' }}>
             <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>{genericMeta.hint}</span>
           </div>

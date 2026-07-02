@@ -6,6 +6,7 @@
     "packages/*"
   ],
   "scripts": {
+    "test": "npm run test --workspace=packages/bridge",
     "bridge": "npm run dev --workspace=packages/bridge",
     "web": "npm run dev --workspace=packages/web-rcp",
     "dev": "npm run bridge & npm run web",

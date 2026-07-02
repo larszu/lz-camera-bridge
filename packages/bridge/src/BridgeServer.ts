@@ -74,6 +74,9 @@ export interface BridgeConfig {
   camHost?: string;
   /** Generic network camera: port (mode-specific default applied if unset) */
   camPort?: number;
+  /** Login for cameras that require one (JVC web API) */
+  camUser?: string;
+  camPass?: string;
 }
 
 interface ClientMessage {
@@ -386,7 +389,7 @@ export class BridgeServer {
       mode === 'zcam' ? new ZCamClient(host, port)
       : mode === 'panasonic-ptz' ? new PanasonicPtzClient(host, port)
       : mode === 'visca' ? new ViscaClient(host, port)
-      : mode === 'jvc' ? new JvcClient(host, port)
+      : mode === 'jvc' ? new JvcClient(host, port, this.config.camUser ?? '', this.config.camPass ?? '')
       : new BirddogClient(host, port);
 
     this.generic = client;
@@ -937,8 +940,18 @@ export class BridgeServer {
       action = 'setNdFilter';
     }
 
-    // Route to camera
-    if (!this.ccuClient?.connected) return;
+    // Route to whichever camera backend is currently connected. The previous
+    // guard only allowed the Sony CCU, silently dropping Companion commands
+    // for every other backend (Lumix, USB, Blackmagic, Canon, PTZ …).
+    const anyConnected =
+      (this.ccuClient?.connected ?? false) ||
+      (this.lumixClient?.connected ?? false) ||
+      (this.sonyUsb?.isConnected ?? false) ||
+      (this.bmClient?.isConnected ?? false) ||
+      (this.sonyMnc?.isConnected ?? false) ||
+      (this.canon?.isConnected ?? false) ||
+      (this.generic?.isConnected ?? false);
+    if (!anyConnected) return;
 
     // Create a dummy WebSocket-like object for error handling
     const dummyWs = { readyState: WebSocket.OPEN, send: () => {} } as unknown as WebSocket;
