@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Camera Bridge — Architektur</title>
+<style>
+  /* ── Tokens: a control-room neutral with a signal-blue bias ───────────── */
+  :root {
+    --bg: #0e1116;
+    --bg-grid: #141922;
+    --panel: #171c24;
+    --panel-2: #1d232d;
+    --line: #2a313c;
+    --line-strong: #3a4350;
+    --ink: #e7ebf1;
+    --ink-dim: #9aa4b2;
+    --ink-faint: #6b7482;
+    --signal: #4d9dff;      /* accent: RCP active-blue */
+    --signal-soft: #4d9dff26;
+    --amber: #f2b04a;       /* value readouts */
+    --good: #37c46e;        /* verified / connected */
+    --warn: #f0a83c;        /* tuning */
+    --tally: #e5514b;       /* disabled / NDA */
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code", Menlo, Consolas, monospace;
+    --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --radius: 12px;
+    --maxw: 1080px;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #eef1f5; --bg-grid: #e5e9ef; --panel: #ffffff; --panel-2: #f4f6f9;
+      --line: #dde2ea; --line-strong: #c5ccd7; --ink: #1a2029; --ink-dim: #55606f;
+      --ink-faint: #8a94a2; --signal: #1f6feb; --signal-soft: #1f6feb18;
+      --amber: #b5760a; --good: #1a9b53; --warn: #b5760a; --tally: #d23b34;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e1116; --bg-grid: #141922; --panel: #171c24; --panel-2: #1d232d;
+    --line: #2a313c; --line-strong: #3a4350; --ink: #e7ebf1; --ink-dim: #9aa4b2;
+    --ink-faint: #6b7482; --signal: #4d9dff; --signal-soft: #4d9dff26;
+    --amber: #f2b04a; --good: #37c46e; --warn: #f0a83c; --tally: #e5514b;
+  }
+  :root[data-theme="light"] {
+    --bg: #eef1f5; --bg-grid: #e5e9ef; --panel: #ffffff; --panel-2: #f4f6f9;
+    --line: #dde2ea; --line-strong: #c5ccd7; --ink: #1a2029; --ink-dim: #55606f;
+    --ink-faint: #8a94a2; --signal: #1f6feb; --signal-soft: #1f6feb18;
+    --amber: #b5760a; --good: #1a9b53; --warn: #b5760a; --tally: #d23b34;
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    font-family: var(--sans);
+    color: var(--ink);
+    background:
+      radial-gradient(1200px 600px at 80% -10%, var(--signal-soft), transparent 60%),
+      linear-gradient(var(--bg-grid) 1px, transparent 1px) 0 0 / 100% 34px,
+      var(--bg);
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: var(--maxw); margin: 0 auto; padding: clamp(1.2rem, 3vw, 2.6rem); }
+
+  /* ── Header ───────────────────────────────────────────────────────────── */
+  header { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
+  .eyebrow {
+    font-family: var(--mono); font-size: .72rem; letter-spacing: .22em; text-transform: uppercase;
+    color: var(--signal); margin: 0 0 .5rem;
+  }
+  h1 { font-size: clamp(1.9rem, 4.5vw, 2.9rem); line-height: 1.05; margin: 0; letter-spacing: -.02em; text-wrap: balance; }
+  .lede { color: var(--ink-dim); max-width: 60ch; margin: .8rem 0 0; font-size: 1.02rem; }
+  .theme-btn {
+    font-family: var(--mono); font-size: .72rem; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--ink-dim); background: var(--panel); border: 1px solid var(--line);
+    border-radius: 999px; padding: .5rem .9rem; cursor: pointer;
+  }
+  .theme-btn:hover { border-color: var(--line-strong); color: var(--ink); }
+  .theme-btn:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+
+  section { margin-top: clamp(2.2rem, 5vw, 3.4rem); }
+  .sec-label {
+    font-family: var(--mono); font-size: .72rem; letter-spacing: .18em; text-transform: uppercase;
+    color: var(--ink-faint); display: flex; align-items: center; gap: .7rem; margin-bottom: 1.1rem;
+  }
+  .sec-label::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+
+  /* ── Flow layers ──────────────────────────────────────────────────────── */
+  .layer-title { display:flex; align-items:baseline; gap:.6rem; margin: 0 0 .7rem; }
+  .layer-title h2 { font-size: 1.05rem; margin: 0; letter-spacing: -.01em; }
+  .layer-title span { font-family: var(--mono); font-size: .72rem; color: var(--ink-faint); }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: .8rem; }
+  .card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 1rem 1.05rem; position: relative; overflow: hidden;
+  }
+  .card::before { content:""; position:absolute; inset:0 auto 0 0; width:3px; background: var(--accent, var(--signal)); opacity:.9; }
+  .card h3 { margin: 0 0 .25rem; font-size: .98rem; letter-spacing: -.01em; }
+  .card p { margin: 0; color: var(--ink-dim); font-size: .86rem; }
+  .card .tag { font-family: var(--mono); font-size: .68rem; color: var(--ink-faint); letter-spacing: .04em; }
+
+  /* connector between layers */
+  .flow-arrow { display:flex; justify-content:center; align-items:center; gap:.6rem; color: var(--ink-faint); padding: .9rem 0; }
+  .flow-arrow .pipe { font-family: var(--mono); font-size: .74rem; letter-spacing: .08em; color: var(--signal); }
+  .flow-arrow::before, .flow-arrow::after { content:""; height:1px; width:min(28%, 180px); background: linear-gradient(90deg, transparent, var(--line-strong)); }
+  .flow-arrow::after { background: linear-gradient(90deg, var(--line-strong), transparent); }
+
+  /* ── Bridge core ──────────────────────────────────────────────────────── */
+  .core {
+    background: linear-gradient(180deg, var(--panel-2), var(--panel));
+    border: 1px solid var(--line-strong); border-radius: 16px; padding: 1.3rem 1.4rem;
+    box-shadow: 0 0 0 1px var(--signal-soft), 0 18px 40px -30px #000;
+  }
+  .core-top { display:flex; align-items:center; gap:.7rem; flex-wrap:wrap; }
+  .core-top h2 { margin:0; font-size:1.15rem; letter-spacing:-.01em; }
+  .badge {
+    font-family: var(--mono); font-size:.68rem; letter-spacing:.06em; padding:.22rem .55rem; border-radius:6px;
+    background: var(--signal-soft); color: var(--signal); border:1px solid var(--signal-soft);
+  }
+  .core p { color: var(--ink-dim); font-size:.9rem; margin:.6rem 0 0; max-width: 68ch; }
+  .vocab { display:flex; flex-wrap:wrap; gap:.4rem; margin-top: 1rem; }
+  .chip {
+    font-family: var(--mono); font-size:.74rem; color: var(--ink); background: var(--panel);
+    border:1px solid var(--line); border-radius:6px; padding:.28rem .5rem;
+  }
+  .chip b { color: var(--amber); font-weight: 600; }
+
+  /* ── Matrix table ─────────────────────────────────────────────────────── */
+  .table-scroll { overflow-x: auto; border:1px solid var(--line); border-radius: var(--radius); }
+  table { border-collapse: collapse; width: 100%; min-width: 640px; font-size: .86rem; }
+  thead th {
+    text-align: left; font-family: var(--mono); font-size:.7rem; letter-spacing:.1em; text-transform: uppercase;
+    color: var(--ink-faint); padding: .7rem .9rem; background: var(--panel-2); position: sticky; top: 0;
+    border-bottom: 1px solid var(--line);
+  }
+  tbody td { padding: .68rem .9rem; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover td { background: var(--signal-soft); }
+  td.mode, td.port { font-family: var(--mono); font-size: .8rem; color: var(--ink-dim); white-space: nowrap; }
+  td.mode { color: var(--signal); }
+  .pill { display:inline-flex; align-items:center; gap:.4rem; font-family: var(--mono); font-size:.72rem; letter-spacing:.03em; padding:.2rem .5rem; border-radius:999px; white-space:nowrap; }
+  .dot { width:7px; height:7px; border-radius:50%; }
+  .pill.ok    { color: var(--good);  background: color-mix(in srgb, var(--good) 14%, transparent); }
+  .pill.ok    .dot { background: var(--good); }
+  .pill.tune  { color: var(--warn);  background: color-mix(in srgb, var(--warn) 15%, transparent); }
+  .pill.tune  .dot { background: var(--warn); }
+  .pill.nda   { color: var(--tally); background: color-mix(in srgb, var(--tally) 14%, transparent); }
+  .pill.nda   .dot { background: var(--tally); }
+
+  .legend { display:flex; flex-wrap:wrap; gap:1rem; margin-top:.9rem; font-size:.8rem; color: var(--ink-dim); }
+  .legend span { display:inline-flex; align-items:center; gap:.4rem; }
+
+  footer { margin-top: 3rem; padding-top: 1.2rem; border-top: 1px solid var(--line); color: var(--ink-faint); font-size:.8rem; font-family: var(--mono); letter-spacing:.03em; }
+  a { color: var(--signal); }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .card, .theme-btn { transition: border-color .15s ease, color .15s ease, background .15s ease; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <p class="eyebrow">Camera Bridge · System</p>
+      <h1>Ein Command-Bus, viele Kameras</h1>
+      <p class="lede">
+        Vier Bedien-Oberflächen sprechen dieselbe Kamerasprache. Die Bridge
+        normalisiert sie zu einem Befehlssatz und verteilt ihn — je nach
+        gewähltem <em>Modus</em> — an das passende native Protokoll.
+      </p>
+    </div>
+    <button class="theme-btn" id="themeBtn" type="button" aria-label="Theme wechseln">◐ Theme</button>
+  </header>
+
+  <!-- ── Layer 1: Input surfaces ─────────────────────────────────────── -->
+  <section>
+    <div class="sec-label">01 · Eingabe-Oberflächen</div>
+    <div class="cards">
+      <div class="card" style="--accent: var(--signal)">
+        <h3>Web-RCP</h3>
+        <p>Sony-Style Bildregler: Iris, Master&nbsp;Black/Gamma, R/G/B, Gain, ND, Shutter.</p>
+      </div>
+      <div class="card" style="--accent: var(--amber)">
+        <h3>PTZ-Panel</h3>
+        <p>Touch-Joystick nach AW-RP150: Pan/Tilt, Zoom, Fokus, Presets, Store.</p>
+      </div>
+      <div class="card" style="--accent: var(--good)">
+        <h3>Bitfocus Companion</h3>
+        <p>Streamdeck-Aktionen &amp; Feedbacks über HTTP + WebSocket.</p>
+      </div>
+      <div class="card" style="--accent: #a78bfa">
+        <h3>USB-Bedienpult (HID)</h3>
+        <p>Physisches Pult → Achsen/Tasten werden auf Befehle gemappt.</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="flow-arrow"><span class="pipe">WebSocket :9700 · HTTP/WS :9701–9702</span><span aria-hidden="true">▼</span></div>
+
+  <!-- ── Layer 2: Bridge core ────────────────────────────────────────── -->
+  <section style="margin-top:0">
+    <div class="core">
+      <div class="core-top">
+        <h2>BridgeServer</h2>
+        <span class="badge">dispatchCameraCommand()</span>
+      </div>
+      <p>
+        Der Kern hält je Modus genau <em>einen</em> verbundenen Client, sendet
+        Statusänderungen zurück an alle Oberflächen und leitet jeden Befehl an
+        das aktive Backend. Jedes Backend erfüllt denselben Vertrag
+        <code>handleRcpCommand(cmd, params)</code> — deshalb genügt <b>ein</b>
+        Vokabular für alle Marken:
+      </p>
+      <div class="vocab">
+        <span class="chip">setIris</span>
+        <span class="chip">setMasterGain</span>
+        <span class="chip">setMasterBlack</span>
+        <span class="chip">setMasterGamma</span>
+        <span class="chip">setWhiteBalance</span>
+        <span class="chip">setBlackBalance</span>
+        <span class="chip">setSaturation</span>
+        <span class="chip">setNdFilter</span>
+        <span class="chip">setShutterSpeed</span>
+        <span class="chip">setColorTemp</span>
+        <span class="chip">autoWhiteBalance</span>
+        <span class="chip">setBars</span>
+        <span class="chip">setRecording</span>
+        <span class="chip"><b>ptz</b></span>
+        <span class="chip"><b>setZoom</b></span>
+        <span class="chip"><b>setFocus</b></span>
+        <span class="chip"><b>autoFocus</b></span>
+        <span class="chip"><b>recallPreset</b></span>
+        <span class="chip"><b>storePreset</b></span>
+      </div>
+    </div>
+  </section>
+
+  <div class="flow-arrow"><span class="pipe">handleRcpCommand → natives Protokoll</span><span aria-hidden="true">▼</span></div>
+
+  <!-- ── Layer 3: Backends by transport ──────────────────────────────── -->
+  <section style="margin-top:0">
+    <div class="sec-label">02 · Kamera-Backends nach Transport</div>
+
+    <div class="layer-title"><h2>Serial / TCP</h2><span>700-Protokoll</span></div>
+    <div class="cards">
+      <div class="card" style="--accent: var(--signal)"><h3>Sony CCU</h3><p>HXC/HDC, BRC — 700PTP über TCP&nbsp;:7700 oder RS-422.</p><span class="tag">tcp · serial</span></div>
+    </div>
+
+    <div class="layer-title" style="margin-top:1.2rem"><h2>USB</h2><span>libusb</span></div>
+    <div class="cards">
+      <div class="card" style="--accent: var(--signal)"><h3>Sony FX / Alpha</h3><p>FX3, FX6, A7 … PTP-Vendor-Extension (PC Remote).</p><span class="tag">sony-usb</span></div>
+    </div>
+
+    <div class="layer-title" style="margin-top:1.2rem"><h2>HTTP / REST</h2><span>fetch</span></div>
+    <div class="cards">
+      <div class="card" style="--accent: var(--good)"><h3>Canon CCAPI</h3><p>EOS R5/R6/R7/R8/R10 — REST&nbsp;:8080.</p><span class="tag">canon-ccapi</span></div>
+      <div class="card" style="--accent: var(--good)"><h3>Panasonic Lumix</h3><p>S1/S5/GH5/GH6 — <code>cam.cgi</code>.</p><span class="tag">lumix-http</span></div>
+      <div class="card" style="--accent: var(--good)"><h3>Blackmagic</h3><p>Pocket/Studio/URSA — <code>/control/api/v1</code>.</p><span class="tag">blackmagic</span></div>
+      <div class="card" style="--accent: var(--good)"><h3>Z CAM</h3><p>E2-Familie — <code>/ctrl/set</code>.</p><span class="tag">zcam</span></div>
+      <div class="card" style="--accent: var(--amber)"><h3>Panasonic AW PTZ</h3><p>AW-UE/HE — <code>aw_ptz</code>/<code>aw_cam</code>.</p><span class="tag">panasonic-ptz</span></div>
+      <div class="card" style="--accent: var(--amber)"><h3>JVC ConnectedCam</h3><p>Digest-Login + <code>/cgi-bin/api.cgi</code>.</p><span class="tag">jvc</span></div>
+    </div>
+
+    <div class="layer-title" style="margin-top:1.2rem"><h2>UDP</h2><span>VISCA over IP</span></div>
+    <div class="cards">
+      <div class="card" style="--accent: var(--amber)"><h3>VISCA generisch</h3><p>PTZOptics/Marshall/AVer&nbsp;:1259 · Sony BRC/SRG&nbsp;:52381 (Header autom.).</p><span class="tag">visca</span></div>
+      <div class="card" style="--accent: var(--amber)"><h3>BirdDog</h3><p>Bewegung via VISCA&nbsp;:52381, Setup via REST&nbsp;:8080.</p><span class="tag">birddog</span></div>
+    </div>
+  </section>
+
+  <!-- ── Layer 4: Mode matrix ────────────────────────────────────────── -->
+  <section>
+    <div class="sec-label">03 · Modus-Matrix</div>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>Modus</th><th>Kamera-Familie</th><th>Transport / Port</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="mode">tcp · serial</td><td>Sony CCU (HXC/HDC/BRC)</td><td class="port">700PTP :7700 · RS-422</td><td><span class="pill nda"><span class="dot"></span>Paint · AWB/ABB NDA</span></td></tr>
+          <tr><td class="mode">sony-usb</td><td>Sony FX / Alpha</td><td class="port">PTP / USB</td><td><span class="pill ok"><span class="dot"></span>verifiziert</span></td></tr>
+          <tr><td class="mode">sony-mnc</td><td>Sony Monitor &amp; Control</td><td class="port">HTTP :10000 · SSDP</td><td><span class="pill nda"><span class="dot"></span>unverifiziert</span></td></tr>
+          <tr><td class="mode">canon-ccapi</td><td>Canon EOS</td><td class="port">CCAPI :8080</td><td><span class="pill ok"><span class="dot"></span>verifiziert</span></td></tr>
+          <tr><td class="mode">lumix-http</td><td>Panasonic Lumix</td><td class="port">cam.cgi :80</td><td><span class="pill ok"><span class="dot"></span>verifiziert</span></td></tr>
+          <tr><td class="mode">blackmagic</td><td>Blackmagic (FW 8.6+)</td><td class="port">REST :80/443</td><td><span class="pill ok"><span class="dot"></span>verifiziert</span></td></tr>
+          <tr><td class="mode">zcam</td><td>Z CAM E2</td><td class="port">HTTP :80</td><td><span class="pill ok"><span class="dot"></span>verifiziert</span></td></tr>
+          <tr><td class="mode">panasonic-ptz</td><td>Panasonic AW PTZ</td><td class="port">CGI :80</td><td><span class="pill ok"><span class="dot"></span>verifiziert</span></td></tr>
+          <tr><td class="mode">visca</td><td>PTZOptics/Marshall/AVer · Sony BRC/SRG</td><td class="port">UDP :1259 · :52381</td><td><span class="pill ok"><span class="dot"></span>verifiziert</span></td></tr>
+          <tr><td class="mode">jvc</td><td>JVC ConnectedCam / KY-PZ</td><td class="port">HTTP :80 (Digest)</td><td><span class="pill tune"><span class="dot"></span>Vokabular ok · Feintuning</span></td></tr>
+          <tr><td class="mode">birddog</td><td>BirdDog NDI PTZ</td><td class="port">VISCA :52381 · REST :8080</td><td><span class="pill tune"><span class="dot"></span>Endpunkte ok · Feintuning</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--good)"></span>verifiziert — gegen öffentliche Doku / offizielle Referenz</span>
+      <span><span class="dot" style="background:var(--warn)"></span>Feintuning — Struktur echt, Werte am Gerät bestätigen</span>
+      <span><span class="dot" style="background:var(--tally)"></span>NDA / unverifiziert — kein öffentliches Protokoll</span>
+    </div>
+  </section>
+
+  <footer>
+    Camera Bridge — packages/bridge · packages/web-rcp · Companion · Electron · Firmware
+  </footer>
+</div>
+
+<script>
+  (function () {
+    var btn = document.getElementById('themeBtn');
+    var root = document.documentElement;
+    btn.addEventListener('click', function () {
+      var cur = root.getAttribute('data-theme');
+      if (!cur) cur = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      root.setAttribute('data-theme', cur === 'dark' ? 'light' : 'dark');
+    });
+  })();
+</script>
+</body>
+</html>
