@@ -7,7 +7,7 @@ type ConnMode = ConnectionMode;
 const GENERIC_MODES: { id: ConnMode; label: string; port: number; hint: string }[] = [
   { id: 'zcam', label: 'Z CAM', port: 80, hint: 'Z CAM E2 / F-Serie – HTTP-Control-API' },
   { id: 'panasonic-ptz', label: 'Panasonic PTZ', port: 80, hint: 'AW-UE/HE-Serie – HTTP CGI (AW-Protokoll)' },
-  { id: 'visca', label: 'VISCA over IP', port: 1259, hint: 'PTZOptics, Marshall, AVer, Sony/Pana PTZ … (UDP)' },
+  { id: 'visca', label: 'VISCA over IP', port: 1259, hint: 'PTZOptics/Marshall/AVer: Port 1259 · Sony BRC/SRG: Port 52381 (Header automatisch)' },
   { id: 'jvc', label: 'JVC ConnectedCam', port: 80, hint: 'GY-HC/HM-Serie – HTTP-API' },
   { id: 'birddog', label: 'BirdDog', port: 8080, hint: 'BirdDog NDI PTZ – REST-API' },
 ];
@@ -49,6 +49,8 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices,
   const [canonPort, setCanonPort] = useState(String(config.canonPort ?? 8080));
   const [camHost, setCamHost] = useState(config.camHost ?? '192.168.1.100');
   const [camPort, setCamPort] = useState(String(config.camPort ?? 80));
+  const [camUser, setCamUser] = useState(config.camUser ?? '');
+  const [camPass, setCamPass] = useState(config.camPass ?? '');
   const [hidSel, setHidSel] = useState('');
 
   const genericMeta = GENERIC_MODES.find((g) => g.id === mode);
@@ -119,6 +121,10 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices,
       cfg.camHost = camHost;
       cfg.camPort = Number(camPort);
       cfg.ccuId = Number(ccuId);
+      if (mode === 'jvc') {
+        cfg.camUser = camUser;
+        cfg.camPass = camPass;
+      }
     } else {
       cfg.serialPath = serialPath;
       cfg.baudRate = Number(baudRate);
@@ -342,6 +348,18 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices,
             <label>Kamera-Nr.</label>
             <input value={ccuId} onChange={(e) => setCcuId(e.target.value)} placeholder="0" type="number" />
           </div>
+          {mode === 'jvc' && (
+            <>
+              <div className="field field--sm">
+                <label>Benutzer</label>
+                <input value={camUser} onChange={(e) => setCamUser(e.target.value)} placeholder="jvc" autoComplete="off" />
+              </div>
+              <div className="field field--sm">
+                <label>Passwort</label>
+                <input value={camPass} onChange={(e) => setCamPass(e.target.value)} type="password" autoComplete="new-password" />
+              </div>
+            </>
+          )}
           <div className="field" style={{ alignSelf: 'flex-end', paddingBottom: '0.25rem' }}>
             <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>{genericMeta.hint}</span>
           </div>

@@ -43,6 +43,8 @@ export interface BridgeConfig {
   canonPort?: number;
   camHost?: string;
   camPort?: number;
+  camUser?: string;
+  camPass?: string;
 }
 
 export interface HidDevice {

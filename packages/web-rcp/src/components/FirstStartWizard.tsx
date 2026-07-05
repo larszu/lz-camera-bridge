@@ -173,30 +173,31 @@ function StepWelcome() {
     <div className="wizard-step">
       <h2 className="wizard-step__title">Willkommen</h2>
       <p className="wizard-step__desc">
-        <strong>Camera Bridge</strong> verbindet Sony CCU-Kameras (BRC, HXC, HDC…)
-        und Panasonic Lumix Kameras mit Bitfocus Companion und steuert sie über
-        einen professionellen Software-RCP.
+        <strong>Camera Bridge</strong> ist ein universeller Kamera-Hub: eine
+        Software-Oberfläche (RCP + PTZ) und ein Command-Bus, der Sony, Canon,
+        Panasonic, Blackmagic, Z CAM, JVC, BirdDog und generische VISCA-PTZ
+        markenübergreifend steuert – dazu Bitfocus Companion und USB-Bedienpulte.
       </p>
       <div className="wizard-feature-list">
         <div className="wizard-feature">
           <span className="wizard-feature__icon">🎥</span>
           <div>
-            <div className="wizard-feature__name">Sony 700PTP / RS-422</div>
-            <div className="wizard-feature__desc">Iris, Master Black, Gain, Gamma, WB, Tally</div>
+            <div className="wizard-feature__name">Broadcast & Cinema</div>
+            <div className="wizard-feature__desc">Sony CCU (700PTP/RS-422), Sony FX/Alpha (USB), Canon CCAPI, Blackmagic REST, Lumix</div>
           </div>
         </div>
         <div className="wizard-feature">
-          <span className="wizard-feature__icon">📷</span>
+          <span className="wizard-feature__icon">🕹️</span>
           <div>
-            <div className="wizard-feature__name">Panasonic Lumix (WiFi/LAN)</div>
-            <div className="wizard-feature__desc">S1, S5, GH5, GH6, BGH1 – HTTP CGI Protokoll</div>
+            <div className="wizard-feature__name">PTZ-Steuerung (Touch)</div>
+            <div className="wizard-feature__desc">AW-RP150-Panel für VISCA/Sony BRC-SRG, Panasonic AW, BirdDog, JVC</div>
           </div>
         </div>
         <div className="wizard-feature">
           <span className="wizard-feature__icon">🎛️</span>
           <div>
-            <div className="wizard-feature__name">Bitfocus Companion</div>
-            <div className="wizard-feature__desc">HTTP + WebSocket API für Streamdecks</div>
+            <div className="wizard-feature__name">Companion & USB-Pult</div>
+            <div className="wizard-feature__desc">Streamdeck-API + HID-Bedienpult steuern jede verbundene Kamera</div>
           </div>
         </div>
       </div>

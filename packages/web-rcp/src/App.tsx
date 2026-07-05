@@ -1,19 +1,24 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useBridge } from './hooks/useBridge.ts';
 import { ConnectionPanel } from './components/ConnectionPanel.tsx';
 import { SonyRcpPanel } from './components/SonyRcpPanel.tsx';
+import { PtzPanel } from './components/PtzPanel.tsx';
 import { WiznetPanel } from './components/WiznetPanel.tsx';
 import { Dashboard } from './components/Dashboard.tsx';
 import { FirstStartWizard, isWizardDone } from './components/FirstStartWizard.tsx';
+import { capabilitiesForMode, isPtzMode } from './capabilities.ts';
 import type { CameraState, WiznetDevice } from './types.ts';
 import type { TallyState } from './components/TallyBar.tsx';
 import './styles/sony-rcp.css';
 import './styles/wizard.css';
+import './styles/ptz-panel.css';
 
 type AppMode = 'single' | 'dashboard';
+type PanelView = 'rcp' | 'ptz';
 
 export default function App() {
   const [mode, setMode] = useState<AppMode>('dashboard');
+  const [panelView, setPanelView] = useState<PanelView>('rcp');
   const [showWizard, setShowWizard] = useState(!isWizardDone());
   
   const {
@@ -78,6 +83,13 @@ export default function App() {
     },
     [setConfig],
   );
+
+  // PTZ heads default to the PTZ panel; paint-only cameras to the RCP.
+  useEffect(() => {
+    setPanelView(isPtzMode(config.connectionMode) ? 'ptz' : 'rcp');
+  }, [config.connectionMode]);
+
+  const capabilities = capabilitiesForMode(config.connectionMode);
 
   // Dashboard mode - multi-camera RCP panels
   if (mode === 'dashboard') {
@@ -149,13 +161,37 @@ export default function App() {
         </aside>
 
         <div className="app__rcp">
-          <SonyRcpPanel
-            state={state}
-            tally={tally}
-            disabled={!cameraConnected}
-            onCommand={handleCommand}
-            onSetTally={handleSetTally}
-          />
+          <div className="panel-view-tabs" style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.6rem' }}>
+            <button
+              className={`rcp-btn ${panelView === 'rcp' ? 'rcp-btn--primary' : 'rcp-btn--secondary'}`}
+              onClick={() => setPanelView('rcp')}
+            >
+              RCP (Bildregler)
+            </button>
+            <button
+              className={`rcp-btn ${panelView === 'ptz' ? 'rcp-btn--primary' : 'rcp-btn--secondary'}`}
+              onClick={() => setPanelView('ptz')}
+            >
+              PTZ (Joystick)
+            </button>
+          </div>
+
+          {panelView === 'ptz' ? (
+            <PtzPanel
+              cameraId={config.ccuId ?? 1}
+              disabled={!cameraConnected}
+              onCommand={handleCommand}
+            />
+          ) : (
+            <SonyRcpPanel
+              state={state}
+              tally={tally}
+              disabled={!cameraConnected}
+              capabilities={capabilities}
+              onCommand={handleCommand}
+              onSetTally={handleSetTally}
+            />
+          )}
         </div>
       </main>
     </div>

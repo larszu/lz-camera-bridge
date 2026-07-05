@@ -1,0 +1,258 @@
+/* ── AW-RP150-style touch PTZ panel ─────────────────────────────────── */
+
+.ptz-panel {
+  background: var(--panel-bg, #1b1d22);
+  border: 1px solid var(--border, #33363d);
+  border-radius: 10px;
+  padding: 0.75rem;
+  color: var(--text, #e8e8e8);
+  user-select: none;
+  -webkit-user-select: none;
+  max-width: 860px;
+}
+
+.ptz-panel--disabled {
+  opacity: 0.55;
+}
+
+.ptz-panel__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.6rem;
+}
+
+.ptz-panel__title {
+  font-size: 0.8rem;
+  letter-spacing: 0.12em;
+  color: var(--text-muted, #9aa0a6);
+}
+
+.ptz-panel__cam {
+  font-size: 0.8rem;
+  font-weight: 700;
+  background: #2a2d34;
+  border-radius: 4px;
+  padding: 0.15rem 0.5rem;
+}
+
+.ptz-panel__body {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) auto minmax(150px, auto);
+  gap: 1rem;
+  align-items: start;
+}
+
+/* ── Presets ── */
+.ptz-presets__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.7rem;
+  color: var(--text-muted, #9aa0a6);
+  margin-bottom: 0.4rem;
+}
+
+.ptz-presets__pager {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.ptz-presets__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.45rem;
+}
+
+.ptz-preset {
+  min-height: 52px;
+  font-size: 1rem;
+  font-weight: 600;
+  background: #26292f;
+  color: var(--text, #e8e8e8);
+  border: 1px solid #3a3e46;
+  border-radius: 8px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.ptz-preset:active {
+  background: #3a3e46;
+}
+
+.ptz-preset--active {
+  border-color: #4da3ff;
+  color: #4da3ff;
+}
+
+.ptz-preset--store {
+  border-color: #e5534b;
+}
+
+/* ── Buttons ── */
+.ptz-btn {
+  background: #26292f;
+  color: var(--text, #e8e8e8);
+  border: 1px solid #3a3e46;
+  border-radius: 8px;
+  padding: 0.5rem 0.8rem;
+  cursor: pointer;
+  touch-action: manipulation;
+  font-size: 0.85rem;
+}
+
+.ptz-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.ptz-btn--sm {
+  padding: 0.25rem 0.6rem;
+  min-width: 40px;
+}
+
+.ptz-btn--store {
+  width: 100%;
+  margin-top: 0.5rem;
+  letter-spacing: 0.08em;
+}
+
+.ptz-btn--store-armed {
+  background: #e5534b;
+  border-color: #e5534b;
+  color: #fff;
+}
+
+.ptz-btn--af {
+  margin-top: 0.35rem;
+  background: #2b3f5e;
+  border-color: #3d5b88;
+}
+
+/* ── Joystick ── */
+.ptz-stick {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.ptz-stick__pad {
+  position: relative;
+  width: min(260px, 60vw);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 40%, #2e3138, #191b1f 75%);
+  border: 2px solid #3a3e46;
+  touch-action: none; /* the pad IS the gesture surface */
+  cursor: pointer;
+}
+
+.ptz-stick__cross {
+  position: absolute;
+  background: #33363d;
+}
+
+.ptz-stick__cross--h {
+  left: 8%;
+  right: 8%;
+  top: 50%;
+  height: 1px;
+}
+
+.ptz-stick__cross--v {
+  top: 8%;
+  bottom: 8%;
+  left: 50%;
+  width: 1px;
+}
+
+.ptz-stick__knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 34%;
+  aspect-ratio: 1;
+  margin: -17% 0 0 -17%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #6a6f78, #2c2f35 70%);
+  border: 2px solid #494e57;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  transition: transform 60ms linear;
+}
+
+.ptz-speed {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.7rem;
+  color: var(--text-muted, #9aa0a6);
+}
+
+.ptz-speed input {
+  width: 130px;
+}
+
+/* ── Zoom/Focus rockers + iris ── */
+.ptz-right {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.ptz-rocker {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.ptz-rocker__label {
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  color: var(--text-muted, #9aa0a6);
+}
+
+.ptz-rocker__btn {
+  min-height: 56px;
+  min-width: 96px;
+  font-size: 1rem;
+  font-weight: 700;
+  background: #26292f;
+  color: var(--text, #e8e8e8);
+  border: 1px solid #3a3e46;
+  border-radius: 8px;
+  cursor: pointer;
+  touch-action: none; /* hold-to-drive: no scroll while pressing */
+}
+
+.ptz-rocker__btn:active {
+  background: #4da3ff;
+  color: #0c0d0f;
+}
+
+.ptz-iris {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  color: var(--text-muted, #9aa0a6);
+}
+
+.ptz-iris input {
+  width: 100%;
+}
+
+/* Narrow screens: stack columns, keep touch targets big */
+@media (max-width: 720px) {
+  .ptz-panel__body {
+    grid-template-columns: 1fr;
+  }
+
+  .ptz-right {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: flex-end;
+  }
+}
