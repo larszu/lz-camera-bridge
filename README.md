@@ -63,6 +63,10 @@ single command vocabulary (`setIris`, `setMasterGain`, `ptz`, `recallPreset`, �
 fans out to all of them. A visual walk-through lives in
 [`docs/architecture.html`](docs/architecture.html).
 
+Live-video feasibility per camera family — which cameras can show a live
+picture in the panel, at what cost — is documented in
+[`docs/live-video.md`](docs/live-video.md).
+
 ## Packages
 
 | Path | What it is |
