@@ -1358,3 +1358,55 @@
 .dashboard__sidebar .add-camera-btn + .add-camera-btn {
   margin-top: 4px;
 }
+
+/* ── Single-view header + multi-camera switcher (ported from dashboard) ── */
+.app__title {
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  font-size: 1.05rem;
+}
+
+.panel-view-tabs {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 0.6rem;
+}
+
+.cam-switch {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.cam-switch__label {
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted, #8b93a1);
+  margin-right: 0.3rem;
+}
+
+.cam-switch__btn {
+  min-width: 40px;
+  min-height: 38px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text, #e6e9ee);
+  background: #23262d;
+  border: 1px solid #363b44;
+  border-radius: 8px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.cam-switch__btn:hover {
+  border-color: #4d9dff;
+}
+
+.cam-switch__btn--active {
+  background: #4d9dff;
+  border-color: #4d9dff;
+  color: #0c0d0f;
+}
