@@ -212,41 +212,33 @@ export class SonyMncClient extends EventEmitter {
   /**
    * Handle RCP commands and map to camera API
    */
-  async handleRcpCommand(cmd: string, params: Record<string, unknown>): Promise<void> {
+  async handleRcpCommand(cmd: string, params: Record<string, unknown>): Promise<boolean> {
     switch (cmd) {
-      case 'setIris':
+      case 'setIris': {
         // Map 0-255 to F1.4-F22
         const irisValue = params.value as number;
         const fNumber = 1.4 + (irisValue / 255) * 20.6;
         await this.setIris(`F${fNumber.toFixed(1)}`);
-        break;
-        
-      case 'setMasterGain':
+        return true;
+      }
+      case 'setMasterGain': {
         const gainIsoMap: Record<number, number> = {
           0: 800, 1: 1600, 2: 3200, 3: 6400, 4: 12800, 5: 25600, 6: 51200,
         };
         await this.setIsoGain(gainIsoMap[params.value as number] || 800);
-        break;
-        
+        return true;
+      }
       case 'setColorTemp':
         await this.setColorTemperature(params.value as number);
-        break;
-        
+        return true;
       case 'autoWhiteBalance':
         await this.executeAwb();
-        break;
-        
+        return true;
       case 'setNdFilter':
         await this.setNdFilter(params.value as number);
-        break;
-        
-      case 'setBars':
-        // Bars is not typically available over this protocol
-        console.log('[MNC] setBars not supported');
-        break;
-        
+        return true;
       default:
-        console.log(`[MNC] Unhandled command: ${cmd}`, params);
+        return false;
     }
   }
 

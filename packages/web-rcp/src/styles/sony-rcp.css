@@ -1358,3 +1358,127 @@
 .dashboard__sidebar .add-camera-btn + .add-camera-btn {
   margin-top: 4px;
 }
+
+/* ── Single-view header + multi-camera switcher (ported from dashboard) ── */
+.app__title {
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  font-size: 1.05rem;
+}
+
+.panel-view-tabs {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 0.6rem;
+}
+
+.cam-switch {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.cam-switch__label {
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted, #8b93a1);
+  margin-right: 0.3rem;
+}
+
+.cam-switch__btn {
+  min-width: 40px;
+  min-height: 38px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text, #e6e9ee);
+  background: #23262d;
+  border: 1px solid #363b44;
+  border-radius: 8px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.cam-switch__btn:hover {
+  border-color: #4d9dff;
+}
+
+.cam-switch__btn--active {
+  background: #4d9dff;
+  border-color: #4d9dff;
+  color: #0c0d0f;
+}
+
+/* ── Multi-camera list ── */
+.app__header { display: flex; align-items: center; gap: 0.6rem; }
+.app__ws { margin-left: 0.2rem; }
+
+.camera-list { margin-bottom: 0.8rem; }
+.camera-list__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.6rem; }
+.camera-list__empty { color: var(--text-muted, #8b93a1); font-size: 0.82rem; margin: 0.2rem 0; }
+
+.camera-list__item {
+  display: flex; align-items: center; gap: 0.55rem;
+  padding: 0.5rem 0.6rem; border-radius: 8px; cursor: pointer;
+  border: 1px solid transparent;
+}
+.camera-list__item:hover { background: #20242c; }
+.camera-list__item--active { background: #20242c; border-color: #4d9dff; }
+.camera-list__num {
+  font-weight: 700; font-variant-numeric: tabular-nums;
+  min-width: 1.4em; text-align: center;
+}
+.camera-list__mode { flex: 1; color: var(--text-muted, #9aa4b2); font-size: 0.85rem; }
+.camera-list__remove {
+  background: none; border: none; color: var(--text-muted, #8b93a1);
+  cursor: pointer; font-size: 0.85rem; padding: 0.15rem 0.35rem; border-radius: 5px;
+}
+.camera-list__remove:hover { color: #e5514b; background: #2a1d1d; }
+
+.app__empty {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 200px; color: var(--text-muted, #8b93a1); font-size: 0.95rem;
+  border: 1px dashed #333a44; border-radius: 12px; padding: 2rem; text-align: center;
+}
+
+/* ── RCP colour-correction extras (Blackmagic) ── */
+.rcp-section--cc .rcp-cc-row { display: flex; align-items: flex-end; gap: 1rem; padding: 0.4rem 0.2rem; flex-wrap: wrap; }
+.rcp-cc-slider { display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.7rem; letter-spacing: 0.1em; color: var(--text-muted, #8b93a1); flex: 1; min-width: 140px; }
+.rcp-cc-slider input { width: 100%; }
+
+/* ── Multiview (multi-camera control wall) ── */
+.app__viewtabs { margin-left: auto; display: flex; gap: 0.35rem; }
+.multicam { padding: 0.8rem 1rem 2rem; }
+.multicam__bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.8rem; }
+.multicam__title { font-weight: 700; letter-spacing: 0.02em; }
+.multicam__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(460px, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+.multicam__card {
+  background: var(--panel-bg, #16191f);
+  border: 1px solid #2a2f37;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.multicam__card--on { border-color: #2f5d3a; }
+/* PTZ panels are much wider than a paint RCP — let them span two grid cells
+   on roomy screens so the joystick + preset pad aren't clipped. */
+@media (min-width: 1000px) {
+  .multicam__card--ptz { grid-column: span 2; }
+}
+.multicam__card-head {
+  display: flex; align-items: center; gap: 0.55rem;
+  padding: 0.55rem 0.7rem; background: #1b1f26; border-bottom: 1px solid #2a2f37;
+}
+.multicam__card-num { font-weight: 700; font-variant-numeric: tabular-nums; }
+.multicam__card-mode { color: var(--text-muted, #9aa4b2); font-size: 0.85rem; }
+.multicam__card-actions { margin-left: auto; display: flex; align-items: center; gap: 0.35rem; }
+.multicam__card-body { padding: 0.6rem; overflow-x: auto; }
+/* Let the RCP/PTZ panels fill the card width in the grid. */
+.multicam__card-body .rcp-panel,
+.multicam__card-body .ptz-panel { max-width: 100%; }
