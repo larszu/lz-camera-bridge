@@ -3,6 +3,7 @@ import { useBridge } from './hooks/useBridge.ts';
 import { ConnectionPanel } from './components/ConnectionPanel.tsx';
 import { SonyRcpPanel } from './components/SonyRcpPanel.tsx';
 import { PtzPanel } from './components/PtzPanel.tsx';
+import { MultiCamPanel } from './components/MultiCamPanel.tsx';
 import { WiznetPanel } from './components/WiznetPanel.tsx';
 import { FirstStartWizard, isWizardDone } from './components/FirstStartWizard.tsx';
 import { capabilitiesForMode, isPtzMode } from './capabilities.ts';
@@ -13,6 +14,7 @@ import './styles/wizard.css';
 import './styles/ptz-panel.css';
 
 type PanelView = 'rcp' | 'ptz';
+type ViewMode = 'single' | 'multi';
 
 const MODE_LABEL: Record<string, string> = {
   tcp: 'Sony CCU', serial: 'Sony RS-422', 'sony-usb': 'Sony USB', 'sony-mnc': 'Sony WiFi',
@@ -26,6 +28,7 @@ const newCameraConfig = (num: number): BridgeConfig => ({
 
 export default function App() {
   const [panelView, setPanelView] = useState<PanelView>('rcp');
+  const [viewMode, setViewMode] = useState<ViewMode>('single');
   const [showWizard, setShowWizard] = useState(!isWizardDone());
   const [selected, setSelected] = useState<number | null>(null);
 
@@ -98,8 +101,32 @@ export default function App() {
       <header className="app__header">
         <span className="app__title">Camera Bridge</span>
         <span className={`app__ws status-dot status-dot--${status === 'connected' ? 'ok' : 'err'}`} title={`Bridge: ${status}`} />
+        <div className="app__viewtabs">
+          <button className={`rcp-btn rcp-btn--sm ${viewMode === 'single' ? 'rcp-btn--primary' : 'rcp-btn--secondary'}`} onClick={() => setViewMode('single')}>
+            Einzelansicht
+          </button>
+          <button className={`rcp-btn rcp-btn--sm ${viewMode === 'multi' ? 'rcp-btn--primary' : 'rcp-btn--secondary'}`} onClick={() => setViewMode('multi')}>
+            Multiview
+          </button>
+        </div>
       </header>
 
+      {viewMode === 'multi' && (
+        <MultiCamPanel
+          cameras={cameras}
+          cameraStates={cameraStates}
+          tally={tally}
+          onAddCamera={addCamera}
+          onConnect={connectCamera}
+          onDisconnect={disconnectCamera}
+          onRemove={removeCamera}
+          onCommand={(num, cmd, params) => sendCommand(num, cmd, params)}
+          onSetTally={(_num, t) => setTally(t)}
+          onEdit={(num) => { setSelected(num); setViewMode('single'); }}
+        />
+      )}
+
+      {viewMode === 'single' && (
       <main className="app__main app__main--rcp">
         <aside className="app__sidebar">
           {/* Camera list — every configured camera, live status */}
@@ -195,6 +222,7 @@ export default function App() {
           )}
         </div>
       </main>
+      )}
     </div>
   );
 }

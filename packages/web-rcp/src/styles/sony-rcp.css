@@ -1447,3 +1447,38 @@
 .rcp-section--cc .rcp-cc-row { display: flex; align-items: flex-end; gap: 1rem; padding: 0.4rem 0.2rem; flex-wrap: wrap; }
 .rcp-cc-slider { display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.7rem; letter-spacing: 0.1em; color: var(--text-muted, #8b93a1); flex: 1; min-width: 140px; }
 .rcp-cc-slider input { width: 100%; }
+
+/* ── Multiview (multi-camera control wall) ── */
+.app__viewtabs { margin-left: auto; display: flex; gap: 0.35rem; }
+.multicam { padding: 0.8rem 1rem 2rem; }
+.multicam__bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.8rem; }
+.multicam__title { font-weight: 700; letter-spacing: 0.02em; }
+.multicam__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(460px, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+.multicam__card {
+  background: var(--panel-bg, #16191f);
+  border: 1px solid #2a2f37;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.multicam__card--on { border-color: #2f5d3a; }
+/* PTZ panels are much wider than a paint RCP — let them span two grid cells
+   on roomy screens so the joystick + preset pad aren't clipped. */
+@media (min-width: 1000px) {
+  .multicam__card--ptz { grid-column: span 2; }
+}
+.multicam__card-head {
+  display: flex; align-items: center; gap: 0.55rem;
+  padding: 0.55rem 0.7rem; background: #1b1f26; border-bottom: 1px solid #2a2f37;
+}
+.multicam__card-num { font-weight: 700; font-variant-numeric: tabular-nums; }
+.multicam__card-mode { color: var(--text-muted, #9aa4b2); font-size: 0.85rem; }
+.multicam__card-actions { margin-left: auto; display: flex; align-items: center; gap: 0.35rem; }
+.multicam__card-body { padding: 0.6rem; overflow-x: auto; }
+/* Let the RCP/PTZ panels fill the card width in the grid. */
+.multicam__card-body .rcp-panel,
+.multicam__card-body .ptz-panel { max-width: 100%; }
