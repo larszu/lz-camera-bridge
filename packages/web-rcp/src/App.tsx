@@ -6,7 +6,7 @@ import { PtzPanel } from './components/PtzPanel.tsx';
 import { WiznetPanel } from './components/WiznetPanel.tsx';
 import { FirstStartWizard, isWizardDone } from './components/FirstStartWizard.tsx';
 import { capabilitiesForMode, isPtzMode } from './capabilities.ts';
-import type { WiznetDevice } from './types.ts';
+import type { BridgeConfig, WiznetDevice } from './types.ts';
 import type { TallyState } from './components/TallyBar.tsx';
 import './styles/sony-rcp.css';
 import './styles/wizard.css';
@@ -14,115 +14,145 @@ import './styles/ptz-panel.css';
 
 type PanelView = 'rcp' | 'ptz';
 
-/** Highest camera number selectable over a single Sony CCU/CNS connection. */
-const MAX_CCU_CAMERAS = 8;
+const MODE_LABEL: Record<string, string> = {
+  tcp: 'Sony CCU', serial: 'Sony RS-422', 'sony-usb': 'Sony USB', 'sony-mnc': 'Sony WiFi',
+  'lumix-http': 'Lumix', 'canon-ccapi': 'Canon', blackmagic: 'Blackmagic', zcam: 'Z CAM',
+  'panasonic-ptz': 'Pana PTZ', visca: 'VISCA', jvc: 'JVC', birddog: 'BirdDog',
+};
+
+const newCameraConfig = (num: number): BridgeConfig => ({
+  connectionMode: 'tcp', tcpHost: '192.168.1.10', tcpPort: 7700, ccuId: num,
+});
 
 export default function App() {
   const [panelView, setPanelView] = useState<PanelView>('rcp');
   const [showWizard, setShowWizard] = useState(!isWizardDone());
-  const [activeCam, setActiveCam] = useState(0);
+  const [selected, setSelected] = useState<number | null>(null);
 
+  const bridge = useBridge();
   const {
-    status,
-    cameraConnected,
-    state,
-    cameraStates,
-    config,
-    ports,
-    wiznetDevices,
-    sonyUsbDevices,
-    sonyMncDevices,
-    hidDevices,
-    controlSurfaceActive,
-    tally,
-    errorMsg,
-    send,
-    connectCamera,
-    disconnectCamera,
-    listPorts,
-    setConfig,
-    discoverWiznet,
-    configureWiznet,
-    discoverSonyUsb,
-    discoverSonyMnc,
-    listHidDevices,
-    enableControlSurface,
-    disableControlSurface,
-    setTally,
-  } = useBridge();
+    status, cameras, cameraStates, ports, wiznetDevices, sonyUsbDevices, sonyMncDevices,
+    hidDevices, controlSurfaceActive, tally, errorMsg,
+    setCameraConfig, connectCamera, disconnectCamera, removeCamera, sendCommand,
+    listPorts, discoverWiznet, configureWiznet, discoverSonyUsb, discoverSonyMnc,
+    listHidDevices, enableControlSurface, disableControlSurface, setTally,
+  } = bridge;
 
-  // Sony CCU/CNS addresses several cameras by number over one connection.
-  // Every other backend is a single camera, so the switcher only shows there.
-  const isSonyCcu = config.connectionMode === 'tcp' || config.connectionMode === 'serial';
-
-  useEffect(() => {
-    setActiveCam(config.ccuId ?? 0);
-  }, [config.ccuId]);
-
-  // Commands target the selected camera number; state shown follows it too.
-  const handleCommand = useCallback(
-    (cmd: string, params: Record<string, unknown>) => {
-      send('command', { cmd, params: { ...params, cameraNumber: activeCam } });
-    },
-    [send, activeCam],
+  const camNumbers = useMemo(
+    () => Object.keys(cameras).map(Number).sort((a, b) => a - b),
+    [cameras],
   );
 
-  const shownState = useMemo(
-    () => cameraStates[activeCam] ?? state,
-    [cameraStates, activeCam, state],
+  // Keep a valid selection as cameras come and go.
+  useEffect(() => {
+    if (selected === null || !cameras[selected]) {
+      setSelected(camNumbers[0] ?? null);
+    }
+  }, [camNumbers, cameras, selected]);
+
+  const addCamera = useCallback(() => {
+    const num = (camNumbers.length ? Math.max(...camNumbers) : 0) + 1;
+    setCameraConfig(num, newCameraConfig(num));
+    setSelected(num);
+  }, [camNumbers, setCameraConfig]);
+
+  const handleWizardComplete = useCallback(
+    (wizardConfig: Partial<BridgeConfig>) => {
+      const num = (camNumbers.length ? Math.max(...camNumbers) : 0) + 1;
+      setCameraConfig(num, { ...newCameraConfig(num), ...wizardConfig });
+      setSelected(num);
+      setShowWizard(false);
+    },
+    [camNumbers, setCameraConfig],
   );
 
   const handleSelectWiznet = useCallback(
     (device: WiznetDevice) => {
-      setConfig({ connectionMode: 'tcp', tcpHost: device.ip, tcpPort: device.port });
+      if (selected !== null) setCameraConfig(selected, { connectionMode: 'tcp', tcpHost: device.ip, tcpPort: device.port });
     },
-    [setConfig],
+    [selected, setCameraConfig],
   );
 
   const handleSetTally = useCallback((t: Partial<TallyState>) => setTally(t), [setTally]);
 
-  const handleWizardComplete = useCallback(
-    (wizardConfig: Partial<typeof config>) => {
-      setConfig(wizardConfig);
-      setShowWizard(false);
-    },
-    [setConfig],
-  );
+  const cam = selected !== null ? cameras[selected] : undefined;
+  const config = cam?.config ?? newCameraConfig(selected ?? 1);
+  const connected = cam?.connected ?? false;
+  const shownState = selected !== null ? cameraStates[selected] ?? {} : {};
+  const capabilities = capabilitiesForMode(config.connectionMode);
 
-  // PTZ heads default to the PTZ panel; paint-only cameras to the RCP.
   useEffect(() => {
     setPanelView(isPtzMode(config.connectionMode) ? 'ptz' : 'rcp');
-  }, [config.connectionMode]);
+  }, [config.connectionMode, selected]);
 
-  const capabilities = capabilitiesForMode(config.connectionMode);
+  const onCommand = useCallback(
+    (cmd: string, params: Record<string, unknown>) => {
+      if (selected !== null) sendCommand(selected, cmd, params);
+    },
+    [selected, sendCommand],
+  );
 
   return (
     <div className="app">
       {showWizard && <FirstStartWizard onComplete={handleWizardComplete} />}
       <header className="app__header">
         <span className="app__title">Camera Bridge</span>
+        <span className={`app__ws status-dot status-dot--${status === 'connected' ? 'ok' : 'err'}`} title={`Bridge: ${status}`} />
       </header>
+
       <main className="app__main app__main--rcp">
         <aside className="app__sidebar">
-          <ConnectionPanel
-            config={config}
-            ports={ports}
-            sonyUsbDevices={sonyUsbDevices}
-            sonyMncDevices={sonyMncDevices}
-            hidDevices={hidDevices}
-            controlSurfaceActive={controlSurfaceActive}
-            onSetConfig={setConfig}
-            onListPorts={listPorts}
-            onDiscoverSonyUsb={discoverSonyUsb}
-            onDiscoverSonyMnc={discoverSonyMnc}
-            onListHidDevices={listHidDevices}
-            onEnableControlSurface={enableControlSurface}
-            onDisableControlSurface={disableControlSurface}
-            onConnect={connectCamera}
-            onDisconnect={disconnectCamera}
-            cameraConnected={cameraConnected}
-            wsStatus={status}
-          />
+          {/* Camera list — every configured camera, live status */}
+          <div className="panel camera-list">
+            <div className="camera-list__head">
+              <span className="panel__title">Kameras</span>
+              <button className="btn btn--sm btn--primary" onClick={addCamera}>+ Kamera</button>
+            </div>
+            {camNumbers.length === 0 && (
+              <p className="camera-list__empty">Noch keine Kamera. „+ Kamera" fügt eine hinzu.</p>
+            )}
+            {camNumbers.map((n) => {
+              const c = cameras[n];
+              return (
+                <div
+                  key={n}
+                  className={`camera-list__item ${selected === n ? 'camera-list__item--active' : ''}`}
+                  onClick={() => setSelected(n)}
+                >
+                  <span className={`status-dot status-dot--${c.connected ? 'ok' : 'err'}`} />
+                  <span className="camera-list__num">{n}</span>
+                  <span className="camera-list__mode">{MODE_LABEL[c.config.connectionMode ?? 'tcp'] ?? c.config.connectionMode}</span>
+                  <button
+                    className="camera-list__remove"
+                    title="Entfernen"
+                    onClick={(e) => { e.stopPropagation(); removeCamera(n); }}
+                  >✕</button>
+                </div>
+              );
+            })}
+          </div>
+
+          {selected !== null && (
+            <ConnectionPanel
+              config={config}
+              ports={ports}
+              sonyUsbDevices={sonyUsbDevices}
+              sonyMncDevices={sonyMncDevices}
+              hidDevices={hidDevices}
+              controlSurfaceActive={controlSurfaceActive}
+              onSetConfig={(cfg) => setCameraConfig(selected, cfg)}
+              onListPorts={listPorts}
+              onDiscoverSonyUsb={discoverSonyUsb}
+              onDiscoverSonyMnc={discoverSonyMnc}
+              onListHidDevices={listHidDevices}
+              onEnableControlSurface={enableControlSurface}
+              onDisableControlSurface={disableControlSurface}
+              onConnect={() => connectCamera(selected)}
+              onDisconnect={() => disconnectCamera(selected)}
+              cameraConnected={connected}
+              wsStatus={status}
+            />
+          )}
 
           <WiznetPanel
             devices={wiznetDevices}
@@ -135,50 +165,33 @@ export default function App() {
         </aside>
 
         <div className="app__rcp">
-          {/* Multi-camera selector — addresses cameras by number over one
-              Sony CCU/CNS connection (ported from the old dashboard). */}
-          {isSonyCcu && (
-            <div className="cam-switch">
-              <span className="cam-switch__label">Kamera</span>
-              {Array.from({ length: MAX_CCU_CAMERAS }, (_, i) => i + 1).map((n) => (
-                <button
-                  key={n}
-                  className={`cam-switch__btn ${activeCam === n ? 'cam-switch__btn--active' : ''}`}
-                  onClick={() => setActiveCam(n)}
-                >
-                  {n}
-                </button>
-              ))}
-            </div>
-          )}
-
-          <div className="panel-view-tabs">
-            <button
-              className={`rcp-btn ${panelView === 'rcp' ? 'rcp-btn--primary' : 'rcp-btn--secondary'}`}
-              onClick={() => setPanelView('rcp')}
-            >
-              RCP (Bildregler)
-            </button>
-            <button
-              className={`rcp-btn ${panelView === 'ptz' ? 'rcp-btn--primary' : 'rcp-btn--secondary'}`}
-              onClick={() => setPanelView('ptz')}
-            >
-              PTZ (Joystick)
-            </button>
-          </div>
-
-          {panelView === 'ptz' ? (
-            <PtzPanel cameraId={activeCam} disabled={!cameraConnected} onCommand={handleCommand} />
+          {selected === null ? (
+            <div className="app__empty">Füge links eine Kamera hinzu, um sie zu steuern.</div>
           ) : (
-            <SonyRcpPanel
-              state={shownState}
-              tally={tally}
-              cameraId={activeCam}
-              disabled={!cameraConnected}
-              capabilities={capabilities}
-              onCommand={handleCommand}
-              onSetTally={handleSetTally}
-            />
+            <>
+              <div className="panel-view-tabs">
+                <button className={`rcp-btn ${panelView === 'rcp' ? 'rcp-btn--primary' : 'rcp-btn--secondary'}`} onClick={() => setPanelView('rcp')}>
+                  RCP (Bildregler)
+                </button>
+                <button className={`rcp-btn ${panelView === 'ptz' ? 'rcp-btn--primary' : 'rcp-btn--secondary'}`} onClick={() => setPanelView('ptz')}>
+                  PTZ (Joystick)
+                </button>
+              </div>
+
+              {panelView === 'ptz' ? (
+                <PtzPanel cameraId={selected} disabled={!connected} onCommand={onCommand} />
+              ) : (
+                <SonyRcpPanel
+                  state={shownState}
+                  tally={tally}
+                  cameraId={selected}
+                  disabled={!connected}
+                  capabilities={capabilities}
+                  onCommand={onCommand}
+                  onSetTally={handleSetTally}
+                />
+              )}
+            </>
           )}
         </div>
       </main>

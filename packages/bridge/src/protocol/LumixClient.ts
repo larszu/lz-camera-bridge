@@ -94,8 +94,33 @@ export class LumixClient extends EventEmitter {
     return this._connected;
   }
 
+  /** CameraBackend interface alias. */
+  get isConnected(): boolean {
+    return this._connected;
+  }
+
   get state(): CameraState {
     return this._state;
+  }
+
+  /** Map the shared RCP command vocabulary onto the Lumix CGI methods. */
+  async handleRcpCommand(cmd: string, params: Record<string, unknown>): Promise<boolean> {
+    const num = (k: string, d = 0) => Number(params[k] ?? d);
+    switch (cmd) {
+      case 'setIris': await this.setIris(num('value')); return true;
+      case 'setMasterBlack': await this.setMasterBlack(num('value')); return true;
+      case 'setWhiteBalance': await this.setWhiteBalance(num('r'), num('g'), num('b')); return true;
+      case 'setMasterGain': await this.setMasterGain(num('value')); return true;
+      case 'setSaturation': await this.setSaturation(num('value')); return true;
+      case 'setDetailLevel': await this.setDetailLevel(num('value')); return true;
+      case 'setBars': await this.setBars(Boolean(params['on'])); return true;
+      case 'setCameraPower': await this.setCameraPower(Boolean(params['on'])); return true;
+      case 'setNdFilter': await this.setNdFilter(num('value')); return true;
+      case 'setShutterSpeed': await this.setShutterSpeed(num('value')); return true;
+      case 'setZoom': await this.setZoom(num('value')); return true;
+      case 'setRecording': await this.setRecording(Boolean(params['on'])); return true;
+      default: return false;
+    }
   }
 
   // ─── Connection lifecycle ─────────────────────────────────────────────────

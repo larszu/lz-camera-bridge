@@ -1,89 +1,59 @@
 /**
- * WebSocket Bridge Server
+ * WebSocket Bridge Server — multi-camera.
  *
- * Exposes the Sony 700PTP CCU client and RS-422 transport over WebSocket.
- * Web RCP dashboard connects here for real-time camera control.
+ * Holds any number of camera connections at once, each in a numbered slot with
+ * its own backend, and routes commands/state by camera number. Backends are
+ * built by the factory (backendFactory.ts) and share the CameraBackend
+ * interface, so the server has no per-type branching.
  *
- * Message format (JSON):
- *   Client → Server:  { type: 'command', cmd: string, params: Record<string, unknown> }
- *   Server → Client:  { type: 'state', state: CameraState }
- *                     { type: 'connected', info: HandshakeInfo }
- *                     { type: 'disconnected' }
- *                     { type: 'error', message: string }
- *                     { type: 'ports', ports: string[] }
- *                     { type: 'config', config: BridgeConfig }
+ * Client → Server messages:
+ *   { type: 'listCameras' }
+ *   { type: 'setCameraConfig', cameraNumber, config }
+ *   { type: 'connectCamera',    cameraNumber }
+ *   { type: 'disconnectCamera', cameraNumber }
+ *   { type: 'removeCamera',     cameraNumber }
+ *   { type: 'command', cameraNumber, cmd, params }
+ *   { type: 'listPorts' | 'discoverWiznet' | 'configureWiznet'
+ *          | 'discoverSonyUsb' | 'discoverSonyMnc'
+ *          | 'listHidDevices' | 'enableControlSurface' | 'disableControlSurface'
+ *          | 'setTally' | 'getTally' }
+ *
+ * Server → Client messages:
+ *   { type: 'cameras', cameras: [{ cameraNumber, config, connected }] }
+ *   { type: 'cameraConnected' | 'cameraDisconnected', cameraNumber, info? }
+ *   { type: 'state', cameraNumber, state }
+ *   { type: 'error', message, cameraNumber? }
+ *   { type: 'tally' | 'ports' | 'wiznetDevices' | 'sonyUsbDevices'
+ *          | 'sonyMncDevices' | 'hidDevices' | 'controlSurface' | 'wiznetConfigResult' }
  */
 
 import { WebSocketServer, WebSocket } from 'ws';
-import { createServer, IncomingMessage } from 'http';
+import { createServer } from 'http';
 import { Rs422Transport } from './transport/Rs422Transport.js';
-import { CcuClient, CameraState } from './protocol/CcuClient.js';
-import { LumixClient } from './protocol/LumixClient.js';
-import { SonyPtpUsbClient, SonyPtpState, SonyPtpTarget } from './cameras/SonyPtpUsbClient.js';
-import { BMDeviceClient, BMCameraState } from './cameras/BMDeviceClient.js';
-import { SonyMncClient, MncCameraState } from './cameras/SonyMncClient.js';
-import { CanonCcapiClient } from './cameras/CanonCcapiClient.js';
-import { GenericCameraClient } from './cameras/GenericCameraClient.js';
-import { ZCamClient } from './cameras/ZCamClient.js';
-import { PanasonicPtzClient } from './cameras/PanasonicPtzClient.js';
-import { ViscaClient } from './cameras/ViscaClient.js';
-import { JvcClient } from './cameras/JvcClient.js';
-import { BirddogClient } from './cameras/BirddogClient.js';
-import { HidControlSurface, HidSurfaceConfig } from './input/HidControlSurface.js';
-import { WiznetDiscovery, WiznetDevice, WiznetDeviceConfig } from './discovery/WiznetDiscovery.js';
+import { CameraState } from './protocol/CcuClient.js';
+import { makeBackend, CameraBackend, CameraConfig } from './cameras/backendFactory.js';
+import { WiznetDiscovery, WiznetDeviceConfig } from './discovery/WiznetDiscovery.js';
 import { CompanionServer, TallyState } from './companion/CompanionServer.js';
+import { HidControlSurface, HidSurfaceConfig } from './input/HidControlSurface.js';
 
-/** Connection modes routed through the GenericCameraClient code path. */
-const GENERIC_MODES = ['zcam', 'panasonic-ptz', 'visca', 'jvc', 'birddog'] as const;
-type GenericMode = (typeof GENERIC_MODES)[number];
-
-export interface BridgeConfig {
-  /** Connection mode */
-  connectionMode?: 'tcp' | 'serial' | 'lumix-http' | 'sony-usb' | 'blackmagic' | 'sony-mnc' | 'canon-ccapi'
-    | 'zcam' | 'panasonic-ptz' | 'visca' | 'jvc' | 'birddog';
-  /** 700PTP TCP host */
-  tcpHost?: string;
-  /** 700PTP TCP port (default 7700) */
-  tcpPort?: number;
-  /** Serial port path for RS-422 8-pin (e.g. COM3) */
-  serialPath?: string;
-  /** Serial baud rate (default 38400) */
-  baudRate?: number;
-  ccuId?: number;
-  /** Lumix HTTP CGI: camera IP address */
-  lumixHost?: string;
-  /** Lumix HTTP CGI: port (default 80) */
-  lumixPort?: number;
-  /** Sony USB (CRSDK): id of the selected device, e.g. "usb:1.4" */
-  usbDeviceId?: string;
-  /** Sony USB (CRSDK): model name of the selected device */
-  usbDeviceModel?: string;
-  /** Blackmagic REST: camera hostname/IP (e.g. "192.168.1.50" or "Studio-Camera.local") */
-  bmHost?: string;
-  /** Blackmagic REST: use HTTPS (default false) */
-  bmHttps?: boolean;
-  /** Sony Monitor & Control (WiFi): camera IP */
-  mncHost?: string;
-  /** Sony Monitor & Control (WiFi): port (default 10000) */
-  mncPort?: number;
-  /** Canon CCAPI: camera IP */
-  canonHost?: string;
-  /** Canon CCAPI: port (default 8080) */
-  canonPort?: number;
-  /** Generic network camera (Z CAM / Panasonic PTZ / VISCA / JVC / BirdDog): IP */
-  camHost?: string;
-  /** Generic network camera: port (mode-specific default applied if unset) */
-  camPort?: number;
-  /** Login for cameras that require one (JVC web API) */
-  camUser?: string;
-  camPass?: string;
+interface CameraSlot {
+  num: number;
+  config: CameraConfig;
+  backend: CameraBackend | null;
+  mapState: (s: unknown) => Partial<CameraState>;
+  connected: boolean;
 }
 
 interface ClientMessage {
-  type: 'command' | 'connect' | 'disconnect' | 'listPorts' | 'getConfig' | 'setConfig' | 'discoverWiznet' | 'configureWiznet' | 'discoverSonyUsb' | 'discoverSonyMnc' | 'listHidDevices' | 'enableControlSurface' | 'disableControlSurface' | 'setTally' | 'getTally';
+  type:
+    | 'listCameras' | 'setCameraConfig' | 'connectCamera' | 'disconnectCamera' | 'removeCamera'
+    | 'command' | 'listPorts' | 'discoverWiznet' | 'configureWiznet' | 'discoverSonyUsb'
+    | 'discoverSonyMnc' | 'listHidDevices' | 'enableControlSurface' | 'disableControlSurface'
+    | 'setTally' | 'getTally';
+  cameraNumber?: number;
+  config?: CameraConfig;
   cmd?: string;
   params?: Record<string, unknown>;
-  config?: BridgeConfig;
   deviceIp?: string;
   deviceConfig?: WiznetDeviceConfig;
   surface?: HidSurfaceConfig;
@@ -93,42 +63,21 @@ interface ClientMessage {
 export class BridgeServer {
   private wss: WebSocketServer;
   private httpServer: ReturnType<typeof createServer>;
-  private ccuClient: CcuClient | null = null;
-  private lumixClient: LumixClient | null = null;
-  private sonyUsb: SonyPtpUsbClient | null = null;
-  private bmClient: BMDeviceClient | null = null;
-  private sonyMnc: SonyMncClient | null = null;
-  private canon: CanonCcapiClient | null = null;
-  private generic: GenericCameraClient | null = null;
-  private hidSurface: HidControlSurface | null = null;
-  private rs422: Rs422Transport | null = null;
+  private cameras = new Map<number, CameraSlot>();
+  private cameraStates = new Map<number, CameraState>();
   private wiznetDiscovery = new WiznetDiscovery();
   private companion = new CompanionServer();
+  private hidSurface: HidControlSurface | null = null;
   private tally: TallyState = { program: false, preview: false, isoRec: false };
-  private cameraStates = new Map<number, CameraState>();
-  private lastCommandCameraNumber: number | null = null;
-  private config: BridgeConfig = {
-    connectionMode: 'tcp',
-    tcpHost: '192.168.1.10',
-    tcpPort: 7700,
-    serialPath: '',
-    baudRate: 38400,
-    ccuId: 0,
-    lumixHost: '192.168.54.1',
-    lumixPort: 80,
-  };
 
   constructor(private readonly wsPort = 9700) {
     this.httpServer = createServer();
     this.wss = new WebSocketServer({ server: this.httpServer });
     this.wss.on('connection', (ws) => this.onClient(ws));
 
-    // Wire Companion commands to camera
     this.companion.on('command', (cmd: { action: string; params?: Record<string, unknown> }) => {
       this.handleCompanionCommand(cmd.action, cmd.params ?? {});
     });
-
-    // Sync tally from Companion
     this.companion.on('tallyChanged', (t: TallyState) => {
       this.tally = t;
       this.broadcast({ type: 'tally', tally: this.tally });
@@ -144,8 +93,7 @@ export class BridgeServer {
 
   stop(): void {
     this.disableControlSurface();
-    this.disconnectCurrent();
-    this.rs422?.close();
+    for (const slot of this.cameras.values()) void slot.backend?.disconnect();
     this.companion.stop();
     this.wss.close();
     this.httpServer.close();
@@ -155,117 +103,87 @@ export class BridgeServer {
 
   private onClient(ws: WebSocket): void {
     console.log('[BridgeServer] Web client connected');
-
-    // Send current state immediately on connect
-    ws.send(JSON.stringify({ type: 'config', config: this.config }));
+    this.sendCameras(ws);
     ws.send(JSON.stringify({ type: 'tally', tally: this.tally }));
     for (const [cameraNumber, state] of this.cameraStates.entries()) {
       ws.send(JSON.stringify({ type: 'state', cameraNumber, state }));
-    }
-    if (this.ccuClient?.connected) {
-      ws.send(JSON.stringify({ type: 'connected' }));
-      // Send ccuClient live state associated with the configured default camera
-      const defaultCam = this.config.ccuId ?? 0;
-      if (!this.cameraStates.has(defaultCam)) {
-        ws.send(JSON.stringify({ type: 'state', cameraNumber: defaultCam, state: this.ccuClient.state }));
-      }
     }
 
     ws.on('message', (raw) => {
       try {
         const msg: ClientMessage = JSON.parse(raw.toString());
         this.handleClientMessage(ws, msg).catch((err) =>
-          this.sendError(ws, (err as Error).message),
+          this.sendError(ws, (err as Error).message, msg.cameraNumber),
         );
       } catch {
         this.sendError(ws, 'Invalid JSON message');
       }
     });
-
     ws.on('close', () => console.log('[BridgeServer] Web client disconnected'));
     ws.on('error', (err) => console.error('[BridgeServer] WS error:', err));
   }
 
   private async handleClientMessage(ws: WebSocket, msg: ClientMessage): Promise<void> {
     switch (msg.type) {
+      case 'listCameras':
+        this.sendCameras(ws);
+        break;
+
+      case 'setCameraConfig': {
+        const num = msg.cameraNumber ?? 0;
+        const slot = this.getOrCreateSlot(num);
+        slot.config = { ...slot.config, ...(msg.config ?? {}) };
+        this.broadcastCameras();
+        break;
+      }
+
+      case 'connectCamera':
+        await this.connectCamera(msg.cameraNumber ?? 0);
+        break;
+
+      case 'disconnectCamera':
+        await this.disconnectCamera(msg.cameraNumber ?? 0);
+        break;
+
+      case 'removeCamera':
+        await this.disconnectCamera(msg.cameraNumber ?? 0);
+        this.cameras.delete(msg.cameraNumber ?? 0);
+        this.cameraStates.delete(msg.cameraNumber ?? 0);
+        this.broadcastCameras();
+        break;
+
+      case 'command':
+        if (!msg.cmd) break;
+        await this.dispatchCommand(ws, msg.cameraNumber ?? 0, msg.cmd, msg.params ?? {});
+        break;
+
       case 'listPorts': {
         const ports = await Rs422Transport.listPorts();
         ws.send(JSON.stringify({ type: 'ports', ports }));
         break;
       }
 
-      case 'getConfig':
-        ws.send(JSON.stringify({ type: 'config', config: this.config }));
-        break;
-
-      case 'setConfig':
-        if (msg.config) {
-          this.config = { ...this.config, ...msg.config };
-          this.broadcast({ type: 'config', config: this.config });
-        }
-        break;
-
-      case 'connect':
-        if (this.config.connectionMode === 'serial') {
-          await this.connectSerial();
-        } else if (this.config.connectionMode === 'lumix-http') {
-          await this.connectLumix();
-        } else if (this.config.connectionMode === 'sony-usb') {
-          await this.connectSonyUsb(ws);
-        } else if (this.config.connectionMode === 'blackmagic') {
-          await this.connectBlackmagic();
-        } else if (this.config.connectionMode === 'sony-mnc') {
-          await this.connectSonyMnc();
-        } else if (this.config.connectionMode === 'canon-ccapi') {
-          await this.connectCanon();
-        } else if (GENERIC_MODES.includes(this.config.connectionMode as GenericMode)) {
-          await this.connectGeneric(this.config.connectionMode as GenericMode);
-        } else {
-          await this.connectTcp();
-        }
-        break;
-
-      case 'disconnect':
-        this.disconnectCurrent();
-        this.broadcast({ type: 'disconnected' });
-        this.companion.setConnected(false);
-        break;
-
-      case 'command':
-        if (!msg.cmd) break;
-        await this.dispatchCameraCommand(ws, msg.cmd, msg.params ?? {});
-        break;
-
       case 'discoverWiznet': {
-        console.log('[BridgeServer] Scanning for WIZ108SR devices...');
         const devices = await this.wiznetDiscovery.discover();
-        console.log(`[BridgeServer] Found ${devices.length} device(s)`);
         ws.send(JSON.stringify({ type: 'wiznetDevices', devices }));
         break;
       }
 
       case 'configureWiznet': {
-        if (!msg.deviceIp || !msg.deviceConfig) {
-          this.sendError(ws, 'Missing deviceIp or deviceConfig');
-          break;
-        }
-        console.log(`[BridgeServer] Configuring WIZ108SR at ${msg.deviceIp}...`);
+        if (!msg.deviceIp || !msg.deviceConfig) { this.sendError(ws, 'Missing deviceIp or deviceConfig'); break; }
         const ok = await this.wiznetDiscovery.configure(msg.deviceIp, msg.deviceConfig);
         ws.send(JSON.stringify({ type: 'wiznetConfigResult', success: ok, ip: msg.deviceIp }));
         break;
       }
 
       case 'discoverSonyUsb': {
-        console.log('[BridgeServer] Scanning USB for Sony cameras...');
         const { discoverSonyUsbCameras } = await import('./discovery/SonyUsbDiscovery.js');
         const { devices, reason } = await discoverSonyUsbCameras();
-        console.log(`[BridgeServer] Found ${devices.length} Sony USB device(s)`);
         ws.send(JSON.stringify({ type: 'sonyUsbDevices', devices, reason }));
         break;
       }
 
       case 'discoverSonyMnc': {
-        console.log('[BridgeServer] SSDP scan for Sony WiFi cameras...');
         const { discoverSonyMncCameras } = await import('./cameras/SonyMncClient.js');
         const devices = await discoverSonyMncCameras();
         ws.send(JSON.stringify({ type: 'sonyMncDevices', devices }));
@@ -279,27 +197,22 @@ export class BridgeServer {
         break;
       }
 
-      case 'enableControlSurface': {
-        if (!msg.surface) {
-          this.sendError(ws, 'Missing control-surface config');
-          break;
-        }
+      case 'enableControlSurface':
+        if (!msg.surface) { this.sendError(ws, 'Missing control-surface config'); break; }
         await this.enableControlSurface(msg.surface);
         break;
-      }
 
       case 'disableControlSurface':
         this.disableControlSurface();
         break;
 
-      case 'setTally': {
+      case 'setTally':
         if (msg.tally) {
           this.tally = { ...this.tally, ...msg.tally };
           this.companion.setTally(this.tally);
           this.broadcast({ type: 'tally', tally: this.tally });
         }
         break;
-      }
 
       case 'getTally':
         ws.send(JSON.stringify({ type: 'tally', tally: this.tally }));
@@ -307,134 +220,155 @@ export class BridgeServer {
     }
   }
 
-  // ─── TCP connection to CCU/RP700 ──────────────────────────────────────────
+  // ─── Camera slots ─────────────────────────────────────────────────────────
 
-  private async connectTcp(): Promise<void> {
-    this.disconnectCurrent();
-
-    this.ccuClient = new CcuClient({
-      host: this.config.tcpHost ?? '192.168.1.10',
-      port: this.config.tcpPort ?? 7700,
-      ccuId: this.config.ccuId ?? 0,
-    });
-    this.wireCcuEvents();
-    await this.ccuClient.connect();
+  private getOrCreateSlot(num: number): CameraSlot {
+    let slot = this.cameras.get(num);
+    if (!slot) {
+      slot = { num, config: {}, backend: null, mapState: (s) => (s ?? {}) as Partial<CameraState>, connected: false };
+      this.cameras.set(num, slot);
+    }
+    return slot;
   }
 
-  // ─── Serial connection (8-pin RS-422 direct) ──────────────────────────
+  private async connectCamera(num: number): Promise<void> {
+    const slot = this.cameras.get(num);
+    if (!slot) throw new Error(`Kamera ${num} ist nicht konfiguriert`);
 
-  private async connectSerial(): Promise<void> {
-    if (!this.config.serialPath) {
-      throw new Error('No serial port configured');
+    // Reconnecting? drop this slot's previous backend only (others stay up).
+    if (slot.backend) {
+      try { await slot.backend.disconnect(); } catch { /* ignore */ }
+      slot.backend = null;
+      slot.connected = false;
     }
-    this.disconnectCurrent();
 
-    this.ccuClient = new CcuClient({
-      serialPath: this.config.serialPath,
-      baudRate: this.config.baudRate ?? 38400,
-      ccuId: this.config.ccuId ?? 0,
-    });
-    this.wireCcuEvents();
-    await this.ccuClient.connect();
+    const { backend, mapState } = makeBackend(slot.config);
+    slot.backend = backend;
+    slot.mapState = mapState;
+    this.wireSlot(slot);
+    await backend.connect();
   }
 
-  private disconnectCurrent(): void {
-    if (this.ccuClient?.connected) {
-      this.ccuClient.disconnect();
-    }
-    this.ccuClient = null;
-    if (this.lumixClient?.connected) {
-      this.lumixClient.disconnect();
-    }
-    this.lumixClient = null;
-    if (this.sonyUsb) {
-      void this.sonyUsb.disconnect();
-    }
-    this.sonyUsb = null;
-    if (this.bmClient) {
-      this.bmClient.disconnect();
-    }
-    this.bmClient = null;
-    if (this.sonyMnc) {
-      void this.sonyMnc.disconnect();
-    }
-    this.sonyMnc = null;
-    if (this.canon) {
-      this.canon.disconnect();
-    }
-    this.canon = null;
-    if (this.generic) {
-      void this.generic.disconnect();
-    }
-    this.generic = null;
+  private async disconnectCamera(num: number): Promise<void> {
+    const slot = this.cameras.get(num);
+    if (!slot?.backend) return;
+    try { await slot.backend.disconnect(); } catch { /* ignore */ }
+    slot.backend = null;
+    slot.connected = false;
+    this.broadcast({ type: 'cameraDisconnected', cameraNumber: num });
+    this.companion.setConnected(this.anyConnected());
+    this.broadcastCameras();
   }
 
-  // ─── Generic network camera (Z CAM / Panasonic PTZ / VISCA / JVC / BirdDog) ──
+  private wireSlot(slot: CameraSlot): void {
+    const backend = slot.backend;
+    if (!backend) return;
+    const num = slot.num;
 
-  private async connectGeneric(mode: GenericMode): Promise<void> {
-    const host = this.config.camHost;
-    if (!host) throw new Error('Keine Kamera-IP konfiguriert');
-    this.disconnectCurrent();
-
-    const defaultPort: Record<GenericMode, number> = {
-      zcam: 80,
-      'panasonic-ptz': 80,
-      visca: 1259,
-      jvc: 80,
-      birddog: 8080,
-    };
-    const port = this.config.camPort ?? defaultPort[mode];
-
-    const client: GenericCameraClient =
-      mode === 'zcam' ? new ZCamClient(host, port)
-      : mode === 'panasonic-ptz' ? new PanasonicPtzClient(host, port)
-      : mode === 'visca' ? new ViscaClient(host, port)
-      : mode === 'jvc' ? new JvcClient(host, port, this.config.camUser ?? '', this.config.camPass ?? '')
-      : new BirddogClient(host, port);
-
-    this.generic = client;
-    const camNum = this.config.ccuId ?? 0;
-
-    client.on('connected', (info) => {
-      console.log(`[BridgeServer] ${mode} camera connected`);
-      this.broadcast({ type: 'connected', info });
+    backend.on('connected', (info: unknown) => {
+      slot.connected = true;
+      console.log(`[BridgeServer] Camera ${num} connected`);
+      this.broadcast({ type: 'cameraConnected', cameraNumber: num, info });
       this.companion.setConnected(true);
-    });
-    client.on('stateChanged', (state: Partial<CameraState>) => {
-      const merged = { ...(this.cameraStates.get(camNum) ?? {}), ...state };
-      this.cameraStates.set(camNum, merged);
-      this.broadcast({ type: 'state', cameraNumber: camNum, state: merged });
-      this.companion.updateCameraStateFor(camNum, merged as Record<string, unknown>);
-    });
-    client.on('disconnected', () => {
-      this.broadcast({ type: 'disconnected' });
-      this.companion.setConnected(false);
-    });
-    client.on('error', (err: Error) => {
-      console.error(`[BridgeServer] ${mode} error:`, err);
-      this.broadcast({ type: 'error', message: err.message });
+      this.broadcastCameras();
     });
 
-    await client.connect();
+    backend.on('stateChanged', (raw: unknown) => {
+      const mapped = slot.mapState(raw);
+      const merged = { ...(this.cameraStates.get(num) ?? {}), ...mapped };
+      this.cameraStates.set(num, merged);
+      this.broadcast({ type: 'state', cameraNumber: num, state: merged });
+      this.companion.updateCameraStateFor(num, merged as Record<string, unknown>);
+    });
+
+    backend.on('disconnected', () => {
+      slot.connected = false;
+      this.broadcast({ type: 'cameraDisconnected', cameraNumber: num });
+      this.companion.setConnected(this.anyConnected());
+      this.broadcastCameras();
+    });
+
+    backend.on('error', (err: Error) => {
+      console.error(`[BridgeServer] Camera ${num} error:`, err);
+      this.broadcast({ type: 'error', message: err.message, cameraNumber: num });
+    });
   }
 
-  // ─── HID control surface (e.g. a Blackmagic USB-C control panel) ────────
+  private async dispatchCommand(ws: WebSocket, num: number, cmd: string, params: Record<string, unknown>): Promise<void> {
+    const slot = this.cameras.get(num);
+    if (!slot?.backend || !slot.connected) {
+      this.sendError(ws, `Kamera ${num} ist nicht verbunden`, num);
+      return;
+    }
+    const handled = await slot.backend.handleRcpCommand(cmd, { ...params, cameraNumber: num });
+    if (!handled) this.sendError(ws, `'${cmd}' wird von Kamera ${num} nicht unterstützt`, num);
+
+    // Optimistic UI echo for value-carrying paint commands (backends that poll
+    // their own state will overwrite this with the real value).
+    const echo = this.echoState(cmd, params);
+    if (echo) {
+      const merged = { ...(this.cameraStates.get(num) ?? {}), ...echo };
+      this.cameraStates.set(num, merged);
+      this.broadcast({ type: 'state', cameraNumber: num, state: merged });
+      this.companion.updateCameraStateFor(num, merged as Record<string, unknown>);
+    }
+  }
+
+  private echoState(cmd: string, params: Record<string, unknown>): Partial<CameraState> | null {
+    const n = (k: string) => Number(params[k] ?? 0);
+    switch (cmd) {
+      case 'setIris': return { iris: n('value') };
+      case 'setMasterBlack': return { masterBlack: n('value') };
+      case 'setMasterGain': return { masterGain: n('value') };
+      case 'setMasterGamma': return { masterGamma: n('value') };
+      case 'setSaturation': return { saturation: n('value') };
+      case 'setDetailLevel': return { detailLevel: n('value') };
+      case 'setNdFilter': return { ndFilter: n('value') };
+      case 'setShutterSpeed': return { shutterSpeed: n('value') };
+      case 'setBars': return { bars: Boolean(params['on']) };
+      case 'setCameraPower': return { cameraPower: Boolean(params['on']) };
+      case 'setWhiteBalance': return { whiteR: n('r'), whiteG: n('g'), whiteB: n('b') };
+      case 'setBlackBalance': return { blackR: n('r'), blackG: n('g'), blackB: n('b') };
+      default: return null;
+    }
+  }
+
+  private anyConnected(): boolean {
+    for (const slot of this.cameras.values()) if (slot.connected) return true;
+    return false;
+  }
+
+  private sendCameras(ws?: WebSocket): void {
+    const cameras = [...this.cameras.values()].map((s) => ({
+      cameraNumber: s.num,
+      config: s.config,
+      connected: s.connected,
+    }));
+    const msg = JSON.stringify({ type: 'cameras', cameras });
+    if (ws) ws.send(msg);
+    else this.broadcastRaw(msg);
+  }
+
+  private broadcastCameras(): void {
+    this.sendCameras();
+  }
+
+  // ─── HID control surface ────────────────────────────────────────────────
 
   private async enableControlSurface(surface: HidSurfaceConfig): Promise<void> {
     this.disableControlSurface();
     const hid = new HidControlSurface(surface);
     this.hidSurface = hid;
-
-    // Panel input drives the bridge's command bus → controls whatever camera
-    // is currently connected, regardless of brand.
     hid.on('command', ({ cmd, params }: { cmd: string; params: Record<string, unknown> }) => {
+      // Panel drives the lowest-numbered connected camera by default.
+      const target = [...this.cameras.values()].find((s) => s.connected)?.num
+        ?? (params.cameraNumber as number | undefined) ?? 0;
       const dummyWs = { readyState: WebSocket.OPEN, send: () => {} } as unknown as WebSocket;
-      void this.dispatchCameraCommand(dummyWs, cmd, params);
+      void this.dispatchCommand(dummyWs, target, cmd, params);
     });
     hid.on('started', (info) => this.broadcast({ type: 'controlSurface', active: true, info }));
     hid.on('stopped', () => this.broadcast({ type: 'controlSurface', active: false }));
     hid.on('error', (err: Error) => this.broadcast({ type: 'error', message: `Control surface: ${err.message}` }));
-
     await hid.start();
   }
 
@@ -445,516 +379,55 @@ export class BridgeServer {
     }
   }
 
-  // ─── Blackmagic REST connection ────────────────────────────────────────
-
-  private async connectBlackmagic(): Promise<void> {
-    if (!this.config.bmHost) throw new Error('Keine Blackmagic-Kamera-IP konfiguriert');
-    this.disconnectCurrent();
-
-    const client = new BMDeviceClient(this.config.bmHost, this.config.bmHttps ?? false);
-    this.bmClient = client;
-    const camNum = this.config.ccuId ?? 0;
-
-    client.on('connected', (info) => {
-      console.log('[BridgeServer] Blackmagic camera connected:', info);
-      this.broadcast({ type: 'connected', info });
-      this.companion.setConnected(true);
-    });
-    client.on('stateChanged', (state: Partial<BMCameraState>) => {
-      const mapped = this.mapBmState(state);
-      const merged = { ...(this.cameraStates.get(camNum) ?? {}), ...mapped };
-      this.cameraStates.set(camNum, merged);
-      this.broadcast({ type: 'state', cameraNumber: camNum, state: merged });
-      this.companion.updateCameraStateFor(camNum, merged as Record<string, unknown>);
-    });
-    client.on('disconnected', () => {
-      this.broadcast({ type: 'disconnected' });
-      this.companion.setConnected(false);
-    });
-    client.on('error', (err: Error) => {
-      console.error('[BridgeServer] Blackmagic error:', err);
-      this.broadcast({ type: 'error', message: err.message });
-    });
-
-    await client.connect();
-  }
-
-  private mapBmState(state: Partial<BMCameraState>): Partial<CameraState> {
-    const out: Partial<CameraState> = {};
-    if (state.iris && typeof state.iris.normalised === 'number') {
-      out.iris = Math.round(state.iris.normalised * 255);
-    }
-    if (typeof state.gainDb === 'number') out.masterGain = state.gainDb;
-    if (typeof state.shutterSpeed === 'number') out.shutterSpeed = state.shutterSpeed;
-    return out;
-  }
-
-  // ─── Sony Monitor & Control (WiFi) connection ──────────────────────────
-
-  private async connectSonyMnc(): Promise<void> {
-    if (!this.config.mncHost) throw new Error('Keine Sony-WiFi-Kamera-IP konfiguriert');
-    this.disconnectCurrent();
-
-    const client = new SonyMncClient(this.config.mncHost, this.config.mncPort ?? 10000);
-    this.sonyMnc = client;
-    const camNum = this.config.ccuId ?? 0;
-
-    client.on('connected', (info) => {
-      console.log('[BridgeServer] Sony WiFi camera connected:', info);
-      this.broadcast({ type: 'connected', info });
-      this.companion.setConnected(true);
-    });
-    client.on('stateChanged', (state: MncCameraState) => {
-      const mapped = this.mapMncState(state);
-      const merged = { ...(this.cameraStates.get(camNum) ?? {}), ...mapped };
-      this.cameraStates.set(camNum, merged);
-      this.broadcast({ type: 'state', cameraNumber: camNum, state: merged });
-      this.companion.updateCameraStateFor(camNum, merged as Record<string, unknown>);
-    });
-    client.on('disconnected', () => {
-      this.broadcast({ type: 'disconnected' });
-      this.companion.setConnected(false);
-    });
-    client.on('error', (err: Error) => {
-      console.error('[BridgeServer] Sony WiFi error:', err);
-      this.broadcast({ type: 'error', message: err.message });
-    });
-
-    await client.connect();
-  }
-
-  private mapMncState(state: MncCameraState): Partial<CameraState> {
-    return {
-      // MNC iris is F-number*100; dashboard uses a 0-255 scale (F1.4-F22).
-      iris: Math.round(((state.iris / 100 - 1.4) / 20.6) * 255),
-      ndFilter: state.ndFilter,
-    };
-  }
-
-  // ─── Canon CCAPI connection ────────────────────────────────────────────
-
-  private async connectCanon(): Promise<void> {
-    if (!this.config.canonHost) throw new Error('Keine Canon-Kamera-IP konfiguriert');
-    this.disconnectCurrent();
-
-    const client = new CanonCcapiClient({
-      host: this.config.canonHost,
-      port: this.config.canonPort ?? 8080,
-    });
-    this.canon = client;
-    const camNum = this.config.ccuId ?? 0;
-
-    client.on('connected', (info) => {
-      console.log('[BridgeServer] Canon camera connected:', info);
-      this.broadcast({ type: 'connected', info });
-      this.companion.setConnected(true);
-    });
-    client.on('stateChanged', (state: CameraState) => {
-      const merged = { ...(this.cameraStates.get(camNum) ?? {}), ...state };
-      this.cameraStates.set(camNum, merged);
-      this.broadcast({ type: 'state', cameraNumber: camNum, state: merged });
-      this.companion.updateCameraStateFor(camNum, merged as Record<string, unknown>);
-    });
-    client.on('disconnected', () => {
-      this.broadcast({ type: 'disconnected' });
-      this.companion.setConnected(false);
-    });
-    client.on('error', (err: Error) => {
-      console.error('[BridgeServer] Canon error:', err);
-      this.broadcast({ type: 'error', message: err.message });
-    });
-
-    await client.connect();
-  }
-
-  // ─── Sony USB (PTP vendor extension) connection ───────────────────────
-
-  private async connectSonyUsb(ws: WebSocket): Promise<void> {
-    this.disconnectCurrent();
-
-    const { discoverSonyUsbCameras } = await import('./discovery/SonyUsbDiscovery.js');
-    const { devices, reason } = await discoverSonyUsbCameras();
-    if (devices.length === 0) {
-      throw new Error(
-        reason ?? 'Keine Sony-Kamera am USB gefunden. Kamera in den Modus „PC Remote" versetzen.',
-      );
-    }
-
-    const found = devices.find((d) => d.id === this.config.usbDeviceId) ?? devices[0];
-    const target: SonyPtpTarget = { id: found.id, model: found.model };
-    this.config = { ...this.config, usbDeviceId: target.id, usbDeviceModel: target.model };
-    this.broadcast({ type: 'config', config: this.config });
-
-    const client = new SonyPtpUsbClient();
-    this.sonyUsb = client;
-    this.wireSonyUsbEvents();
-    await client.connect(target);
-  }
-
-  private wireSonyUsbEvents(): void {
-    if (!this.sonyUsb) return;
-    const camNum = this.config.ccuId ?? 0;
-
-    this.sonyUsb.on('connected', (target: SonyPtpTarget) => {
-      console.log('[BridgeServer] Sony USB camera connected:', target);
-      this.broadcast({ type: 'connected', info: target });
-      this.companion.setConnected(true);
-    });
-
-    this.sonyUsb.on('stateChanged', (state: SonyPtpState) => {
-      const mapped = this.mapSonyUsbState(state);
-      const mergedState = { ...(this.cameraStates.get(camNum) ?? {}), ...mapped };
-      this.cameraStates.set(camNum, mergedState);
-      this.broadcast({ type: 'state', cameraNumber: camNum, state: mergedState });
-      this.companion.updateCameraStateFor(camNum, mergedState as Record<string, unknown>);
-    });
-
-    this.sonyUsb.on('disconnected', () => {
-      this.broadcast({ type: 'disconnected' });
-      this.companion.setConnected(false);
-    });
-
-    this.sonyUsb.on('error', (err: Error) => {
-      console.error('[BridgeServer] Sony USB error:', err);
-      this.broadcast({ type: 'error', message: err.message });
-    });
-  }
-
-  /** Map the PTP camera state onto the dashboard's CameraState shape. */
-  private mapSonyUsbState(state: SonyPtpState): Partial<CameraState> {
-    return {
-      iris: state.iris, // already on the 0-255 RCP scale
-      masterGain: state.masterGain,
-      shutterSpeed: state.shutterSpeed,
-    };
-  }
-
-  // ─── Lumix HTTP CGI connection ─────────────────────────────────────────
-
-  private async connectLumix(): Promise<void> {
-    this.disconnectCurrent();
-
-    this.lumixClient = new LumixClient({
-      host: this.config.lumixHost ?? '192.168.54.1',
-      port: this.config.lumixPort ?? 80,
-    });
-    this.wireLumixEvents();
-    await this.lumixClient.connect();
-  }
-
-  private wireLumixEvents(): void {
-    if (!this.lumixClient) return;
-    const camNum = this.config.ccuId ?? 0;
-
-    this.lumixClient.on('connected', (info) => {
-      console.log('[BridgeServer] Lumix camera connected:', info);
-      this.broadcast({ type: 'connected', info });
-      this.companion.setConnected(true);
-    });
-
-    this.lumixClient.on('stateChanged', (state: CameraState) => {
-      const mergedState = { ...(this.cameraStates.get(camNum) ?? {}), ...state };
-      this.cameraStates.set(camNum, mergedState);
-      this.broadcast({ type: 'state', cameraNumber: camNum, state: mergedState });
-      this.companion.updateCameraStateFor(camNum, mergedState as Record<string, unknown>);
-    });
-
-    this.lumixClient.on('disconnected', () => {
-      this.broadcast({ type: 'disconnected' });
-      this.companion.setConnected(false);
-    });
-
-    this.lumixClient.on('error', (err: Error) => {
-      console.error('[BridgeServer] Lumix error:', err);
-      this.broadcast({ type: 'error', message: err.message });
-    });
-  }
-
-  private wireCcuEvents(): void {
-    if (!this.ccuClient) return;
-
-    this.ccuClient.on('connected', (info) => {
-      console.log('[BridgeServer] Camera connected:', info);
-      this.broadcast({ type: 'connected', info });
-      this.companion.setConnected(true);
-    });
-
-    this.ccuClient.on('stateChanged', (state: CameraState) => {
-      // Associate hardware feedback with the last targeted camera
-      const camNum = this.lastCommandCameraNumber ?? (this.config.ccuId ?? 0);
-      const mergedState = {
-        ...(this.cameraStates.get(camNum) ?? {}),
-        ...state,
-      };
-      this.cameraStates.set(camNum, mergedState);
-      this.broadcast({ type: 'state', cameraNumber: camNum, state: mergedState });
-      this.companion.updateCameraStateFor(camNum, mergedState as Record<string, unknown>);
-    });
-
-    this.ccuClient.on('disconnected', () => {
-      this.broadcast({ type: 'disconnected' });
-      this.companion.setConnected(false);
-    });
-
-    this.ccuClient.on('error', (err: Error) => {
-      console.error('[BridgeServer] Camera error:', err);
-      this.broadcast({ type: 'error', message: err.message });
-    });
-  }
-
-  // ─── Camera command dispatcher ────────────────────────────────────────────
-
-  private async dispatchCameraCommand(
-    ws: WebSocket,
-    cmd: string,
-    params: Record<string, unknown>,
-  ): Promise<void> {
-    const isLumix = this.lumixClient?.connected ?? false;
-    const isSony = this.ccuClient?.connected ?? false;
-    const isSonyUsb = this.sonyUsb?.isConnected ?? false;
-    const isBlackmagic = this.bmClient?.isConnected ?? false;
-    const isSonyMnc = this.sonyMnc?.isConnected ?? false;
-    const isCanon = this.canon?.isConnected ?? false;
-    const isGeneric = this.generic?.isConnected ?? false;
-
-    if (!isLumix && !isSony && !isSonyUsb && !isBlackmagic && !isSonyMnc && !isCanon && !isGeneric) {
-      this.sendError(ws, 'Not connected to any camera');
-      return;
-    }
-
-    const num = (key: string, def = 0) => Number(params[key] ?? def);
-    const targetCamera = num('cameraNumber', this.config.ccuId ?? 0);
-    this.lastCommandCameraNumber = targetCamera;
-
-    const currentState = this.cameraStates.get(targetCamera) ?? {};
-    const stateUpdates: Partial<CameraState> = {};
-
-    if (isSonyUsb) {
-      // ── Sony PTP routing (FX3/FX6/A7 via USB) ─────────────────────────────
-      // The client maps RCP commands to camera properties and emits
-      // `stateChanged`, which is broadcast back to the UI via wireSonyUsbEvents.
-      const handled = await this.sonyUsb!.handleRcpCommand(cmd, params);
-      if (!handled) this.sendError(ws, `'${cmd}' wird über Sony USB/PTP nicht unterstützt`);
-      return;
-    } else if (isBlackmagic) {
-      // ── Blackmagic REST routing ───────────────────────────────────────────
-      const handled = await this.bmClient!.handleRcpCommand(cmd, params);
-      if (!handled) this.sendError(ws, `'${cmd}' wird über die Blackmagic-API nicht unterstützt`);
-      return;
-    } else if (isCanon) {
-      // ── Canon CCAPI routing ───────────────────────────────────────────────
-      const handled = await this.canon!.handleRcpCommand(cmd, params);
-      if (!handled) this.sendError(ws, `'${cmd}' wird über Canon CCAPI nicht unterstützt`);
-      return;
-    } else if (isSonyMnc) {
-      // ── Sony Monitor & Control (WiFi) routing ─────────────────────────────
-      await this.sonyMnc!.handleRcpCommand(cmd, params);
-      return;
-    } else if (isGeneric) {
-      // ── Generic network camera routing (Z CAM / Panasonic PTZ / VISCA / JVC / BirdDog) ──
-      const handled = await this.generic!.handleRcpCommand(cmd, params);
-      if (!handled) this.sendError(ws, `'${cmd}' wird von dieser Kamera nicht unterstützt`);
-      return;
-    } else if (isLumix) {
-      // ── Lumix command routing ─────────────────────────────────────────────
-      const lx = this.lumixClient!;
-      switch (cmd) {
-        case 'setIris':
-          await lx.setIris(num('value'));
-          stateUpdates.iris = num('value');
-          break;
-        case 'setMasterBlack':
-          await lx.setMasterBlack(num('value'));
-          stateUpdates.masterBlack = num('value');
-          break;
-        case 'setWhiteBalance':
-          await lx.setWhiteBalance(num('r'), num('g'), num('b'));
-          stateUpdates.whiteR = num('r');
-          stateUpdates.whiteG = num('g');
-          stateUpdates.whiteB = num('b');
-          break;
-        case 'setMasterGain':
-          await lx.setMasterGain(num('value'));
-          stateUpdates.masterGain = num('value');
-          break;
-        case 'setSaturation':
-          await lx.setSaturation(num('value'));
-          stateUpdates.saturation = num('value');
-          break;
-        case 'setDetailLevel':
-          await lx.setDetailLevel(num('value'));
-          stateUpdates.detailLevel = num('value');
-          break;
-        case 'setBars':
-          await lx.setBars(Boolean(params['on']));
-          stateUpdates.bars = Boolean(params['on']);
-          break;
-        case 'setCameraPower':
-          await lx.setCameraPower(Boolean(params['on']));
-          stateUpdates.cameraPower = Boolean(params['on']);
-          break;
-        case 'setNdFilter':
-          await lx.setNdFilter(num('value'));
-          stateUpdates.ndFilter = num('value');
-          break;
-        case 'setShutterSpeed':
-          await lx.setShutterSpeed(num('value'));
-          stateUpdates.shutterSpeed = num('value');
-          break;
-        case 'setZoom':
-          await lx.setZoom(num('value'));
-          break;
-        case 'setRecording':
-          await lx.setRecording(Boolean(params['on']));
-          break;
-        default:
-          this.sendError(ws, `Unknown command: ${cmd}`);
-      }
-    } else {
-      // ── Sony 700PTP command routing ───────────────────────────────────────
-      const ccu = this.ccuClient!;
-      switch (cmd) {
-        case 'setIris':
-          await ccu.setIris(num('value'), targetCamera);
-          stateUpdates.iris = num('value');
-          break;
-        case 'setMasterBlack':
-          await ccu.setMasterBlack(num('value'), targetCamera);
-          stateUpdates.masterBlack = num('value');
-          break;
-        case 'setBlackBalance':
-          await ccu.setBlackBalance(num('r'), num('g'), num('b'), targetCamera);
-          if (params['r'] !== undefined) stateUpdates.blackR = num('r');
-          if (params['g'] !== undefined) stateUpdates.blackG = num('g');
-          if (params['b'] !== undefined) stateUpdates.blackB = num('b');
-          break;
-        case 'setWhiteBalance':
-          await ccu.setWhiteBalance(num('r'), num('g'), num('b'), targetCamera);
-          if (params['r'] !== undefined) stateUpdates.whiteR = num('r');
-          if (params['g'] !== undefined) stateUpdates.whiteG = num('g');
-          if (params['b'] !== undefined) stateUpdates.whiteB = num('b');
-          break;
-        case 'setMasterGain':
-          await ccu.setMasterGain(num('value'), targetCamera);
-          stateUpdates.masterGain = num('value');
-          break;
-        case 'setMasterGamma':
-          await ccu.setMasterGamma(num('value'), targetCamera);
-          stateUpdates.masterGamma = num('value');
-          break;
-        case 'setSaturation':
-          await ccu.setSaturation(num('value'), targetCamera);
-          stateUpdates.saturation = num('value');
-          break;
-        case 'setDetailLevel':
-          await ccu.setDetailLevel(num('value'), targetCamera);
-          stateUpdates.detailLevel = num('value');
-          break;
-        case 'setBars':
-          await ccu.setBars(Boolean(params['on']), targetCamera);
-          stateUpdates.bars = Boolean(params['on']);
-          break;
-        case 'setCameraPower':
-          await ccu.setCameraPower(Boolean(params['on']), targetCamera);
-          stateUpdates.cameraPower = Boolean(params['on']);
-          break;
-        case 'setNdFilter':
-          await ccu.setNdFilter(num('value'), targetCamera);
-          stateUpdates.ndFilter = num('value');
-          break;
-        case 'setShutterSpeed':
-          await ccu.setShutterSpeed(num('value'), targetCamera);
-          stateUpdates.shutterSpeed = num('value');
-          break;
-        default:
-          this.sendError(ws, `Unknown command: ${cmd}`);
-      }
-    }
-
-    const mergedState = { ...currentState, ...stateUpdates };
-    this.cameraStates.set(targetCamera, mergedState);
-    this.broadcast({ type: 'state', cameraNumber: targetCamera, state: mergedState });
-    this.companion.updateCameraStateFor(targetCamera, mergedState as Record<string, unknown>);
-  }
-
   // ─── Helpers ──────────────────────────────────────────────────────────────
 
   private broadcast(msg: unknown): void {
-    const data = JSON.stringify(msg);
+    this.broadcastRaw(JSON.stringify(msg));
+  }
+
+  private broadcastRaw(data: string): void {
     for (const client of this.wss.clients) {
-      if (client.readyState === WebSocket.OPEN) {
-        client.send(data);
-      }
+      if (client.readyState === WebSocket.OPEN) client.send(data);
     }
   }
 
-  private sendError(ws: WebSocket, message: string): void {
+  private sendError(ws: WebSocket, message: string, cameraNumber?: number): void {
     if (ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: 'error', message }));
+      ws.send(JSON.stringify({ type: 'error', message, cameraNumber }));
     }
   }
 
-  // ─── Companion command handler ────────────────────────────────────────────
+  // ─── Companion command handler ──────────────────────────────────────────
 
   private async handleCompanionCommand(action: string, params: Record<string, unknown>): Promise<void> {
-    // Handle tally commands
-    if (action === 'tallyProgram') {
-      this.tally.program = !this.tally.program;
-      this.companion.setTally(this.tally);
-      this.broadcast({ type: 'tally', tally: this.tally });
-      return;
-    }
-    if (action === 'tallyPreview') {
-      this.tally.preview = !this.tally.preview;
-      this.companion.setTally(this.tally);
-      this.broadcast({ type: 'tally', tally: this.tally });
-      return;
-    }
-    if (action === 'tallyClear') {
-      this.tally = { program: false, preview: false, isoRec: false };
+    if (action === 'tallyProgram' || action === 'tallyPreview' || action === 'tallyClear') {
+      if (action === 'tallyClear') this.tally = { program: false, preview: false, isoRec: false };
+      else this.tally[action === 'tallyProgram' ? 'program' : 'preview'] = !this.tally[action === 'tallyProgram' ? 'program' : 'preview'];
       this.companion.setTally(this.tally);
       this.broadcast({ type: 'tally', tally: this.tally });
       return;
     }
 
-    // Handle increment/decrement commands — read from per-camera state, not global ccuClient state
-    const companionCamNum = Number(params.cameraNumber ?? this.config.ccuId ?? 0);
-    const perCamState = this.cameraStates.get(companionCamNum) ?? {};
+    const camNum = Number(params.cameraNumber ?? 0);
+    const perCam = this.cameraStates.get(camNum) ?? {};
 
     if (action === 'irisUp' || action === 'irisDown') {
-      const delta = action === 'irisUp' ? 5 : -5;
-      const current = (perCamState.iris ?? this.ccuClient?.state.iris ?? 128) + delta;
-      params.value = Math.max(0, Math.min(255, current));
+      const cur = (perCam.iris ?? 128) + (action === 'irisUp' ? 5 : -5);
+      params.value = Math.max(0, Math.min(255, cur));
       action = 'setIris';
-    }
-    if (action === 'gainUp' || action === 'gainDown') {
-      const delta = action === 'gainUp' ? 1 : -1;
-      const current = (perCamState.masterGain ?? this.ccuClient?.state.masterGain ?? 0) + delta;
-      params.value = Math.max(0, Math.min(7, current));
+    } else if (action === 'gainUp' || action === 'gainDown') {
+      const cur = (perCam.masterGain ?? 0) + (action === 'gainUp' ? 1 : -1);
+      params.value = Math.max(0, Math.min(7, cur));
       action = 'setMasterGain';
-    }
-    if (action === 'ndUp' || action === 'ndDown') {
-      const delta = action === 'ndUp' ? 1 : -1;
-      const current = (perCamState.ndFilter ?? this.ccuClient?.state.ndFilter ?? 0) + delta;
-      params.value = Math.max(0, Math.min(4, current));
+    } else if (action === 'ndUp' || action === 'ndDown') {
+      const cur = (perCam.ndFilter ?? 0) + (action === 'ndUp' ? 1 : -1);
+      params.value = Math.max(0, Math.min(4, cur));
       action = 'setNdFilter';
     }
 
-    // Route to whichever camera backend is currently connected. The previous
-    // guard only allowed the Sony CCU, silently dropping Companion commands
-    // for every other backend (Lumix, USB, Blackmagic, Canon, PTZ …).
-    const anyConnected =
-      (this.ccuClient?.connected ?? false) ||
-      (this.lumixClient?.connected ?? false) ||
-      (this.sonyUsb?.isConnected ?? false) ||
-      (this.bmClient?.isConnected ?? false) ||
-      (this.sonyMnc?.isConnected ?? false) ||
-      (this.canon?.isConnected ?? false) ||
-      (this.generic?.isConnected ?? false);
-    if (!anyConnected) return;
-
-    // Create a dummy WebSocket-like object for error handling
+    const slot = this.cameras.get(camNum);
+    if (!slot?.connected) return;
     const dummyWs = { readyState: WebSocket.OPEN, send: () => {} } as unknown as WebSocket;
-    await this.dispatchCameraCommand(dummyWs, action, params);
+    await this.dispatchCommand(dummyWs, camNum, action, params);
   }
 }

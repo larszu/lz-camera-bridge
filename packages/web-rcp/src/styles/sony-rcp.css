@@ -1410,3 +1410,40 @@
   border-color: #4d9dff;
   color: #0c0d0f;
 }
+
+/* ── Multi-camera list ── */
+.app__header { display: flex; align-items: center; gap: 0.6rem; }
+.app__ws { margin-left: 0.2rem; }
+
+.camera-list { margin-bottom: 0.8rem; }
+.camera-list__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.6rem; }
+.camera-list__empty { color: var(--text-muted, #8b93a1); font-size: 0.82rem; margin: 0.2rem 0; }
+
+.camera-list__item {
+  display: flex; align-items: center; gap: 0.55rem;
+  padding: 0.5rem 0.6rem; border-radius: 8px; cursor: pointer;
+  border: 1px solid transparent;
+}
+.camera-list__item:hover { background: #20242c; }
+.camera-list__item--active { background: #20242c; border-color: #4d9dff; }
+.camera-list__num {
+  font-weight: 700; font-variant-numeric: tabular-nums;
+  min-width: 1.4em; text-align: center;
+}
+.camera-list__mode { flex: 1; color: var(--text-muted, #9aa4b2); font-size: 0.85rem; }
+.camera-list__remove {
+  background: none; border: none; color: var(--text-muted, #8b93a1);
+  cursor: pointer; font-size: 0.85rem; padding: 0.15rem 0.35rem; border-radius: 5px;
+}
+.camera-list__remove:hover { color: #e5514b; background: #2a1d1d; }
+
+.app__empty {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 200px; color: var(--text-muted, #8b93a1); font-size: 0.95rem;
+  border: 1px dashed #333a44; border-radius: 12px; padding: 2rem; text-align: center;
+}
+
+/* ── RCP colour-correction extras (Blackmagic) ── */
+.rcp-section--cc .rcp-cc-row { display: flex; align-items: flex-end; gap: 1rem; padding: 0.4rem 0.2rem; flex-wrap: wrap; }
+.rcp-cc-slider { display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.7rem; letter-spacing: 0.1em; color: var(--text-muted, #8b93a1); flex: 1; min-width: 140px; }
+.rcp-cc-slider input { width: 100%; }

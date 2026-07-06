@@ -201,6 +201,35 @@ export class CcuClient extends EventEmitter {
     return this.transport?.writable === true && this.remoteInfo !== null;
   }
 
+  /** CameraBackend interface alias. */
+  get isConnected(): boolean {
+    return this.connected;
+  }
+
+  /**
+   * Map the shared RCP command vocabulary onto the 700PTP set-methods.
+   * `cameraNumber` selects which camera on the CNS the command targets.
+   */
+  async handleRcpCommand(cmd: string, params: Record<string, unknown>): Promise<boolean> {
+    const num = (k: string, d = 0) => Number(params[k] ?? d);
+    const cam = params.cameraNumber !== undefined ? Number(params.cameraNumber) : undefined;
+    switch (cmd) {
+      case 'setIris': await this.setIris(num('value'), cam); return true;
+      case 'setMasterBlack': await this.setMasterBlack(num('value'), cam); return true;
+      case 'setBlackBalance': await this.setBlackBalance(num('r'), num('g'), num('b'), cam); return true;
+      case 'setWhiteBalance': await this.setWhiteBalance(num('r'), num('g'), num('b'), cam); return true;
+      case 'setMasterGain': await this.setMasterGain(num('value'), cam); return true;
+      case 'setMasterGamma': await this.setMasterGamma(num('value'), cam); return true;
+      case 'setSaturation': await this.setSaturation(num('value'), cam); return true;
+      case 'setDetailLevel': await this.setDetailLevel(num('value'), cam); return true;
+      case 'setBars': await this.setBars(Boolean(params['on']), cam); return true;
+      case 'setCameraPower': await this.setCameraPower(Boolean(params['on']), cam); return true;
+      case 'setNdFilter': await this.setNdFilter(num('value'), cam); return true;
+      case 'setShutterSpeed': await this.setShutterSpeed(num('value'), cam); return true;
+      default: return false;
+    }
+  }
+
   // ─── Handshake ─────────────────────────────────────────────────────────────
 
   private performHandshake(): Promise<void> {

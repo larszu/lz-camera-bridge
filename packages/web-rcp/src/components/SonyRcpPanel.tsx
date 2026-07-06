@@ -301,6 +301,30 @@ export function SonyRcpPanel({ state, tally, cameraId = 1, disabled = false, cap
         </div>
       </div>
 
+      {/* ═══════ COLOUR CORRECTION EXTRAS (Blackmagic) ═══════ */}
+      {(can('contrast') || can('resetCc')) && (
+        <div className="rcp-section rcp-section--cc">
+          <div className="rcp-section__header">
+            <span className="rcp-section__label">COLOR CORRECTION</span>
+          </div>
+          <div className="rcp-cc-row">
+            {can('contrast') && (
+              <label className="rcp-cc-slider">
+                CONTRAST
+                <input
+                  type="range" min={0} max={255} defaultValue={128}
+                  onChange={(e) => cmd('setContrast', { value: parseInt(e.target.value) })}
+                  disabled={!can('contrast')}
+                />
+              </label>
+            )}
+            {can('resetCc') && (
+              <RcpButton label="RESET CC" onClick={() => cmd('resetColorCorrection')} disabled={!can('resetCc')} />
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ═══════ BOTTOM BAR ═══════ */}
       <div className="rcp-bottombar">
         <RcpButton label="PREVIEW" active={tally.preview} onClick={() => onSetTally({ preview: !tally.preview })} disabled={!can('tallyPreview')} />

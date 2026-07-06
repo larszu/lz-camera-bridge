@@ -496,6 +496,13 @@ export class BMDeviceClient extends EventEmitter {
           luma: 1,
         });
         return true;
+      case 'setContrast':
+        // 0-255 → adjust 0..2 around a 0.5 pivot.
+        await this.setContrast(0.5, Math.max(0, Math.min(2, num('value') / 128)));
+        return true;
+      case 'resetColorCorrection':
+        await this.resetColorCorrection();
+        return true;
       case 'setRecording':
         await (Boolean(params['on']) ? this.startRecording() : this.stopRecording());
         return true;

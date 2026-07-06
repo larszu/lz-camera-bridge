@@ -1,57 +1,33 @@
 /**
- * WebSocket hook for Camera Bridge
+ * WebSocket hook for the multi-camera Camera Bridge.
+ *
+ * The bridge holds many camera slots keyed by number; this hook mirrors that:
+ * `cameras` is the authoritative slot list (config + connected) from the
+ * bridge, `cameraStates` the live paint state per number. All actions are
+ * camera-scoped.
  */
-
 import { useEffect, useRef, useCallback, useState } from 'react';
-import type { CameraState, CameraStatesByNumber, BridgeConfig, WiznetDevice, SonyUsbDevice, SonyMncDevice, HidDevice, TallyState } from '../types.ts';
+import type {
+  CameraState, CameraStatesByNumber, BridgeConfig, WiznetDevice,
+  SonyUsbDevice, SonyMncDevice, HidDevice, TallyState,
+} from '../types.ts';
 
 export type ConnectionStatus = 'idle' | 'connecting' | 'connected' | 'error' | 'disconnected';
 
-interface UseBridgeReturn {
-  status: ConnectionStatus;
-  cameraConnected: boolean;
-  state: CameraState;
-  cameraStates: CameraStatesByNumber;
+export interface CameraSlot {
+  cameraNumber: number;
   config: BridgeConfig;
-  ports: string[];
-  wiznetDevices: WiznetDevice[];
-  sonyUsbDevices: SonyUsbDevice[];
-  sonyMncDevices: SonyMncDevice[];
-  hidDevices: HidDevice[];
-  controlSurfaceActive: boolean;
-  tally: TallyState;
-  errorMsg: string | null;
-  send: (type: string, payload?: Record<string, unknown>) => void;
-  connectCamera: () => void;
-  disconnectCamera: () => void;
-  listPorts: () => void;
-  setConfig: (config: Partial<BridgeConfig>) => void;
-  discoverWiznet: () => void;
-  configureWiznet: (deviceIp: string, deviceConfig: Record<string, unknown>) => void;
-  discoverSonyUsb: () => void;
-  discoverSonyMnc: () => void;
-  listHidDevices: () => void;
-  enableControlSurface: (surface: Record<string, unknown>) => void;
-  disableControlSurface: () => void;
-  setTally: (tally: Partial<TallyState>) => void;
-}
-
-interface StateResponseMessage {
-  type: 'state';
-  state?: CameraState;
-  cameraNumber?: number;
+  connected: boolean;
 }
 
 const bridgeHost = window.location.hostname || 'localhost';
 const WS_URL = `ws://${bridgeHost}:9700`;
 
-export function useBridge(): UseBridgeReturn {
+export function useBridge() {
   const ws = useRef<WebSocket | null>(null);
   const [status, setStatus] = useState<ConnectionStatus>('idle');
-  const [cameraConnected, setCameraConnected] = useState(false);
-  const [state, setState] = useState<CameraState>({});
+  const [cameras, setCameras] = useState<Record<number, CameraSlot>>({});
   const [cameraStates, setCameraStates] = useState<CameraStatesByNumber>({});
-  const [config, setConfigState] = useState<BridgeConfig>({ connectionMode: 'tcp', tcpHost: '192.168.1.10', tcpPort: 7700, serialPath: '', baudRate: 38400, ccuId: 0 });
   const [ports, setPorts] = useState<string[]>([]);
   const [wiznetDevices, setWiznetDevices] = useState<WiznetDevice[]>([]);
   const [sonyUsbDevices, setSonyUsbDevices] = useState<SonyUsbDevice[]>([]);
@@ -76,31 +52,38 @@ export function useBridge(): UseBridgeReturn {
     socket.onopen = () => {
       setStatus('connected');
       setErrorMsg(null);
+      socket.send(JSON.stringify({ type: 'listCameras' }));
     };
 
     socket.onmessage = (event) => {
       try {
         const msg = JSON.parse(event.data as string);
         switch (msg.type) {
-          case 'state': {
-            const stateMsg = msg as StateResponseMessage;
-            if (typeof stateMsg.cameraNumber === 'number') {
-              setCameraStates((prev) => ({
-                ...prev,
-                [stateMsg.cameraNumber!]: { ...(prev[stateMsg.cameraNumber!] ?? {}), ...(stateMsg.state ?? {}) },
-              }));
-            } else {
-              setState((prev) => ({ ...prev, ...stateMsg.state }));
-            }
+          case 'cameras': {
+            const rec: Record<number, CameraSlot> = {};
+            for (const c of msg.cameras as CameraSlot[]) rec[c.cameraNumber] = c;
+            setCameras(rec);
             break;
           }
-          case 'connected':
-            setCameraConnected(true);
+          case 'state':
+            if (typeof msg.cameraNumber === 'number') {
+              setCameraStates((prev) => ({
+                ...prev,
+                [msg.cameraNumber]: { ...(prev[msg.cameraNumber] ?? {}), ...(msg.state ?? {}) },
+              }));
+            }
             break;
-          case 'disconnected':
-            setCameraConnected(false);
-            setState({});
-            setCameraStates({});
+          case 'cameraConnected':
+            setErrorMsg(null);
+            break;
+          case 'cameraDisconnected':
+            if (typeof msg.cameraNumber === 'number') {
+              setCameraStates((prev) => {
+                const next = { ...prev };
+                delete next[msg.cameraNumber];
+                return next;
+              });
+            }
             break;
           case 'error':
             setErrorMsg(msg.message as string);
@@ -108,19 +91,12 @@ export function useBridge(): UseBridgeReturn {
           case 'ports':
             setPorts(msg.ports as string[]);
             break;
-          case 'config':
-            setConfigState(msg.config as BridgeConfig);
-            break;
           case 'wiznetDevices':
             setWiznetDevices(msg.devices as WiznetDevice[]);
             break;
           case 'sonyUsbDevices':
             setSonyUsbDevices(msg.devices as SonyUsbDevice[]);
-            if ((msg.devices as SonyUsbDevice[]).length === 0 && msg.reason) {
-              setErrorMsg(msg.reason as string);
-            } else {
-              setErrorMsg(null);
-            }
+            if ((msg.devices as SonyUsbDevice[]).length === 0 && msg.reason) setErrorMsg(msg.reason as string);
             break;
           case 'sonyMncDevices':
             setSonyMncDevices(msg.devices as SonyMncDevice[]);
@@ -133,11 +109,7 @@ export function useBridge(): UseBridgeReturn {
             setControlSurfaceActive(Boolean(msg.active));
             break;
           case 'wiznetConfigResult':
-            if (msg.success) {
-              setErrorMsg(null);
-            } else {
-              setErrorMsg(`Failed to configure WIZ108SR at ${msg.ip}`);
-            }
+            setErrorMsg(msg.success ? null : `Failed to configure WIZ108SR at ${msg.ip}`);
             break;
           case 'tally':
             setTallyState(msg.tally as TallyState);
@@ -148,16 +120,12 @@ export function useBridge(): UseBridgeReturn {
 
     socket.onclose = () => {
       setStatus('disconnected');
-      setCameraConnected(false);
-      // Reconnect after 3s
       setTimeout(connect, 3000);
     };
-
     socket.onerror = () => {
       setStatus('error');
       setErrorMsg('WebSocket connection failed');
     };
-
     ws.current = socket;
   }, []);
 
@@ -167,34 +135,35 @@ export function useBridge(): UseBridgeReturn {
   }, [connect]);
 
   const send = useCallback((type: string, payload: Record<string, unknown> = {}) => {
-    if (ws.current?.readyState === WebSocket.OPEN) {
-      ws.current.send(JSON.stringify({ type, ...payload }));
-    }
+    if (ws.current?.readyState === WebSocket.OPEN) ws.current.send(JSON.stringify({ type, ...payload }));
   }, []);
 
-  const connectCamera = useCallback(() => send('connect'), [send]);
-  const disconnectCamera = useCallback(() => send('disconnect'), [send]);
+  // ── Camera actions ──────────────────────────────────────────────────────
+  const setCameraConfig = useCallback((cameraNumber: number, config: Partial<BridgeConfig>) =>
+    send('setCameraConfig', { cameraNumber, config }), [send]);
+  const connectCamera = useCallback((cameraNumber: number) => send('connectCamera', { cameraNumber }), [send]);
+  const disconnectCamera = useCallback((cameraNumber: number) => send('disconnectCamera', { cameraNumber }), [send]);
+  const removeCamera = useCallback((cameraNumber: number) => send('removeCamera', { cameraNumber }), [send]);
+  const sendCommand = useCallback((cameraNumber: number, cmd: string, params: Record<string, unknown> = {}) =>
+    send('command', { cameraNumber, cmd, params }), [send]);
+
+  // ── Discovery / global ──────────────────────────────────────────────────
   const listPorts = useCallback(() => send('listPorts'), [send]);
-
-  const setConfig = useCallback((cfg: Partial<BridgeConfig>) => {
-    send('setConfig', { config: cfg });
-  }, [send]);
-
   const discoverWiznet = useCallback(() => send('discoverWiznet'), [send]);
-
-  const configureWiznet = useCallback((deviceIp: string, deviceConfig: Record<string, unknown>) => {
-    send('configureWiznet', { deviceIp, deviceConfig });
-  }, [send]);
-
+  const configureWiznet = useCallback((deviceIp: string, deviceConfig: Record<string, unknown>) =>
+    send('configureWiznet', { deviceIp, deviceConfig }), [send]);
   const discoverSonyUsb = useCallback(() => send('discoverSonyUsb'), [send]);
   const discoverSonyMnc = useCallback(() => send('discoverSonyMnc'), [send]);
   const listHidDevices = useCallback(() => send('listHidDevices'), [send]);
   const enableControlSurface = useCallback((surface: Record<string, unknown>) => send('enableControlSurface', { surface }), [send]);
   const disableControlSurface = useCallback(() => send('disableControlSurface'), [send]);
+  const setTally = useCallback((t: Partial<TallyState>) => send('setTally', { tally: t }), [send]);
 
-  const setTally = useCallback((t: Partial<TallyState>) => {
-    send('setTally', { tally: t });
-  }, [send]);
-
-  return { status, cameraConnected, state, cameraStates, config, ports, wiznetDevices, sonyUsbDevices, sonyMncDevices, hidDevices, controlSurfaceActive, tally, errorMsg, send, connectCamera, disconnectCamera, listPorts, setConfig, discoverWiznet, configureWiznet, discoverSonyUsb, discoverSonyMnc, listHidDevices, enableControlSurface, disableControlSurface, setTally };
+  return {
+    status, cameras, cameraStates, ports, wiznetDevices, sonyUsbDevices, sonyMncDevices,
+    hidDevices, controlSurfaceActive, tally, errorMsg,
+    send, setCameraConfig, connectCamera, disconnectCamera, removeCamera, sendCommand,
+    listPorts, discoverWiznet, configureWiznet, discoverSonyUsb, discoverSonyMnc,
+    listHidDevices, enableControlSurface, disableControlSurface, setTally,
+  };
 }
