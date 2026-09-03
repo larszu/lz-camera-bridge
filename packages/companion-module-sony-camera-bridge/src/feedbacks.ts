@@ -31,7 +31,7 @@ export function updateFeedbacks(self: ModuleInstance): void {
         bgcolor: combineRgb(204, 0, 0),
       },
       options: [],
-      callback: () => self.tallyState.program,
+      callback: () => self.tallyState.program === true,
     },
     tally_preview: {
       type: 'boolean',
@@ -41,7 +41,7 @@ export function updateFeedbacks(self: ModuleInstance): void {
         bgcolor: combineRgb(0, 204, 0),
       },
       options: [],
-      callback: () => self.tallyState.preview,
+      callback: () => self.tallyState.preview === true,
     },
     tally_iso_rec: {
       type: 'boolean',
@@ -51,7 +51,27 @@ export function updateFeedbacks(self: ModuleInstance): void {
         bgcolor: combineRgb(255, 102, 0),
       },
       options: [],
-      callback: () => self.tallyState.isoRec,
+      callback: () => self.tallyState.isoRec === true,
+    },
+    // ADR-003 — der Fall, den die drei Feedbacks oben nicht ausdruecken
+    // koennen. Sie sind boolesch: „unbestaetigt" sieht dort aus wie „aus",
+    // und eine dunkle Tally-Lampe liest sich als Freigabe. Dieses Feedback
+    // macht den Unterschied sichtbar, damit ein Button ihn zeigen kann
+    // (Vorschlag: Amber). Es ersetzt keine der drei, es steht daneben.
+    tally_unknown: {
+      type: 'boolean',
+      name: 'Tally state unconfirmed',
+      description:
+        'True while the bridge has not confirmed the tally state — before the first poll, or when /api/tally answered without a tally field. A dark program lamp does NOT mean "off" while this is true.',
+      defaultStyle: {
+        color: combineRgb(0, 0, 0),
+        bgcolor: combineRgb(255, 191, 0),
+      },
+      options: [],
+      callback: () =>
+        self.tallyState.program === undefined ||
+        self.tallyState.preview === undefined ||
+        self.tallyState.isoRec === undefined,
     },
   })
 }
