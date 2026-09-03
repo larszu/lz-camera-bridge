@@ -113,4 +113,4 @@ cameras open the joystick panel automatically; paint cameras open the RCP.
 
 ## License
 
-MIT.
+Proprietär — © 2026 Lars Zumpe, alle Rechte vorbehalten. Nutzung der veröffentlichten Builds ist kostenlos; Weiterverbreitung und abgeleitete Werke sind es nicht. Siehe [LICENSE](LICENSE).

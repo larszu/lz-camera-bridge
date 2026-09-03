@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "description": "Universal camera-control bridge: one software RCP + touch PTZ panel and a normalizing command bus for Sony, Canon, Panasonic, Blackmagic, Z CAM, JVC, BirdDog and generic VISCA PTZ cameras — with Bitfocus Companion and USB control-panel input.",
-  "license": "MIT",
+  "license": "UNLICENSED",
   "workspaces": [
     "packages/*"
   ],
