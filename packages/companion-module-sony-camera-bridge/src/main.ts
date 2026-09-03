@@ -1,5 +1,11 @@
 import { InstanceBase, InstanceStatus, runEntrypoint } from '@companion-module/base'
-import { BridgeClient, type BridgeCameraState, type BridgeTallyState } from './bridge.js'
+import {
+  BridgeClient,
+  formatTally,
+  UNKNOWN_TALLY,
+  type BridgeCameraState,
+  type BridgeTallyState,
+} from './bridge.js'
 import { DEFAULT_CONFIG, getConfigFields, type ModuleConfig } from './config.js'
 import { updateActions } from './actions.js'
 import { updateFeedbacks } from './feedbacks.js'
@@ -7,18 +13,21 @@ import { updatePresets } from './presets.js'
 import { UpgradeScripts } from './upgrades.js'
 import { updateVariableDefinitions } from './variables.js'
 
-const DEFAULT_TALLY: BridgeTallyState = {
-  program: false,
-  preview: false,
-  isoRec: false,
-}
+/**
+ * ADR-003 — der Anfangszustand ist „unbekannt", nicht „aus".
+ *
+ * Vorher stand hier `{ program: false, preview: false, isoRec: false }`:
+ * zwischen dem Laden des Moduls und der ersten erfolgreichen Abfrage
+ * behauptete es also, die Kamera sei nicht auf Sendung. Das ist genau die
+ * Zeitspanne, in der noch niemand etwas wissen kann.
+ */
 
 export class ModuleInstance extends InstanceBase<ModuleConfig, undefined> {
   config: ModuleConfig = DEFAULT_CONFIG
   bridgeConnected = false
   cameraConnected = false
   cameraState: BridgeCameraState = {}
-  tallyState: BridgeTallyState = { ...DEFAULT_TALLY }
+  tallyState: BridgeTallyState = { ...UNKNOWN_TALLY }
   private client: BridgeClient | null = null
 
   constructor(internal: unknown) {
@@ -128,9 +137,13 @@ export class ModuleInstance extends InstanceBase<ModuleConfig, undefined> {
       this.applyVariableValues()
     }
     this.client.onTally = (tally) => {
-      this.tallyState = { ...DEFAULT_TALLY, ...tally }
+      // Kein Auffuellen mit `false` und kein Weiterschleppen des alten
+      // Standes: die Antwort IST der aktuelle Kenntnisstand. Ein Feld, das
+      // sie nicht nennt, ist unbekannt — nicht aus, und nicht das, was vor
+      // zwei Sekunden galt.
+      this.tallyState = { ...tally }
       this.applyVariableValues()
-      this.checkFeedbacks('tally_program', 'tally_preview', 'tally_iso_rec')
+      this.checkFeedbacks('tally_program', 'tally_preview', 'tally_iso_rec', 'tally_unknown')
     }
     this.client.onError = (message) => {
       this.log('warn', message)
@@ -159,9 +172,11 @@ export class ModuleInstance extends InstanceBase<ModuleConfig, undefined> {
       nd_filter: this.formatNumber(this.cameraState.ndFilter),
       bars: this.cameraState.bars ? 'true' : 'false',
       camera_power: this.cameraState.cameraPower ? 'true' : 'false',
-      tally_program: this.tallyState.program ? 'true' : 'false',
-      tally_preview: this.tallyState.preview ? 'true' : 'false',
-      tally_iso_rec: this.tallyState.isoRec ? 'true' : 'false',
+      // `unknown` ist hier der eigentliche Gewinn: an der Lampe sieht man
+      // nur an/aus, in der Variablen steht, ob es bestaetigt ist.
+      tally_program: formatTally(this.tallyState.program),
+      tally_preview: formatTally(this.tallyState.preview),
+      tally_iso_rec: formatTally(this.tallyState.isoRec),
     })
   }
 

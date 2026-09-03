@@ -21,11 +21,35 @@ export interface BridgeCameraState {
   detailLevel?: number
 }
 
+/**
+ * ADR-003 — Tally-Zustand, in dem „unbestaetigt" ein eigener Wert ist.
+ *
+ * `undefined` heisst NICHT „aus". Es heisst: die Bridge hat dazu nichts
+ * gesagt. Der Unterschied ist bei Tally kein Detail — eine dunkle Lampe
+ * liest ein Operator als „die Kamera ist nicht auf Sendung, ich kann davor
+ * langlaufen". Wer das behauptet, ohne es zu wissen, behauptet genau das
+ * Gefaehrliche.
+ *
+ * Companion-Feedbacks koennen nur an oder aus; deshalb gibt es zusaetzlich
+ * das Feedback `tally_unknown`, mit dem sich der Fall sichtbar machen laesst,
+ * und die Variablen sagen `unknown` statt `false`.
+ */
 export interface BridgeTallyState {
-  program: boolean
-  preview: boolean
-  isoRec: boolean
+  program?: boolean
+  preview?: boolean
+  isoRec?: boolean
 }
+
+/** Nichts bestaetigt. Der Anfangszustand und die Antwort auf eine Luecke. */
+export const UNKNOWN_TALLY: BridgeTallyState = {}
+
+/**
+ * `true` / `false` / `unknown` fuer die Companion-Variablen — nie `false`
+ * fuer „nicht gesagt". Steht hier und nicht in `main.ts`, weil `main.ts` beim
+ * Laden `runEntrypoint` aufruft und damit nicht testbar importierbar ist.
+ */
+export const formatTally = (value: boolean | undefined): string =>
+  value === undefined ? 'unknown' : value ? 'true' : 'false'
 
 interface StateResponse {
   connected: boolean
@@ -33,7 +57,7 @@ interface StateResponse {
 }
 
 interface TallyResponse {
-  tally: BridgeTallyState
+  tally?: BridgeTallyState
 }
 
 export class BridgeClient {
@@ -185,7 +209,16 @@ export class BridgeClient {
 
     const json = (await response.json()) as TallyResponse
     this.onBridgeReachable?.(true)
-    this.onTally?.(json.tally ?? { program: false, preview: false, isoRec: false })
+    if (!json.tally) {
+      // Hier stand `?? { program: false, preview: false, isoRec: false }`.
+      // Eine 200-Antwort ohne `tally`-Feld wurde damit zu „alle Lampen aus"
+      // — eine erfundene Bestaetigung, und zwar in die gefaehrliche
+      // Richtung. Jetzt: nichts behaupten und es sagen.
+      this.onError?.('Bridge antwortete auf /api/tally ohne tally-Feld — Zustand unbekannt.')
+      this.onTally?.(UNKNOWN_TALLY)
+      return
+    }
+    this.onTally?.(json.tally)
   }
 
   private httpUrl(path: string): string {

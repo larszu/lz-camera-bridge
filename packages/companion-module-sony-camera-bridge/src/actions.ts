@@ -127,6 +127,15 @@ export function updateActions(self: ModuleInstance): void {
       ],
       callback: async (event) => {
         const option = String(event.options.mode)
+        // ADR-003 — „Toggle" leitet einen Befehl aus einem Zustand ab. Ist
+        // der Zustand unbestaetigt, gibt es kein Gegenteil, das man bilden
+        // koennte: `!undefined` waere `true` und haette die Kamera aus purer
+        // Unkenntnis auf Sendung geschaltet. Der Befehl unterbleibt und sagt
+        // es; „On" und „Off" an derselben Aktion bleiben jederzeit moeglich.
+        if (option === 'toggle' && self.tallyState.program === undefined) {
+          self.log('warn', 'tally_program: Zustand unbestaetigt — Toggle unterbleibt. On/Off waehlen.')
+          return
+        }
         const next = option === 'toggle' ? !self.tallyState.program : option === 'on'
         await self.sendTally({ program: next })
       },
@@ -148,6 +157,15 @@ export function updateActions(self: ModuleInstance): void {
       ],
       callback: async (event) => {
         const option = String(event.options.mode)
+        // ADR-003 — „Toggle" leitet einen Befehl aus einem Zustand ab. Ist
+        // der Zustand unbestaetigt, gibt es kein Gegenteil, das man bilden
+        // koennte: `!undefined` waere `true` und haette die Kamera aus purer
+        // Unkenntnis auf Sendung geschaltet. Der Befehl unterbleibt und sagt
+        // es; „On" und „Off" an derselben Aktion bleiben jederzeit moeglich.
+        if (option === 'toggle' && self.tallyState.preview === undefined) {
+          self.log('warn', 'tally_preview: Zustand unbestaetigt — Toggle unterbleibt. On/Off waehlen.')
+          return
+        }
         const next = option === 'toggle' ? !self.tallyState.preview : option === 'on'
         await self.sendTally({ preview: next })
       },
