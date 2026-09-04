@@ -1,0 +1,39 @@
+# ───────────────────────────────────────────────────────────────────────────
+# CI — 15 Tests, die bis hierher nur lokal liefen.
+#
+# Das Repo hatte keine CI. Vorhanden sind aber zwei Test-Suiten mit zusammen
+# 15 Pruefungen (`packages/bridge`: 8, `packages/companion-module-*`: 7), und
+# sie halten ausgerechnet die Zusicherung fest, die dieses Projekt teuer
+# gelernt hat: ADR-003, "unbestaetigt ist nicht aus".
+#
+# Die Testnamen sagen es selbst -- "eine 200-Antwort ohne tally-Feld behauptet
+# nichts", "eine TEILWEISE Antwort fuellt die uebrigen Felder nicht mit false
+# auf", "der Anfangszustand ist unbekannt, nicht aus". Genau diese Aussagen
+# duerfen nicht unbemerkt kippen: ein Tally-Licht, das faelschlich AUS zeigt,
+# schickt jemanden vor eine laufende Kamera.
+# ───────────────────────────────────────────────────────────────────────────
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    name: Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Test (alle Workspaces)
+        run: npm test
