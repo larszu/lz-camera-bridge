@@ -301,7 +301,26 @@ export class BridgeServer {
       return;
     }
     const handled = await slot.backend.handleRcpCommand(cmd, { ...params, cameraNumber: num });
-    if (!handled) this.sendError(ws, `'${cmd}' wird von Kamera ${num} nicht unterstützt`, num);
+    if (!handled) {
+      // `return` — nicht bloss melden. Ohne ihn lief der optimistische Echo
+      // unten TROTZDEM: Der Client bekam eine Fehlermeldung UND einen
+      // `type: 'state'`-Broadcast mit genau dem Wert, den die Kamera gerade
+      // abgelehnt hat. Die Oberflaeche zeigte danach Iris 42 an einer Kamera,
+      // die `setIris` nicht kann.
+      //
+      // Der Kommentar unten begruendet den Echo damit, dass pollende Backends
+      // ihn mit dem echten Wert ueberschreiben. Genau das passiert hier nicht:
+      // ein Backend, das das Kommando nicht unterstuetzt, pollt dafuer auch
+      // keinen Wert — der erfundene bleibt stehen, bis jemand die Kamera neu
+      // verbindet.
+      //
+      // ADR-003 in einem Satz: ein Zustand, den niemand kommandiert hat, darf
+      // nicht behauptet werden. Ein Fehler UND ein Erfolg fuer dasselbe
+      // Kommando ist die schlimmste der beiden Auskuenfte, weil die zweite die
+      // erste ueberschreibt.
+      this.sendError(ws, `'${cmd}' wird von Kamera ${num} nicht unterstützt`, num);
+      return;
+    }
 
     // Optimistic UI echo for value-carrying paint commands (backends that poll
     // their own state will overwrite this with the real value).
