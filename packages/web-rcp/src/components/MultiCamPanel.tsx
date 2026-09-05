@@ -58,6 +58,21 @@ export function MultiCamPanel(p: Props) {
               <div className="multicam__card-head">
                 <span className={`status-dot status-dot--${connected ? 'ok' : 'err'}`} />
                 <span className="multicam__card-num">{num}</span>
+                {/* Die Beschriftung aus dem Plan (B-41.1): am Pult steht dann
+                    "CAM 3 -- Buehne links" statt einer nackten Nummer. Ein
+                    blosser Vorschlag (Nummer im Namen) wird gekennzeichnet --
+                    sonst sieht er aus wie ein Befund. */}
+                {cam.plan && (
+                  <span
+                    className={`multicam__card-plan ${cam.planMatchedBy === 'number' ? 'multicam__card-plan--weak' : ''}`}
+                    title={cam.planMatchedBy === 'number'
+                      ? 'Aus der Nummer im Namen vorgeschlagen, nicht gemessen'
+                      : cam.planMatchedBy === 'model' ? 'Modell gemessen' : 'Von Hand zugeordnet'}
+                  >
+                    {cam.plan.label}
+                    {cam.planMatchedBy === 'number' ? ' ?' : ''}
+                  </span>
+                )}
                 <span className="multicam__card-mode">{MODE_LABEL[mode] ?? mode}</span>
                 <div className="multicam__card-actions">
                   <button className="btn btn--sm" onClick={() => p.onEdit(num)} title="Konfigurieren">⚙</button>

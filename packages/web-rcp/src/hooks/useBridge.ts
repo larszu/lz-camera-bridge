@@ -14,10 +14,39 @@ import type {
 
 export type ConnectionStatus = 'idle' | 'connecting' | 'connected' | 'error' | 'disconnected';
 
+/** Eine geplante Kamera aus dem MultiCam-Planner (B-41.1). */
+export interface PlanCamera {
+  id: string;
+  label: string;
+  manufacturer?: string;
+  model?: string;
+  x?: number;
+  y?: number;
+}
+
+/** Wie eine Zuordnung belegt ist. Ein Vorschlag darf nicht wie eine Tatsache aussehen. */
+export type PlanMatchedBy = 'model' | 'number' | 'manual';
+
+export interface PlanMatch {
+  planCameraId: string;
+  label: string;
+  cameraNumber?: number;
+  matchedBy?: PlanMatchedBy;
+  reason?: string;
+}
+
+export interface PlanMatchResult {
+  matches: PlanMatch[];
+  unmatchedSlots: number[];
+}
+
 export interface CameraSlot {
   cameraNumber: number;
   config: BridgeConfig;
   connected: boolean;
+  /** Die geplante Kamera auf diesem Slot, samt Beleg. */
+  plan?: PlanCamera;
+  planMatchedBy?: PlanMatchedBy;
 }
 
 const bridgeHost = window.location.hostname || 'localhost';
@@ -28,6 +57,7 @@ export function useBridge() {
   const [status, setStatus] = useState<ConnectionStatus>('idle');
   const [cameras, setCameras] = useState<Record<number, CameraSlot>>({});
   const [cameraStates, setCameraStates] = useState<CameraStatesByNumber>({});
+  const [planMatch, setPlanMatch] = useState<PlanMatchResult | null>(null);
   const [ports, setPorts] = useState<string[]>([]);
   const [wiznetDevices, setWiznetDevices] = useState<WiznetDevice[]>([]);
   const [sonyUsbDevices, setSonyUsbDevices] = useState<SonyUsbDevice[]>([]);
@@ -114,6 +144,12 @@ export function useBridge() {
           case 'tally':
             setTallyState(msg.tally as TallyState);
             break;
+          case 'cameraPlanMatch':
+            setPlanMatch({
+              matches: (msg.matches ?? []) as PlanMatch[],
+              unmatchedSlots: (msg.unmatchedSlots ?? []) as number[],
+            });
+            break;
         }
       } catch { /* ignore malformed */ }
     };
@@ -159,11 +195,25 @@ export function useBridge() {
   const disableControlSurface = useCallback(() => send('disableControlSurface'), [send]);
   const setTally = useCallback((t: Partial<TallyState>) => send('setTally', { tally: t }), [send]);
 
+  // ── Kamera-Plan (B-41.1) ────────────────────────────────────────────────
+  // Abgleichen sagt, was zusammengehoert und WOMIT das belegt ist;
+  // uebernehmen schreibt es an die Slots. Der erste Schritt ist nicht
+  // optional: wer eine Kamera falsch beschriftet, schwenkt spaeter die
+  // falsche.
+  const matchCameraPlan = useCallback((plan: string) => send('matchCameraPlan', { plan }), [send]);
+  const applyCameraPlan = useCallback((plan: string) => send('applyCameraPlan', { plan }), [send]);
+  const assignPlanCamera = useCallback(
+    (cameraNumber: number, planCameraId: string | null, plan?: string) =>
+      send('assignPlanCamera', { cameraNumber, planCameraId, ...(plan ? { plan } : {}) }),
+    [send],
+  );
+
   return {
     status, cameras, cameraStates, ports, wiznetDevices, sonyUsbDevices, sonyMncDevices,
-    hidDevices, controlSurfaceActive, tally, errorMsg,
+    hidDevices, controlSurfaceActive, tally, errorMsg, planMatch,
     send, setCameraConfig, connectCamera, disconnectCamera, removeCamera, sendCommand,
     listPorts, discoverWiznet, configureWiznet, discoverSonyUsb, discoverSonyMnc,
     listHidDevices, enableControlSurface, disableControlSurface, setTally,
+    matchCameraPlan, applyCameraPlan, assignPlanCamera,
   };
 }

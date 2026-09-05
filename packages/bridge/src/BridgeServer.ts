@@ -35,6 +35,15 @@ import { makeBackend, CameraBackend, CameraConfig } from './cameras/backendFacto
 import { WiznetDiscovery, WiznetDeviceConfig } from './discovery/WiznetDiscovery.js';
 import { CompanionServer, TallyState } from './companion/CompanionServer.js';
 import { HidControlSurface, HidSurfaceConfig } from './input/HidControlSurface.js';
+import {
+  matchCameraPlan, parseCameraPlan,
+  type CameraPlan, type PlanCamera, type SlotFacts,
+} from './plan/cameraPlan.js';
+
+/** Was der Nutzer liest, wenn die Datei kein Kamera-Plan ist. */
+const PLAN_FEHLER =
+  'Keine gueltige Kamera-Liste. Erwartet wird eine Datei im Format ' +
+  "'camera-list' v1 (Export aus dem MultiCam-Planner).";
 
 interface CameraSlot {
   num: number;
@@ -42,6 +51,14 @@ interface CameraSlot {
   backend: CameraBackend | null;
   mapState: (s: unknown) => Partial<CameraState>;
   connected: boolean;
+  /**
+   * Die geplante Kamera, die auf diesem Slot sitzt (B-41.1). Am Pult steht
+   * dann "CAM 3 — Buehne links" statt einer nackten Nummer; das ist die
+   * Sprache, in der die Show geplant wurde.
+   */
+  plan?: PlanCamera;
+  /** Womit die Zuordnung belegt ist. Siehe `plan/cameraPlan.ts`. */
+  planMatchedBy?: 'model' | 'number' | 'manual';
 }
 
 interface ClientMessage {
@@ -49,7 +66,8 @@ interface ClientMessage {
     | 'listCameras' | 'setCameraConfig' | 'connectCamera' | 'disconnectCamera' | 'removeCamera'
     | 'command' | 'listPorts' | 'discoverWiznet' | 'configureWiznet' | 'discoverSonyUsb'
     | 'discoverSonyMnc' | 'listHidDevices' | 'enableControlSurface' | 'disableControlSurface'
-    | 'setTally' | 'getTally';
+    | 'setTally' | 'getTally'
+    | 'matchCameraPlan' | 'applyCameraPlan' | 'assignPlanCamera';
   cameraNumber?: number;
   config?: CameraConfig;
   cmd?: string;
@@ -58,6 +76,10 @@ interface ClientMessage {
   deviceConfig?: WiznetDeviceConfig;
   surface?: HidSurfaceConfig;
   tally?: Partial<TallyState>;
+  /** Kamera-Plan als Text ODER als Objekt — beides, siehe `handleClientMessage`. */
+  plan?: string | Record<string, unknown>;
+  /** Fuer `assignPlanCamera`: leer laesst die Zuordnung fallen. */
+  planCameraId?: string | null;
 }
 
 export class BridgeServer {
@@ -217,7 +239,85 @@ export class BridgeServer {
       case 'getTally':
         ws.send(JSON.stringify({ type: 'tally', tally: this.tally }));
         break;
+
+      // ── Kamera-Plan aus dem MultiCam-Planner (B-41.1) ───────────────────
+      //
+      // Zwei Schritte, und der erste ist nicht optional: `matchCameraPlan`
+      // sagt, welche geplante Kamera auf welchem Slot sitzt und WOMIT das
+      // belegt ist, `applyCameraPlan` schreibt es an die Slots. Wer eine
+      // Kamera falsch beschriftet, schwenkt spaeter die falsche.
+      case 'matchCameraPlan': {
+        const plan = this.leseKameraPlan(msg.plan);
+        if (!plan) { this.sendError(ws, PLAN_FEHLER); break; }
+        ws.send(JSON.stringify({ type: 'cameraPlanMatch', ...matchCameraPlan(plan, this.slotFacts()) }));
+        break;
+      }
+
+      case 'applyCameraPlan': {
+        const plan = this.leseKameraPlan(msg.plan);
+        if (!plan) { this.sendError(ws, PLAN_FEHLER); break; }
+        const ergebnis = matchCameraPlan(plan, this.slotFacts());
+        for (const m of ergebnis.matches) {
+          if (m.cameraNumber === undefined) continue;
+          const slot = this.getOrCreateSlot(m.cameraNumber);
+          slot.plan = plan.cameras.find((c) => c.id === m.planCameraId);
+          slot.planMatchedBy = m.matchedBy;
+        }
+        ws.send(JSON.stringify({ type: 'cameraPlanMatch', ...ergebnis }));
+        this.broadcastCameras();
+        break;
+      }
+
+      case 'assignPlanCamera': {
+        // Von Hand: das staerkste Wort. Ueberschreibt jeden Vorschlag und
+        // ueberlebt den naechsten Abgleich.
+        const num = msg.cameraNumber ?? 0;
+        const slot = this.getOrCreateSlot(num);
+        if (!msg.planCameraId) {
+          slot.plan = undefined;
+          slot.planMatchedBy = undefined;
+        } else {
+          const plan = this.leseKameraPlan(msg.plan);
+          const cam = plan?.cameras.find((c) => c.id === msg.planCameraId);
+          if (!cam) { this.sendError(ws, 'Diese geplante Kamera steht nicht in der mitgeschickten Liste.'); break; }
+          // Dieselbe Kamera darf nicht auf zwei Slots liegen: dann waeren zwei
+          // Pulte fuer dasselbe Geraet beschriftet, und eines davon luegt.
+          for (const anderer of this.cameras.values()) {
+            if (anderer.num !== num && anderer.plan?.id === cam.id) {
+              anderer.plan = undefined;
+              anderer.planMatchedBy = undefined;
+            }
+          }
+          slot.plan = cam;
+          slot.planMatchedBy = 'manual';
+        }
+        this.broadcastCameras();
+        break;
+      }
     }
+  }
+
+  /** Der Plan als Text oder als Objekt. Beides, damit Hand- und Programmweg denselben Eingang haben. */
+  private leseKameraPlan(roh: string | Record<string, unknown> | undefined): CameraPlan | null {
+    if (typeof roh === 'string') return parseCameraPlan(roh);
+    if (roh && typeof roh === 'object') return parseCameraPlan(JSON.stringify(roh));
+    return null;
+  }
+
+  /**
+   * Was die Bruecke ueber ihre Slots weiss, soweit es fuer den Abgleich zaehlt.
+   *
+   * `usbDeviceModel` ist der einzige Modellname, den die Slot-Konfiguration
+   * heute fuehrt — bei TCP, seriell und den HTTP-Backends steht dort eine
+   * Adresse und kein Geraet. Genau deshalb liefert der Abgleich einen Beleg
+   * mit, statt ueberall etwas zu behaupten.
+   */
+  private slotFacts(): SlotFacts[] {
+    return [...this.cameras.values()].map((s) => ({
+      num: s.num,
+      ...(s.config.usbDeviceModel ? { knownModel: s.config.usbDeviceModel } : {}),
+      ...(s.planMatchedBy === 'manual' && s.plan ? { planCameraId: s.plan.id } : {}),
+    }));
   }
 
   // ─── Camera slots ─────────────────────────────────────────────────────────
@@ -362,6 +462,10 @@ export class BridgeServer {
       cameraNumber: s.num,
       config: s.config,
       connected: s.connected,
+      // Der Plan geht mit, damit das Pult die Kamera so beschriften kann, wie
+      // sie in der Show heisst -- samt Beleg, damit ein blosser Vorschlag
+      // nicht wie eine Tatsache aussieht.
+      ...(s.plan ? { plan: s.plan, planMatchedBy: s.planMatchedBy } : {}),
     }));
     const msg = JSON.stringify({ type: 'cameras', cameras });
     if (ws) ws.send(msg);

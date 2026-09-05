@@ -67,6 +67,13 @@ Live-video feasibility per camera family — which cameras can show a live
 picture in the panel, at what cost — is documented in
 [`docs/live-video.md`](docs/live-video.md).
 
+The bridge reads the `camera-list` the AV Planner Suite's MultiCam Planner
+exports and holds it against the cameras on the bus, so the control wall can
+label a slot the way the show calls it ("CAM 3 — Bühne links") instead of by
+number. Every match carries evidence — a measured model, a mere convention, or a
+human — and where there is none, there is no match. See
+[`docs/camera-plan.md`](docs/camera-plan.md).
+
 ## Packages
 
 | Path | What it is |

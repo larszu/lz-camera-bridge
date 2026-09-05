@@ -4,6 +4,7 @@ import { ConnectionPanel } from './components/ConnectionPanel.tsx';
 import { SonyRcpPanel } from './components/SonyRcpPanel.tsx';
 import { PtzPanel } from './components/PtzPanel.tsx';
 import { MultiCamPanel } from './components/MultiCamPanel.tsx';
+import { CameraPlanPanel } from './components/CameraPlanPanel.tsx';
 import { WiznetPanel } from './components/WiznetPanel.tsx';
 import { FirstStartWizard, isWizardDone } from './components/FirstStartWizard.tsx';
 import { capabilitiesForMode, isPtzMode } from './capabilities.ts';
@@ -35,10 +36,11 @@ export default function App() {
   const bridge = useBridge();
   const {
     status, cameras, cameraStates, ports, wiznetDevices, sonyUsbDevices, sonyMncDevices,
-    hidDevices, controlSurfaceActive, tally, errorMsg,
+    hidDevices, controlSurfaceActive, tally, errorMsg, planMatch,
     setCameraConfig, connectCamera, disconnectCamera, removeCamera, sendCommand,
     listPorts, discoverWiznet, configureWiznet, discoverSonyUsb, discoverSonyMnc,
     listHidDevices, enableControlSurface, disableControlSurface, setTally,
+    matchCameraPlan, applyCameraPlan,
   } = bridge;
 
   const camNumbers = useMemo(
@@ -112,6 +114,10 @@ export default function App() {
       </header>
 
       {viewMode === 'multi' && (
+        <>
+        {/* Der Plan steht ueber der Wand, nicht in einem Einstellungs-Reiter:
+            er beschriftet genau die Kacheln darunter. */}
+        <CameraPlanPanel planMatch={planMatch} onMatch={matchCameraPlan} onApply={applyCameraPlan} />
         <MultiCamPanel
           cameras={cameras}
           cameraStates={cameraStates}
@@ -124,6 +130,7 @@ export default function App() {
           onSetTally={(_num, t) => setTally(t)}
           onEdit={(num) => { setSelected(num); setViewMode('single'); }}
         />
+        </>
       )}
 
       {viewMode === 'single' && (
