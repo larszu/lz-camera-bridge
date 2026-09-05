@@ -16,6 +16,7 @@
     "companion-module:dev": "npm run dev --workspace=packages/companion-module-sony-camera-bridge",
     "electron": "npm run dev --workspace=packages/electron-app",
     "electron:build": "npm run build --workspace=packages/web-rcp && npm run dist --workspace=packages/electron-app",
-    "electron:dist": "npm run build --workspace=packages/web-rcp && npm run dist:win --workspace=packages/electron-app"
+    "electron:dist": "npm run build --workspace=packages/web-rcp && npm run dist:win --workspace=packages/electron-app",
+    "actions:check": "node scripts/actions-node-runtime.mjs"
   }
 }
