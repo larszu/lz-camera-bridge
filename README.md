@@ -6,6 +6,8 @@ AW‑RP150 — plus a normalizing **command bus** that drives cameras from many
 vendors over their native protocols. The same commands also reach every camera
 from a Bitfocus **Companion** surface or a USB **control panel**.
 
+![Camera Bridge – Web-Oberfläche mit dem Einrichtungs-Assistenten](docs/screenshot.png)
+
 > **Status:** the bridge, protocols and UI are real and build clean; a
 > committed unit-test suite covers the protocol framing. Where a family was
 > verified against public docs or an official reference it is marked

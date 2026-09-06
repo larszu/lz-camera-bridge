@@ -4,3 +4,6 @@ dist/
 .env
 .DS_Store
 Thumbs.db
+
+# lokale Build-Logs (nicht einchecken)
+build.log
