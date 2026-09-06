@@ -32,6 +32,12 @@ export interface BMCameraInfo {
   frameRate: number;
 }
 
+/**
+ * Ein Index-Schritt auf dem Bus in dB (Bedarf 129). Die Reihe stammt aus
+ * `SonyRcpPanel.GAIN_VALUES`: 0dB, +3dB, +6dB … +18dB.
+ */
+const BUS_GAIN_STEP_DB = 3;
+
 export interface BMCameraState {
   // Lens
   iris: { normalised: number; apertureStop: number };
@@ -445,8 +451,18 @@ export class BMDeviceClient extends EventEmitter {
         await this.setIris(Math.max(0, Math.min(1, num('value') / 255)));
         return true;
       case 'setMasterGain':
-        // Treat the gain index as a dB value (Blackmagic gain is in dB).
-        await this.setGain(num('value'));
+        // BEDARF 129 — der Bus fuehrt `masterGain` als INDEX, nicht als dB.
+        // Sechs der sieben Backends lesen ihn so: `SonyMncClient.gainIsoMap`
+        // (0..6), `GAIN_INDEX_TO_ISO` bei Canon und Z CAM,
+        // `SonyPtpUsbClient.setGainIndex`, die Gain-Position bei VISCA. Nur
+        // hier stand frueher "treat the gain index as a dB value" — und
+        // damit erreichte Index 6, den das Web-RCP als "+18dB" beschriftet,
+        // eine Blackmagic-Kamera als 6 dB. Genau die stille Fehlskalierung,
+        // von der `companion-module-bmd-atem#350` spricht.
+        //
+        // Die Stufen des Busses sind die Sony-Reihe 0/+3/+6/+9/+12/+15/+18 dB
+        // (`SonyRcpPanel.GAIN_VALUES`), also Index * 3 dB.
+        await this.setGain(num('value') * BUS_GAIN_STEP_DB);
         return true;
       case 'setShutterSpeed':
         await this.setShutterSpeed(num('value'));

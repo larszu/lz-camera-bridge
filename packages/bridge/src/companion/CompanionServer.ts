@@ -16,6 +16,7 @@
 
 import { createServer, IncomingMessage, ServerResponse } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
+import { NUDGE_ACTIONS } from '../protocol/paintNudge.js';
 import { EventEmitter } from 'events';
 
 export interface TallyState {
@@ -49,6 +50,9 @@ export class CompanionServer extends EventEmitter {
     private readonly httpPort = 9702,
     private readonly wsPort = 9701,
   ) {
+    // Beide Vorgaben greifen auch bei `undefined` — der Aufrufer darf einen
+    // Port weglassen, ohne den anderen zu kennen.
+
     super();
     this.httpServer = createServer((req, res) => this.handleHttp(req, res));
     this.wss = new WebSocketServer({ port: wsPort });
@@ -193,18 +197,23 @@ export class CompanionServer extends EventEmitter {
     return [
       // Iris
       { id: 'setIris', label: 'Iris', category: 'Exposure' },
-      { id: 'irisUp', label: 'Iris +', category: 'Exposure' },
-      { id: 'irisDown', label: 'Iris -', category: 'Exposure' },
       // Gain
       { id: 'setMasterGain', label: 'Master Gain', category: 'Exposure' },
-      { id: 'gainUp', label: 'Gain +3dB', category: 'Exposure' },
-      { id: 'gainDown', label: 'Gain -3dB', category: 'Exposure' },
       // Shutter
       { id: 'setShutterSpeed', label: 'Shutter', category: 'Exposure' },
       // ND
       { id: 'setNdFilter', label: 'ND Filter', category: 'Exposure' },
-      { id: 'ndUp', label: 'ND +', category: 'Exposure' },
-      { id: 'ndDown', label: 'ND -', category: 'Exposure' },
+      // Relative Tasten (Bedarf 129). Sie stehen NICHT hier, sondern in
+      // `protocol/paintNudge.ts` — dieselbe Tabelle, aus der der Dispatcher
+      // seine Schrittweiten und Wertebereiche nimmt. Vorher standen die Ids
+      // hier und die Rechnung dort, und beide Listen kannten `masterBlack`
+      // nicht: der Wert, den der Beleg als den meistgetrimmten benennt, hatte
+      // ueberhaupt keine relative Taste.
+      ...Object.entries(NUDGE_ACTIONS).map(([id, a]) => ({
+        id,
+        label: a.label,
+        category: a.category,
+      })),
       // Black
       { id: 'setMasterBlack', label: 'Master Black', category: 'Black' },
       { id: 'setBlackR', label: 'Black R', category: 'Black' },

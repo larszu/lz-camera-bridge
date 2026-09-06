@@ -89,8 +89,15 @@ export function SonyRcpPanel({ state, tally, cameraId = 1, disabled = false, cap
   const can = (feature: keyof CameraCapabilities): boolean => !disabled && (capabilities?.[feature] ?? true);
   
   // Convert values to display format
-  const gainIdx = state.masterGain ?? 0;
-  const ndIdx = state.ndFilter ?? 0;
+  // BEDARF 129 — kein erfundener Ausgangswert. `?? 0` stand hier fuer beide
+  // Werte und liess das Pult "0dB" bzw. die erste ND-Stellung anzeigen,
+  // solange die Kamera ihren Wert noch gar nicht gemeldet hatte. Wer dann auf
+  // "+" drueckte, sprang von einer Anzeige aus, die niemand abgelesen hatte.
+  // Unbekannt wird jetzt als unbekannt angezeigt, und der Trimm laeuft ueber
+  // das relative Kommando des Busses, das seinerseits absagt, wenn der
+  // aktuelle Wert fehlt (siehe `protocol/paintNudge.ts` in der Bruecke).
+  const gainIdx = state.masterGain;
+  const ndIdx = state.ndFilter;
   const ccIdx = 0;
   const detail = Math.round(((state.detailLevel ?? 128) - 128) / 12.8); // -10 to +10
   const irisValue = ((state.iris ?? 128) / 255 * 16).toFixed(1); // F1.4 - F16
@@ -129,9 +136,9 @@ export function SonyRcpPanel({ state, tally, cameraId = 1, disabled = false, cap
       {/* ═══════ GAIN ROW ═══════ */}
       <div className="rcp-row rcp-row--gain">
         <Selector 
-          value={GAIN_VALUES[gainIdx] ?? '0dB'} 
+          value={gainIdx === undefined ? '--' : GAIN_VALUES[gainIdx] ?? `#${gainIdx}`}
           label="MASTER GAIN"
-          onChange={(d) => cmd('setMasterGain', { value: Math.max(0, Math.min(6, gainIdx + d)) })}
+          onChange={(d) => cmd('nudge', { parameter: 'masterGain', by: d })}
           disabled={!can('masterGain')}
         />
         <div className="rcp-row__spacer" />
@@ -258,9 +265,9 @@ export function SonyRcpPanel({ state, tally, cameraId = 1, disabled = false, cap
           </label>
           <div className="rcp-filter-group">
             <Selector 
-              value={ND_VALUES[ndIdx] ?? '1'} 
+              value={ndIdx === undefined ? '--' : ND_VALUES[ndIdx] ?? `#${ndIdx}`}
               label="ND"
-              onChange={(d) => cmd('setNdFilter', { value: Math.max(0, Math.min(3, ndIdx + d)) })}
+              onChange={(d) => cmd('nudge', { parameter: 'ndFilter', by: d })}
               disabled={!can('ndFilter')}
             />
             <Selector 

@@ -13,6 +13,9 @@
  *   { type: 'disconnectCamera', cameraNumber }
  *   { type: 'removeCamera',     cameraNumber }
  *   { type: 'command', cameraNumber, cmd, params }
+ *       cmd 'nudge', params { parameter, by } trimmt relativ; siehe
+ *       protocol/paintNudge.ts. Wird zu einem absoluten Kommando
+ *       aufgeloest, bevor irgendein Backend es sieht.
  *   { type: 'listPorts' | 'discoverWiznet' | 'configureWiznet'
  *          | 'discoverSonyUsb' | 'discoverSonyMnc'
  *          | 'listHidDevices' | 'enableControlSurface' | 'disableControlSurface'
@@ -39,6 +42,7 @@ import {
   matchCameraPlan, parseCameraPlan,
   type CameraPlan, type PlanCamera, type SlotFacts,
 } from './plan/cameraPlan.js';
+import { NUDGE_ACTIONS, NUDGE_REFUSAL_LABEL, resolveNudge } from './protocol/paintNudge.js';
 
 /** Was der Nutzer liest, wenn die Datei kein Kamera-Plan ist. */
 const PLAN_FEHLER =
@@ -88,11 +92,23 @@ export class BridgeServer {
   private cameras = new Map<number, CameraSlot>();
   private cameraStates = new Map<number, CameraState>();
   private wiznetDiscovery = new WiznetDiscovery();
-  private companion = new CompanionServer();
+  private companion: CompanionServer;
   private hidSurface: HidControlSurface | null = null;
   private tally: TallyState = { program: false, preview: false, isoRec: false };
 
-  constructor(private readonly wsPort = 9700) {
+  /**
+   * `companionPorts` ist da, damit eine zweite Bruecke im selben Prozess
+   * ueberhaupt entstehen kann. `CompanionServer` bindet seinen WebSocket-Port
+   * SCHON IM KONSTRUKTOR, und er stand fest auf 9701 — zwei Instanzen gaben
+   * `EADDRINUSE`, ohne dass jemand nach einem Port gefragt haette. Aufgefallen
+   * ist es an zwei Testdateien, die der Runner nebenlaeufig ausfuehrt; es
+   * gilt aber genauso fuer zwei Bruecken auf einem Rechner.
+   */
+  constructor(
+    private readonly wsPort = 9700,
+    companionPorts?: { http?: number; ws?: number },
+  ) {
+    this.companion = new CompanionServer(companionPorts?.http, companionPorts?.ws);
     this.httpServer = createServer();
     this.wss = new WebSocketServer({ server: this.httpServer });
     this.wss.on('connection', (ws) => this.onClient(ws));
@@ -400,6 +416,29 @@ export class BridgeServer {
       this.sendError(ws, `Kamera ${num} ist nicht verbunden`, num);
       return;
     }
+
+    // BEDARF 129 — relativ trimmen. Die Aufloesung passiert HIER, einmal, und
+    // zwar gegen den Zustand, den die Bruecke fuer diese Kamera fuehrt. Was
+    // nach unten geht, ist ein gewoehnliches absolutes Kommando: die Backends
+    // kennen keine relative Sprache, und es soll dabei bleiben — sonst
+    // muesste jedes von ihnen den Ausgangswert selbst kennen, und dann gaebe
+    // es acht Antworten auf die Frage, wovon aus getrimmt wird.
+    if (cmd === 'nudge') {
+      const aufgeloest = resolveNudge(
+        String(params.parameter ?? ''),
+        Number(params.by ?? Number.NaN),
+        this.cameraStates.get(num),
+      );
+      if ('refusal' in aufgeloest) {
+        // Mit Grund. Eine Taste, die wortlos nichts tut, ist von einer
+        // kaputten Bruecke nicht zu unterscheiden.
+        this.sendError(ws, NUDGE_REFUSAL_LABEL[aufgeloest.refusal], num);
+        return;
+      }
+      await this.dispatchCommand(ws, num, aufgeloest.command, { value: aufgeloest.value });
+      return;
+    }
+
     const handled = await slot.backend.handleRcpCommand(cmd, { ...params, cameraNumber: num });
     if (!handled) {
       // `return` — nicht bloss melden. Ohne ihn lief der optimistische Echo
@@ -532,20 +571,33 @@ export class BridgeServer {
     }
 
     const camNum = Number(params.cameraNumber ?? 0);
-    const perCam = this.cameraStates.get(camNum) ?? {};
 
-    if (action === 'irisUp' || action === 'irisDown') {
-      const cur = (perCam.iris ?? 128) + (action === 'irisUp' ? 5 : -5);
-      params.value = Math.max(0, Math.min(255, cur));
-      action = 'setIris';
-    } else if (action === 'gainUp' || action === 'gainDown') {
-      const cur = (perCam.masterGain ?? 0) + (action === 'gainUp' ? 1 : -1);
-      params.value = Math.max(0, Math.min(7, cur));
-      action = 'setMasterGain';
-    } else if (action === 'ndUp' || action === 'ndDown') {
-      const cur = (perCam.ndFilter ?? 0) + (action === 'ndUp' ? 1 : -1);
-      params.value = Math.max(0, Math.min(4, cur));
-      action = 'setNdFilter';
+    // BEDARF 129 — die relativen Tasten gehen durch DIESELBE Aufloesung wie
+    // der WebSocket-Weg (`protocol/paintNudge.ts`). Vorher rechnete diese
+    // Stelle drei Sonderfaelle selbst aus, und alle drei waren falsch:
+    // `(perCam.iris ?? 128) + 5` erfand einen Ausgangswert, wo die Bruecke
+    // keinen gelesen hatte; `Math.min(7, …)` liess `masterGain` auf einen
+    // Index laufen, den die Gain-Tabellen der Backends nicht kennen (sie
+    // fallen dann auf 0 dB zurueck — die Taste „Gain +" sprang von +18 dB
+    // nach unten); `Math.min(4, …)` dasselbe fuer den ND-Filter, der vier
+    // Stellungen hat (0..3). `masterBlack`, der Wert aus dem Beleg, kam gar
+    // nicht vor.
+    const nudge = NUDGE_ACTIONS[action];
+    if (nudge) {
+      const aufgeloest = resolveNudge(nudge.parameter, nudge.by, this.cameraStates.get(camNum));
+      if ('refusal' in aufgeloest) {
+        // Companion hat fuer Presets keinen Rueckkanal. Die Absage geht
+        // deshalb an die Pult-Clients — irgendwo sichtbar ist besser als
+        // nirgends, und „die Taste tut nichts" ist die schlechteste Auskunft.
+        this.broadcast({
+          type: 'error',
+          message: `${nudge.label}: ${NUDGE_REFUSAL_LABEL[aufgeloest.refusal]}`,
+          cameraNumber: camNum,
+        });
+        return;
+      }
+      action = aufgeloest.command;
+      params.value = aufgeloest.value;
     }
 
     const slot = this.cameras.get(camNum);

@@ -28,7 +28,9 @@ const fakeWs = () => {
 
 /** Ein Backend, das jedes Kommando annimmt oder jedes ablehnt. */
 const server = (handled: boolean, port: number) => {
-  const s = new BridgeServer(port);
+  // Eigene Companion-Ports: der feste 9701 kollidierte mit der zweiten
+  // Testdatei, sobald der Runner beide nebenlaeufig faehrt.
+  const s = new BridgeServer(port, { http: port + 100, ws: port + 200 });
   const innen = s as unknown as {
     cameras: Map<number, unknown>;
     cameraStates: Map<number, Record<string, unknown>>;
@@ -72,7 +74,7 @@ test('angenommenes Kommando setzt den Zustand weiterhin', async () => {
 test('nicht verbundene Kamera setzt ebenfalls keinen Zustand', async () => {
   // Der frueh zurueckkehrende Zweig darueber — er war schon richtig, und der
   // Test haelt fest, dass er es bleibt.
-  const s = new BridgeServer(19733);
+  const s = new BridgeServer(19733, { http: 19833, ws: 19933 });
   const innen = s as unknown as { cameraStates: Map<number, unknown> };
   const { ws, gesendet } = fakeWs();
   await (s as unknown as {

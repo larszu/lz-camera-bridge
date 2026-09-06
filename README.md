@@ -65,6 +65,13 @@ single command vocabulary (`setIris`, `setMasterGain`, `ptz`, `recallPreset`, �
 fans out to all of them. A visual walk-through lives in
 [`docs/architecture.html`](docs/architecture.html).
 
+Paint values can be trimmed relatively (`cmd: 'nudge'`) instead of only jumped
+to: one resolution for every path — WebSocket, Companion buttons, the RCP's
+up/down selectors — against the value the bridge has actually read. Where it has
+read none, the trim is refused with a reason rather than started from a guessed
+128. The bus scale of every value, and what each backend makes of it, is
+documented in [`docs/paint-nudge.md`](docs/paint-nudge.md).
+
 Live-video feasibility per camera family — which cameras can show a live
 picture in the panel, at what cost — is documented in
 [`docs/live-video.md`](docs/live-video.md).
