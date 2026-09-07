@@ -163,6 +163,16 @@ export function useBridge() {
                 delete next[msg.cameraNumber];
                 return next;
               });
+              // Und die Bestaetigungs-ZEIT aus demselben Grund. Sie kam mit
+              // Bedarf 102 dazu und blieb hier stehen — auf einem Melde-Weg
+              // (`push`) liest `freshness` daraus dauerhaft „frisch", also
+              // genau die Behauptung, die dieser Bedarf abschaffen wollte,
+              // nur eine Ebene tiefer.
+              setCameraConfirmations((prev) => {
+                const next = { ...prev };
+                delete next[msg.cameraNumber];
+                return next;
+              });
             }
             break;
           case 'error':

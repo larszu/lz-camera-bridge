@@ -225,8 +225,7 @@ export class BridgeServer {
       case 'removeCamera':
         await this.disconnectCamera(msg.cameraNumber ?? 0);
         this.cameras.delete(msg.cameraNumber ?? 0);
-        this.cameraStates.delete(msg.cameraNumber ?? 0);
-        this.cameraOrigins.delete(msg.cameraNumber ?? 0);
+        this.vergissKamera(msg.cameraNumber ?? 0);
         this.broadcastCameras();
         break;
 
@@ -405,12 +404,32 @@ export class BridgeServer {
     await backend.connect();
   }
 
+  /**
+   * Was die Bruecke ueber eine Kamera BEHAUPTET, faellt mit der Verbindung.
+   *
+   * Zustand, Herkunft und Bestaetigungszeit sind Aussagen ueber ein Geraet,
+   * mit dem gerade gesprochen wird. Ohne Verbindung sind sie es nicht mehr:
+   * wer die Kamera in der Zwischenzeit am Menue anfasst, macht jede davon
+   * still falsch. Beim naechsten Verbindungsaufbau kaemen sie sonst als
+   * Aussage der NEUEN Sitzung zurueck.
+   *
+   * Eine Stelle, damit hier nicht wieder eine Karte vergessen wird — genau
+   * das war passiert: `cameraConfirmations` kam mit Bedarf 102 dazu und
+   * stand danach in keinem der beiden Aufraeumwege.
+   */
+  private vergissKamera(num: number): void {
+    this.cameraStates.delete(num);
+    this.cameraOrigins.delete(num);
+    this.cameraConfirmations.delete(num);
+  }
+
   private async disconnectCamera(num: number): Promise<void> {
     const slot = this.cameras.get(num);
     if (!slot?.backend) return;
     try { await slot.backend.disconnect(); } catch { /* ignore */ }
     slot.backend = null;
     slot.connected = false;
+    this.vergissKamera(num);
     this.broadcast({ type: 'cameraDisconnected', cameraNumber: num });
     this.companion.setConnected(this.anyConnected());
     this.broadcastCameras();
@@ -459,6 +478,10 @@ export class BridgeServer {
 
     backend.on('disconnected', () => {
       slot.connected = false;
+      // Auch beim UNGEWOLLTEN Verbindungsverlust — der ist der haeufigere
+      // Fall und der gefaehrlichere: niemand hat etwas getan, und die Werte
+      // stehen weiter da, als seien sie bestaetigt.
+      this.vergissKamera(num);
       this.broadcast({ type: 'cameraDisconnected', cameraNumber: num });
       this.companion.setConnected(this.anyConnected());
       this.broadcastCameras();
