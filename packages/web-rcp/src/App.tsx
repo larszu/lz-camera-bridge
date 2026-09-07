@@ -35,7 +35,7 @@ export default function App() {
 
   const bridge = useBridge();
   const {
-    status, cameras, cameraStates, ports, wiznetDevices, sonyUsbDevices, sonyMncDevices,
+    status, cameras, cameraStates, cameraOrigins, ports, wiznetDevices, sonyUsbDevices, sonyMncDevices,
     hidDevices, controlSurfaceActive, tally, errorMsg, planMatch,
     setCameraConfig, connectCamera, disconnectCamera, removeCamera, sendCommand,
     listPorts, discoverWiznet, configureWiznet, discoverSonyUsb, discoverSonyMnc,
@@ -84,6 +84,10 @@ export default function App() {
   const config = cam?.config ?? newCameraConfig(selected ?? 1);
   const connected = cam?.connected ?? false;
   const shownState = selected !== null ? cameraStates[selected] ?? {} : {};
+  // BEDARF 46 — die Herkunft der angezeigten Werte, und ob dieser Weg
+  // ueberhaupt je etwas zurueckliest. Beides kommt von der Bruecke.
+  const shownOrigins = selected !== null ? cameraOrigins[selected] ?? {} : {};
+  const neverReadsBack = cam?.neverReadsBack ?? false;
   const capabilities = capabilitiesForMode(config.connectionMode);
 
   useEffect(() => {
@@ -217,6 +221,8 @@ export default function App() {
               ) : (
                 <SonyRcpPanel
                   state={shownState}
+                  origins={shownOrigins}
+                  neverReadsBack={neverReadsBack}
                   tally={tally}
                   cameraId={selected}
                   disabled={!connected}

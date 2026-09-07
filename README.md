@@ -72,6 +72,13 @@ read none, the trim is refused with a reason rather than started from a guessed
 128. The bus scale of every value, and what each backend makes of it, is
 documented in [`docs/paint-nudge.md`](docs/paint-nudge.md).
 
+Every paint value on the panel says where it comes from: read back from the
+device, or merely the last thing the bridge sent. Which is which is decided per
+field and per connection mode by a table that was read out of this repository's
+own backends — five of the twelve paths read nothing back at all, and the panel
+says so once at the top instead of marking twenty knobs. See
+[`docs/value-origin.md`](docs/value-origin.md).
+
 Live-video feasibility per camera family — which cameras can show a live
 picture in the panel, at what cost — is documented in
 [`docs/live-video.md`](docs/live-video.md).

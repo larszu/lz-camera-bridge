@@ -11,6 +11,7 @@ import type {
   CameraState, CameraStatesByNumber, BridgeConfig, WiznetDevice,
   SonyUsbDevice, SonyMncDevice, HidDevice, TallyState,
 } from '../types.ts';
+import type { CameraOriginsByNumber, Origins } from '../origin.ts';
 
 export type ConnectionStatus = 'idle' | 'connecting' | 'connected' | 'error' | 'disconnected';
 
@@ -44,6 +45,14 @@ export interface CameraSlot {
   cameraNumber: number;
   config: BridgeConfig;
   connected: boolean;
+  /**
+   * BEDARF 46 — dieser Weg liest gar nichts zurueck.
+   *
+   * Kommt fertig von der Bruecke; das Pult fuehrt dafuer keine eigene
+   * Tabelle. Fehlt das Feld (aeltere Bruecke), gilt `false` — lieber keine
+   * Warnung als eine erfundene.
+   */
+  neverReadsBack?: boolean;
   /** Die geplante Kamera auf diesem Slot, samt Beleg. */
   plan?: PlanCamera;
   planMatchedBy?: PlanMatchedBy;
@@ -57,6 +66,10 @@ export function useBridge() {
   const [status, setStatus] = useState<ConnectionStatus>('idle');
   const [cameras, setCameras] = useState<Record<number, CameraSlot>>({});
   const [cameraStates, setCameraStates] = useState<CameraStatesByNumber>({});
+  // BEDARF 46 — woher jeder angezeigte Wert stammt. Getrennt vom Zustand,
+  // genau wie in der Bruecke: der Zustand ist die Zahl, die Herkunft eine
+  // Aussage ueber sie.
+  const [cameraOrigins, setCameraOrigins] = useState<CameraOriginsByNumber>({});
   const [planMatch, setPlanMatch] = useState<PlanMatchResult | null>(null);
   const [ports, setPorts] = useState<string[]>([]);
   const [wiznetDevices, setWiznetDevices] = useState<WiznetDevice[]>([]);
@@ -101,6 +114,13 @@ export function useBridge() {
                 ...prev,
                 [msg.cameraNumber]: { ...(prev[msg.cameraNumber] ?? {}), ...(msg.state ?? {}) },
               }));
+              setCameraOrigins((prev) => ({
+                ...prev,
+                [msg.cameraNumber]: {
+                  ...(prev[msg.cameraNumber] ?? {}),
+                  ...((msg.origins ?? {}) as Origins),
+                },
+              }));
             }
             break;
           case 'cameraConnected':
@@ -109,6 +129,15 @@ export function useBridge() {
           case 'cameraDisconnected':
             if (typeof msg.cameraNumber === 'number') {
               setCameraStates((prev) => {
+                const next = { ...prev };
+                delete next[msg.cameraNumber];
+                return next;
+              });
+              // Die Herkunft geht mit dem Wert. Bliebe sie stehen, truege der
+              // naechste Verbindungsaufbau die Bestaetigungen der vorigen
+              // Sitzung — und die gelten fuer eine Kamera, die inzwischen
+              // jemand angefasst haben kann.
+              setCameraOrigins((prev) => {
                 const next = { ...prev };
                 delete next[msg.cameraNumber];
                 return next;
@@ -209,7 +238,7 @@ export function useBridge() {
   );
 
   return {
-    status, cameras, cameraStates, ports, wiznetDevices, sonyUsbDevices, sonyMncDevices,
+    status, cameras, cameraStates, cameraOrigins, ports, wiznetDevices, sonyUsbDevices, sonyMncDevices,
     hidDevices, controlSurfaceActive, tally, errorMsg, planMatch,
     send, setCameraConfig, connectCamera, disconnectCamera, removeCamera, sendCommand,
     listPorts, discoverWiznet, configureWiznet, discoverSonyUsb, discoverSonyMnc,

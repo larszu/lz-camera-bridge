@@ -1520,3 +1520,32 @@
 @media (max-width: 900px) {
   .plan__cols { grid-template-columns: 1fr; }
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   BEDARF 46 — kommandiert ist nicht bestaetigt.
+
+   Ein Wert, den die Bruecke nur GESENDET und nie zurueckgelesen hat, ist
+   keine Auskunft ueber die Kamera. Er wird trotzdem angezeigt — er ist ja
+   das Einzige, was es gibt —, aber nicht wie eine Messung: gestrichelt
+   unterlegt und gedimmt, mit dem Satz als Tooltip.
+
+   Bewusst KEIN Rot und kein Warnsymbol: es ist kein Fehler, sondern die
+   Normallage auf den meisten Wegen. Rot an zwanzig Reglern erzoege genau
+   die Blindheit, gegen die diese Markierung gebaut ist.
+   ───────────────────────────────────────────────────────────────────────── */
+.rcp-unconfirmed {
+  opacity: 0.65;
+  border-bottom: 1px dashed currentColor;
+}
+
+/* Wo GAR NICHTS zurueckgelesen wird, steht der Satz einmal oben statt
+   zwanzigmal am Regler. */
+.rcp-noreadback {
+  margin: 0 0 8px;
+  padding: 6px 10px;
+  border-left: 3px solid #888;
+  background: #2a2a2a;
+  color: #bbb;
+  font-size: 11px;
+  line-height: 1.4;
+}

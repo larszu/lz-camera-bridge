@@ -22,9 +22,10 @@
  *          | 'setTally' | 'getTally' }
  *
  * Server → Client messages:
- *   { type: 'cameras', cameras: [{ cameraNumber, config, connected }] }
+ *   { type: 'cameras', cameras: [{ cameraNumber, config, connected, neverReadsBack }] }
  *   { type: 'cameraConnected' | 'cameraDisconnected', cameraNumber, info? }
- *   { type: 'state', cameraNumber, state }
+ *   { type: 'state', cameraNumber, state, origins }   // origins je Feld:
+ *                        'confirmed' (vom Geraet gelesen) | 'commanded' (Echo)
  *   { type: 'error', message, cameraNumber? }
  *   { type: 'tally' | 'ports' | 'wiznetDevices' | 'sonyUsbDevices'
  *          | 'sonyMncDevices' | 'hidDevices' | 'controlSurface' | 'wiznetConfigResult' }
@@ -43,6 +44,12 @@ import {
   type CameraPlan, type PlanCamera, type SlotFacts,
 } from './plan/cameraPlan.js';
 import { NUDGE_ACTIONS, NUDGE_REFUSAL_LABEL, resolveNudge } from './protocol/paintNudge.js';
+import {
+  applyOrigins,
+  feldnamen,
+  neverReadsBack,
+  type Origins,
+} from './protocol/valueOrigin.js';
 
 /** Was der Nutzer liest, wenn die Datei kein Kamera-Plan ist. */
 const PLAN_FEHLER =
@@ -91,6 +98,15 @@ export class BridgeServer {
   private httpServer: ReturnType<typeof createServer>;
   private cameras = new Map<number, CameraSlot>();
   private cameraStates = new Map<number, CameraState>();
+  /**
+   * BEDARF 46 — woher jeder Wert in `cameraStates` stammt.
+   *
+   * Getrennt gefuehrt und nicht in den Zustand gemischt: der Zustand ist die
+   * Sprache zu den Backends und zu Companion, die Herkunft eine Aussage
+   * UEBER ihn. Zusammengelegt haette jede Stelle, die den Zustand weiterreicht,
+   * eine Meinung dazu haben muessen.
+   */
+  private cameraOrigins = new Map<number, Origins>();
   private wiznetDiscovery = new WiznetDiscovery();
   private companion: CompanionServer;
   private hidSurface: HidControlSurface | null = null;
@@ -144,7 +160,14 @@ export class BridgeServer {
     this.sendCameras(ws);
     ws.send(JSON.stringify({ type: 'tally', tally: this.tally }));
     for (const [cameraNumber, state] of this.cameraStates.entries()) {
-      ws.send(JSON.stringify({ type: 'state', cameraNumber, state }));
+      ws.send(
+        JSON.stringify({
+          type: 'state',
+          cameraNumber,
+          state,
+          origins: this.cameraOrigins.get(cameraNumber) ?? {},
+        }),
+      );
     }
 
     ws.on('message', (raw) => {
@@ -187,6 +210,7 @@ export class BridgeServer {
         await this.disconnectCamera(msg.cameraNumber ?? 0);
         this.cameras.delete(msg.cameraNumber ?? 0);
         this.cameraStates.delete(msg.cameraNumber ?? 0);
+        this.cameraOrigins.delete(msg.cameraNumber ?? 0);
         this.broadcastCameras();
         break;
 
@@ -393,7 +417,19 @@ export class BridgeServer {
       const mapped = slot.mapState(raw);
       const merged = { ...(this.cameraStates.get(num) ?? {}), ...mapped };
       this.cameraStates.set(num, merged);
-      this.broadcast({ type: 'state', cameraNumber: num, state: merged });
+      // BEDARF 46 — `stateChanged` heisst NICHT „vom Geraet gelesen". Mehrere
+      // Backends werfen aus `handleRcpCommand` heraus den gerade geschickten
+      // Wert als `stateChanged` zurueck (Visca, JVC, Z CAM, Panasonic-PTZ,
+      // Sony-USB). Ob es eine Rueckmeldung war, entscheidet deshalb
+      // `MODE_READBACK` je Feld und Weg — nicht der Kanal.
+      const origins = applyOrigins(
+        this.cameraOrigins.get(num),
+        slot.config?.connectionMode,
+        feldnamen(mapped),
+        'read',
+      );
+      this.cameraOrigins.set(num, origins);
+      this.broadcast({ type: 'state', cameraNumber: num, state: merged, origins });
       this.companion.updateCameraStateFor(num, merged as Record<string, unknown>);
     });
 
@@ -467,7 +503,17 @@ export class BridgeServer {
     if (echo) {
       const merged = { ...(this.cameraStates.get(num) ?? {}), ...echo };
       this.cameraStates.set(num, merged);
-      this.broadcast({ type: 'state', cameraNumber: num, state: merged });
+      // Ein Echo ist ein Echo. Es ueberschreibt eine fruehere Bestaetigung
+      // ausdruecklich — was die Kamera vor dem Kommando gemeldet hat, gilt
+      // danach nicht mehr, und ein pollendes Backend setzt sie gleich wieder.
+      const origins = applyOrigins(
+        this.cameraOrigins.get(num),
+        slot.config?.connectionMode,
+        feldnamen(echo),
+        'command',
+      );
+      this.cameraOrigins.set(num, origins);
+      this.broadcast({ type: 'state', cameraNumber: num, state: merged, origins });
       this.companion.updateCameraStateFor(num, merged as Record<string, unknown>);
     }
   }
@@ -501,6 +547,11 @@ export class BridgeServer {
       cameraNumber: s.num,
       config: s.config,
       connected: s.connected,
+      // BEDARF 46 — ob dieser Weg ueberhaupt je etwas zurueckliest. Das Pult
+      // bekommt die fertige Auskunft und KEINE Kopie von `MODE_READBACK`:
+      // eine zweite Tabelle im selben Repo waere die zweite Wahrheit, die
+      // dieses Modul gerade abschafft.
+      neverReadsBack: neverReadsBack(s.config?.connectionMode ?? 'tcp'),
       // Der Plan geht mit, damit das Pult die Kamera so beschriften kann, wie
       // sie in der Show heisst -- samt Beleg, damit ein blosser Vorschlag
       // nicht wie eine Tatsache aussieht.

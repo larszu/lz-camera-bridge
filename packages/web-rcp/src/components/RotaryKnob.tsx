@@ -14,6 +14,15 @@ interface RotaryKnobProps {
   detent?: number; // Center detent position
   editable?: boolean; // Allow clicking to edit value
   displayValue?: string; // Custom display value override
+  /**
+   * BEDARF 46 — dieser Wert wurde gesendet und nie zurueckgelesen.
+   *
+   * Der Regler bleibt bedienbar: er ist ja der einzige Weg, ihn zu setzen.
+   * Nur die ANZEIGE sagt, dass die Zahl keine Auskunft ueber die Kamera ist.
+   */
+  unconfirmed?: boolean;
+  /** Der Satz dazu, als Tooltip. Kommt aus `origin.ts`, nicht von hier. */
+  unconfirmedTitle?: string;
 }
 
 /**
@@ -34,6 +43,8 @@ export function RotaryKnob({
   detent,
   editable = false,
   displayValue: displayValueProp,
+  unconfirmed = false,
+  unconfirmedTitle,
 }: RotaryKnobProps) {
   const knobRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -215,7 +226,8 @@ export function RotaryKnob({
           />
         ) : (
           <div 
-            className={`rotary-knob__value ${editable ? 'rotary-knob__value--editable' : ''}`}
+            className={`rotary-knob__value ${editable ? 'rotary-knob__value--editable' : ''}${unconfirmed ? ' rcp-unconfirmed' : ''}`}
+            title={unconfirmed ? unconfirmedTitle : undefined}
             onClick={handleValueClick}
           >
             {displayValue}

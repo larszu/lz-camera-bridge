@@ -2,9 +2,23 @@ import React, { useState } from 'react';
 import { TallyState } from './TallyBar.tsx';
 import { RotaryKnob } from './RotaryKnob.tsx';
 import type { CameraCapabilities, CameraState } from '../types.ts';
+import {
+  NO_READBACK_NOTE,
+  UNCONFIRMED_CLASS,
+  UNCONFIRMED_NOTE,
+  istUnbestaetigt,
+  type Origins,
+} from '../origin.ts';
 
 interface SonyRcpPanelProps {
   state: CameraState;
+  /**
+   * BEDARF 46 — woher jeder Wert stammt. Ohne Eintrag: es gibt ihn nicht,
+   * und das Pult zeigt „--" statt einer markierten Zahl.
+   */
+  origins?: Origins;
+  /** Dieser Weg liest gar nichts zurueck. Kommt fertig von der Bruecke. */
+  neverReadsBack?: boolean;
   tally: TallyState;
   cameraId?: number;
   disabled?: boolean;
@@ -43,15 +57,22 @@ function ValueBox({ value, color, label, onChange, disabled }: {
 }
 
 /** Selector with up/down arrows */
-function Selector({ value, label, onChange, disabled }: {
+function Selector({ value, label, onChange, disabled, unconfirmed }: {
   value: string;
   label: string;
   onChange?: (delta: number) => void;
   disabled?: boolean;
+  /** BEDARF 46 — gesendet, aber nie zurueckgelesen. */
+  unconfirmed?: boolean;
 }) {
   return (
     <div className={`rcp-selector ${disabled ? 'rcp-selector--disabled' : ''}`}>
-      <div className="rcp-selector__display">{value}</div>
+      <div
+        className={`rcp-selector__display${unconfirmed ? ` ${UNCONFIRMED_CLASS}` : ''}`}
+        title={unconfirmed ? UNCONFIRMED_NOTE : undefined}
+      >
+        {value}
+      </div>
       {onChange && (
         <div className="rcp-selector__arrows">
           <button onClick={() => onChange(1)} disabled={disabled}>▲</button>
@@ -83,10 +104,16 @@ function RcpButton({ label, active, variant, onClick, disabled }: {
 /**
  * Software-style RCP Panel
  */
-export function SonyRcpPanel({ state, tally, cameraId = 1, disabled = false, capabilities, onCommand, onSetTally }: SonyRcpPanelProps) {
+export function SonyRcpPanel({ state, origins, neverReadsBack = false, tally, cameraId = 1, disabled = false, capabilities, onCommand, onSetTally }: SonyRcpPanelProps) {
   const [autoIris, setAutoIris] = useState(false);
   const cmd = (c: string, params: Record<string, unknown> = {}) => onCommand(c, params);
   const can = (feature: keyof CameraCapabilities): boolean => !disabled && (capabilities?.[feature] ?? true);
+  // BEDARF 46 — ein Wert ist markiert, wenn er GESENDET und nie
+  // zurueckgelesen wurde. Wo der Weg ueberhaupt nichts zurueckliest, steht
+  // der Satz EINMAL oben: zwanzig gleiche Markierungen an zwanzig Reglern
+  // sind keine Auskunft mehr, sondern Tapete.
+  const offen = (feld: keyof CameraState): boolean =>
+    !neverReadsBack && istUnbestaetigt(origins, feld);
   
   // Convert values to display format
   // BEDARF 129 — kein erfundener Ausgangswert. `?? 0` stand hier fuer beide
@@ -104,6 +131,9 @@ export function SonyRcpPanel({ state, tally, cameraId = 1, disabled = false, cap
 
   return (
     <div className={`rcp-panel ${disabled ? 'rcp-panel--disabled' : ''}`}>
+      {/* BEDARF 46 — der Weg liest nichts zurueck. Einmal, ganz oben, weil er
+          die Lesart JEDER Zahl darunter bestimmt. */}
+      {neverReadsBack && <div className="rcp-noreadback">{NO_READBACK_NOTE}</div>}
       
       {/* ═══════ TOP BAR ═══════ */}
       <div className="rcp-topbar">
@@ -140,6 +170,7 @@ export function SonyRcpPanel({ state, tally, cameraId = 1, disabled = false, cap
           label="MASTER GAIN"
           onChange={(d) => cmd('nudge', { parameter: 'masterGain', by: d })}
           disabled={!can('masterGain')}
+          unconfirmed={offen('masterGain')}
         />
         <div className="rcp-row__spacer" />
         <RcpButton label="AWB" onClick={() => cmd('autoWhiteBalance', { preset: 'A' })} disabled={!can('awb')} />
@@ -156,6 +187,8 @@ export function SonyRcpPanel({ state, tally, cameraId = 1, disabled = false, cap
           <RotaryKnob
             label="R"
             value={state.whiteR ?? 128}
+            unconfirmed={offen('whiteR')}
+            unconfirmedTitle={UNCONFIRMED_NOTE}
             min={0}
             max={255}
             detent={128}
@@ -168,6 +201,8 @@ export function SonyRcpPanel({ state, tally, cameraId = 1, disabled = false, cap
           <RotaryKnob
             label="G"
             value={state.whiteG ?? 128}
+            unconfirmed={offen('whiteG')}
+            unconfirmedTitle={UNCONFIRMED_NOTE}
             min={0}
             max={255}
             detent={128}
@@ -180,6 +215,8 @@ export function SonyRcpPanel({ state, tally, cameraId = 1, disabled = false, cap
           <RotaryKnob
             label="B"
             value={state.whiteB ?? 128}
+            unconfirmed={offen('whiteB')}
+            unconfirmedTitle={UNCONFIRMED_NOTE}
             min={0}
             max={255}
             detent={128}
@@ -201,6 +238,8 @@ export function SonyRcpPanel({ state, tally, cameraId = 1, disabled = false, cap
           <RotaryKnob
             label="MASTER"
             value={state.masterBlack ?? 128}
+            unconfirmed={offen('masterBlack')}
+            unconfirmedTitle={UNCONFIRMED_NOTE}
             min={0}
             max={255}
             detent={128}
@@ -212,6 +251,8 @@ export function SonyRcpPanel({ state, tally, cameraId = 1, disabled = false, cap
           <RotaryKnob
             label="R"
             value={state.blackR ?? 128}
+            unconfirmed={offen('blackR')}
+            unconfirmedTitle={UNCONFIRMED_NOTE}
             min={0}
             max={255}
             detent={128}
@@ -224,6 +265,8 @@ export function SonyRcpPanel({ state, tally, cameraId = 1, disabled = false, cap
           <RotaryKnob
             label="G"
             value={state.blackG ?? 128}
+            unconfirmed={offen('blackG')}
+            unconfirmedTitle={UNCONFIRMED_NOTE}
             min={0}
             max={255}
             detent={128}
@@ -236,6 +279,8 @@ export function SonyRcpPanel({ state, tally, cameraId = 1, disabled = false, cap
           <RotaryKnob
             label="B"
             value={state.blackB ?? 128}
+            unconfirmed={offen('blackB')}
+            unconfirmedTitle={UNCONFIRMED_NOTE}
             min={0}
             max={255}
             detent={128}
@@ -269,6 +314,7 @@ export function SonyRcpPanel({ state, tally, cameraId = 1, disabled = false, cap
               label="ND"
               onChange={(d) => cmd('nudge', { parameter: 'ndFilter', by: d })}
               disabled={!can('ndFilter')}
+              unconfirmed={offen('ndFilter')}
             />
             <Selector 
               value={CC_VALUES[ccIdx] ?? 'A'} 
@@ -280,7 +326,12 @@ export function SonyRcpPanel({ state, tally, cameraId = 1, disabled = false, cap
         </div>
         <div className="rcp-iris-center">
           <div className="rcp-iris-display">
-            <span className="rcp-iris-display__value">{irisValue}</span>
+            <span
+              className={`rcp-iris-display__value${offen('iris') ? ` ${UNCONFIRMED_CLASS}` : ''}`}
+              title={offen('iris') ? UNCONFIRMED_NOTE : undefined}
+            >
+              {irisValue}
+            </span>
             <span className="rcp-iris-display__label">IRIS</span>
           </div>
         </div>
