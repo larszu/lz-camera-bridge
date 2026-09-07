@@ -35,7 +35,7 @@ export default function App() {
 
   const bridge = useBridge();
   const {
-    status, cameras, cameraStates, cameraOrigins, ports, wiznetDevices, sonyUsbDevices, sonyMncDevices,
+    status, cameras, cameraStates, cameraOrigins, cameraConfirmations, ports, wiznetDevices, sonyUsbDevices, sonyMncDevices,
     hidDevices, controlSurfaceActive, tally, errorMsg, planMatch,
     setCameraConfig, connectCamera, disconnectCamera, removeCamera, sendCommand,
     listPorts, discoverWiznet, configureWiznet, discoverSonyUsb, discoverSonyMnc,
@@ -87,6 +87,8 @@ export default function App() {
   // BEDARF 46 — die Herkunft der angezeigten Werte, und ob dieser Weg
   // ueberhaupt je etwas zurueckliest. Beides kommt von der Bruecke.
   const shownOrigins = selected !== null ? cameraOrigins[selected] ?? {} : {};
+  // BEDARF 102 — Zeitstempel je Feld und die fertigen Grenzen je Kamera.
+  const shownConfirmations = selected !== null ? cameraConfirmations[selected] ?? {} : {};
   const neverReadsBack = cam?.neverReadsBack ?? false;
   const capabilities = capabilitiesForMode(config.connectionMode);
 
@@ -222,6 +224,8 @@ export default function App() {
                 <SonyRcpPanel
                   state={shownState}
                   origins={shownOrigins}
+                  confirmations={shownConfirmations}
+                  freshnessLimits={cam?.freshnessLimits ?? null}
                   neverReadsBack={neverReadsBack}
                   tally={tally}
                   cameraId={selected}

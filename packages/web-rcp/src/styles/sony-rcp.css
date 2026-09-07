@@ -1538,6 +1538,18 @@
   border-bottom: 1px dashed currentColor;
 }
 
+/* BEDARF 102 — ein Wert, der bestaetigt WAR. Bewusst leiser als
+   `.rcp-unconfirmed`: dort fehlt jede Aussage ueber die Kamera, hier gab es
+   eine, sie ist nur alt. Wer beides gleich laut zeichnet, macht den
+   Unterschied unsichtbar, um den es geht. */
+.rcp-aging {
+  border-bottom: 1px dotted currentColor;
+}
+.rcp-stale {
+  opacity: 0.8;
+  border-bottom: 1px dashed var(--rcp-amber);
+}
+
 /* Wo GAR NICHTS zurueckgelesen wird, steht der Satz einmal oben statt
    zwanzigmal am Regler. */
 .rcp-noreadback {

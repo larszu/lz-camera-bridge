@@ -22,10 +22,15 @@
  *          | 'setTally' | 'getTally' }
  *
  * Server → Client messages:
- *   { type: 'cameras', cameras: [{ cameraNumber, config, connected, neverReadsBack }] }
+ *   { type: 'cameras', cameras: [{ cameraNumber, config, connected,
+ *                                  neverReadsBack, freshnessLimits }] }
  *   { type: 'cameraConnected' | 'cameraDisconnected', cameraNumber, info? }
- *   { type: 'state', cameraNumber, state, origins }   // origins je Feld:
- *                        'confirmed' (vom Geraet gelesen) | 'commanded' (Echo)
+ *   { type: 'state', cameraNumber, state, origins, confirmations }
+ *                        origins je Feld: 'confirmed' (vom Geraet gelesen)
+ *                        | 'commanded' (Echo).
+ *                        confirmations je Feld: wann zuletzt bestaetigt
+ *                        (ms seit Epoche). Nur bestaetigte Felder stehen
+ *                        darin; ein Kommando loescht den Eintrag.
  *   { type: 'error', message, cameraNumber? }
  *   { type: 'tally' | 'ports' | 'wiznetDevices' | 'sonyUsbDevices'
  *          | 'sonyMncDevices' | 'hidDevices' | 'controlSurface' | 'wiznetConfigResult' }
@@ -46,8 +51,12 @@ import {
 import { NUDGE_ACTIONS, NUDGE_REFUSAL_LABEL, resolveNudge } from './protocol/paintNudge.js';
 import {
   applyOrigins,
+  applyConfirmations,
+  type Confirmations,
   feldnamen,
   neverReadsBack,
+  MODE_CADENCE,
+  freshnessLimits,
   type Origins,
 } from './protocol/valueOrigin.js';
 
@@ -107,6 +116,12 @@ export class BridgeServer {
    * eine Meinung dazu haben muessen.
    */
   private cameraOrigins = new Map<number, Origins>();
+  // BEDARF 102 — wann jedes Feld ZULETZT bestaetigt wurde. Getrennt von
+  // `cameraOrigins` gefuehrt, weil es eine andere Frage beantwortet: die
+  // Herkunft sagt „hat die Kamera das je gesagt", der Zeitstempel sagt
+  // „gilt das noch". Wer am Kameramenue dreht, aendert das zweite, nicht
+  // das erste.
+  private cameraConfirmations = new Map<number, Confirmations>();
   private wiznetDiscovery = new WiznetDiscovery();
   private companion: CompanionServer;
   private hidSurface: HidControlSurface | null = null;
@@ -166,6 +181,7 @@ export class BridgeServer {
           cameraNumber,
           state,
           origins: this.cameraOrigins.get(cameraNumber) ?? {},
+          confirmations: this.cameraConfirmations.get(cameraNumber) ?? {},
         }),
       );
     }
@@ -429,7 +445,15 @@ export class BridgeServer {
         'read',
       );
       this.cameraOrigins.set(num, origins);
-      this.broadcast({ type: 'state', cameraNumber: num, state: merged, origins });
+      const confirmations = applyConfirmations(
+        this.cameraConfirmations.get(num),
+        slot.config?.connectionMode,
+        feldnamen(mapped),
+        'read',
+        Date.now(),
+      );
+      this.cameraConfirmations.set(num, confirmations);
+      this.broadcast({ type: 'state', cameraNumber: num, state: merged, origins, confirmations });
       this.companion.updateCameraStateFor(num, merged as Record<string, unknown>);
     });
 
@@ -513,7 +537,17 @@ export class BridgeServer {
         'command',
       );
       this.cameraOrigins.set(num, origins);
-      this.broadcast({ type: 'state', cameraNumber: num, state: merged, origins });
+      // Und der Zeitstempel faellt mit: er beschriebe sonst das Alter einer
+      // Bestaetigung, die einen ANDEREN Wert betraf.
+      const confirmations = applyConfirmations(
+        this.cameraConfirmations.get(num),
+        slot.config?.connectionMode,
+        feldnamen(echo),
+        'command',
+        Date.now(),
+      );
+      this.cameraConfirmations.set(num, confirmations);
+      this.broadcast({ type: 'state', cameraNumber: num, state: merged, origins, confirmations });
       this.companion.updateCameraStateFor(num, merged as Record<string, unknown>);
     }
   }
@@ -552,6 +586,10 @@ export class BridgeServer {
       // eine zweite Tabelle im selben Repo waere die zweite Wahrheit, die
       // dieses Modul gerade abschafft.
       neverReadsBack: neverReadsBack(s.config?.connectionMode ?? 'tcp'),
+      // BEDARF 102 — der Takt kommt FERTIG mit, wie schon
+      // `neverReadsBack`. Das Pult bekommt kein Duplikat der Tabelle;
+      // eine zweite Tabelle waere die zweite Wahrheit.
+      freshnessLimits: freshnessLimits(MODE_CADENCE[s.config?.connectionMode ?? 'tcp']),
       // Der Plan geht mit, damit das Pult die Kamera so beschriften kann, wie
       // sie in der Show heisst -- samt Beleg, damit ein blosser Vorschlag
       // nicht wie eine Tatsache aussieht.

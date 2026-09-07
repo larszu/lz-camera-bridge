@@ -23,6 +23,15 @@ interface RotaryKnobProps {
   unconfirmed?: boolean;
   /** Der Satz dazu, als Tooltip. Kommt aus `origin.ts`, nicht von hier. */
   unconfirmedTitle?: string;
+  /**
+   * BEDARF 102 — dieser Wert WAR bestaetigt und ist alt.
+   *
+   * Eine eigene, leisere Markierung neben `unconfirmed`: dort fehlt jede
+   * Aussage ueber die Kamera, hier gab es eine. Beides gleich laut zu
+   * zeichnen machte den Unterschied unsichtbar, um den es geht.
+   */
+  markClass?: string;
+  markTitle?: string;
 }
 
 /**
@@ -45,6 +54,8 @@ export function RotaryKnob({
   displayValue: displayValueProp,
   unconfirmed = false,
   unconfirmedTitle,
+  markClass,
+  markTitle,
 }: RotaryKnobProps) {
   const knobRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -226,8 +237,8 @@ export function RotaryKnob({
           />
         ) : (
           <div 
-            className={`rotary-knob__value ${editable ? 'rotary-knob__value--editable' : ''}${unconfirmed ? ' rcp-unconfirmed' : ''}`}
-            title={unconfirmed ? unconfirmedTitle : undefined}
+            className={`rotary-knob__value ${editable ? 'rotary-knob__value--editable' : ''}${unconfirmed ? ' rcp-unconfirmed' : ''}${markClass ? ` ${markClass}` : ''}`}
+            title={unconfirmed ? unconfirmedTitle : markTitle}
             onClick={handleValueClick}
           >
             {displayValue}

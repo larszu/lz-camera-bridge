@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { TallyState } from './TallyBar.tsx';
 import { RotaryKnob } from './RotaryKnob.tsx';
 import type { CameraCapabilities, CameraState } from '../types.ts';
@@ -6,7 +6,11 @@ import {
   NO_READBACK_NOTE,
   UNCONFIRMED_CLASS,
   UNCONFIRMED_NOTE,
+  freshnessOf,
+  freshnessProps,
   istUnbestaetigt,
+  type Confirmations,
+  type FreshnessLimits,
   type Origins,
 } from '../origin.ts';
 
@@ -19,6 +23,13 @@ interface SonyRcpPanelProps {
   origins?: Origins;
   /** Dieser Weg liest gar nichts zurueck. Kommt fertig von der Bruecke. */
   neverReadsBack?: boolean;
+  /**
+   * BEDARF 102 — wann jedes Feld zuletzt bestaetigt wurde, und in welchem
+   * Takt dieser Weg ueberhaupt bestaetigt. Beides kommt fertig von der
+   * Bruecke; das Pult rechnet das Urteil nicht selbst aus.
+   */
+  confirmations?: Confirmations;
+  freshnessLimits?: FreshnessLimits | null;
   tally: TallyState;
   cameraId?: number;
   disabled?: boolean;
@@ -104,7 +115,7 @@ function RcpButton({ label, active, variant, onClick, disabled }: {
 /**
  * Software-style RCP Panel
  */
-export function SonyRcpPanel({ state, origins, neverReadsBack = false, tally, cameraId = 1, disabled = false, capabilities, onCommand, onSetTally }: SonyRcpPanelProps) {
+export function SonyRcpPanel({ state, origins, neverReadsBack = false, confirmations, freshnessLimits, tally, cameraId = 1, disabled = false, capabilities, onCommand, onSetTally }: SonyRcpPanelProps) {
   const [autoIris, setAutoIris] = useState(false);
   const cmd = (c: string, params: Record<string, unknown> = {}) => onCommand(c, params);
   const can = (feature: keyof CameraCapabilities): boolean => !disabled && (capabilities?.[feature] ?? true);
@@ -114,6 +125,29 @@ export function SonyRcpPanel({ state, origins, neverReadsBack = false, tally, ca
   // sind keine Auskunft mehr, sondern Tapete.
   const offen = (feld: keyof CameraState): boolean =>
     !neverReadsBack && istUnbestaetigt(origins, feld);
+
+  // BEDARF 102 — das Alter tickt, also muss die Anzeige ticken. Einmal je
+  // Sekunde und nicht haeufiger: es geht um Vielfache des Poll-Takts, nicht
+  // um Millisekunden, und ein Pult, das sich sechzigmal je Sekunde neu
+  // zeichnet, kostet Strom ohne eine einzige zusaetzliche Aussage.
+  const [jetzt, setJetzt] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setJetzt(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  /**
+   * Die Markierung fuer das ALTER eines Wertes.
+   *
+   * Ein unbestaetigter Wert bekommt sie nicht: der traegt bereits die
+   * Markierung aus Bedarf 46, und zwei Markierungen an einer Zahl sind eine
+   * zu viel.
+   */
+  const stand = (feld: keyof CameraState): { markClass?: string; markTitle?: string } => {
+    if (neverReadsBack || offen(feld)) return {};
+    const wann = confirmations?.[feld as string];
+    return freshnessProps(freshnessOf(wann, jetzt, freshnessLimits), wann, jetzt);
+  };
   
   // Convert values to display format
   // BEDARF 129 — kein erfundener Ausgangswert. `?? 0` stand hier fuer beide
@@ -170,7 +204,7 @@ export function SonyRcpPanel({ state, origins, neverReadsBack = false, tally, ca
           label="MASTER GAIN"
           onChange={(d) => cmd('nudge', { parameter: 'masterGain', by: d })}
           disabled={!can('masterGain')}
-          unconfirmed={offen('masterGain')}
+          unconfirmed={offen('masterGain')} {...stand('masterGain')}
         />
         <div className="rcp-row__spacer" />
         <RcpButton label="AWB" onClick={() => cmd('autoWhiteBalance', { preset: 'A' })} disabled={!can('awb')} />
@@ -187,7 +221,7 @@ export function SonyRcpPanel({ state, origins, neverReadsBack = false, tally, ca
           <RotaryKnob
             label="R"
             value={state.whiteR ?? 128}
-            unconfirmed={offen('whiteR')}
+            unconfirmed={offen('whiteR')} {...stand('whiteR')}
             unconfirmedTitle={UNCONFIRMED_NOTE}
             min={0}
             max={255}
@@ -201,7 +235,7 @@ export function SonyRcpPanel({ state, origins, neverReadsBack = false, tally, ca
           <RotaryKnob
             label="G"
             value={state.whiteG ?? 128}
-            unconfirmed={offen('whiteG')}
+            unconfirmed={offen('whiteG')} {...stand('whiteG')}
             unconfirmedTitle={UNCONFIRMED_NOTE}
             min={0}
             max={255}
@@ -215,7 +249,7 @@ export function SonyRcpPanel({ state, origins, neverReadsBack = false, tally, ca
           <RotaryKnob
             label="B"
             value={state.whiteB ?? 128}
-            unconfirmed={offen('whiteB')}
+            unconfirmed={offen('whiteB')} {...stand('whiteB')}
             unconfirmedTitle={UNCONFIRMED_NOTE}
             min={0}
             max={255}
@@ -238,7 +272,7 @@ export function SonyRcpPanel({ state, origins, neverReadsBack = false, tally, ca
           <RotaryKnob
             label="MASTER"
             value={state.masterBlack ?? 128}
-            unconfirmed={offen('masterBlack')}
+            unconfirmed={offen('masterBlack')} {...stand('masterBlack')}
             unconfirmedTitle={UNCONFIRMED_NOTE}
             min={0}
             max={255}
@@ -251,7 +285,7 @@ export function SonyRcpPanel({ state, origins, neverReadsBack = false, tally, ca
           <RotaryKnob
             label="R"
             value={state.blackR ?? 128}
-            unconfirmed={offen('blackR')}
+            unconfirmed={offen('blackR')} {...stand('blackR')}
             unconfirmedTitle={UNCONFIRMED_NOTE}
             min={0}
             max={255}
@@ -265,7 +299,7 @@ export function SonyRcpPanel({ state, origins, neverReadsBack = false, tally, ca
           <RotaryKnob
             label="G"
             value={state.blackG ?? 128}
-            unconfirmed={offen('blackG')}
+            unconfirmed={offen('blackG')} {...stand('blackG')}
             unconfirmedTitle={UNCONFIRMED_NOTE}
             min={0}
             max={255}
@@ -279,7 +313,7 @@ export function SonyRcpPanel({ state, origins, neverReadsBack = false, tally, ca
           <RotaryKnob
             label="B"
             value={state.blackB ?? 128}
-            unconfirmed={offen('blackB')}
+            unconfirmed={offen('blackB')} {...stand('blackB')}
             unconfirmedTitle={UNCONFIRMED_NOTE}
             min={0}
             max={255}
@@ -314,7 +348,7 @@ export function SonyRcpPanel({ state, origins, neverReadsBack = false, tally, ca
               label="ND"
               onChange={(d) => cmd('nudge', { parameter: 'ndFilter', by: d })}
               disabled={!can('ndFilter')}
-              unconfirmed={offen('ndFilter')}
+              unconfirmed={offen('ndFilter')} {...stand('ndFilter')}
             />
             <Selector 
               value={CC_VALUES[ccIdx] ?? 'A'} 

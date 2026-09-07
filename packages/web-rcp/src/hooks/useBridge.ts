@@ -11,7 +11,12 @@ import type {
   CameraState, CameraStatesByNumber, BridgeConfig, WiznetDevice,
   SonyUsbDevice, SonyMncDevice, HidDevice, TallyState,
 } from '../types.ts';
-import type { CameraOriginsByNumber, Origins } from '../origin.ts';
+import type {
+  CameraConfirmationsByNumber,
+  CameraOriginsByNumber,
+  Confirmations,
+  Origins,
+} from '../origin.ts';
 
 export type ConnectionStatus = 'idle' | 'connecting' | 'connected' | 'error' | 'disconnected';
 
@@ -53,6 +58,10 @@ export interface CameraSlot {
    * Warnung als eine erfundene.
    */
   neverReadsBack?: boolean;
+  /** BEDARF 102 — ab wann ein bestaetigter Wert auffaellt bzw. ueberholt
+   *  ist, in Millisekunden. Kommt FERTIG GERECHNET von der Bruecke; das Pult
+   *  fuehrt weder Takt-Tabelle noch Schwellen. `null`: keine Verfallsfrist. */
+  freshnessLimits?: { agingAfterMs: number; staleAfterMs: number } | null;
   /** Die geplante Kamera auf diesem Slot, samt Beleg. */
   plan?: PlanCamera;
   planMatchedBy?: PlanMatchedBy;
@@ -70,6 +79,9 @@ export function useBridge() {
   // genau wie in der Bruecke: der Zustand ist die Zahl, die Herkunft eine
   // Aussage ueber sie.
   const [cameraOrigins, setCameraOrigins] = useState<CameraOriginsByNumber>({});
+  // BEDARF 102 — wann jedes Feld zuletzt bestaetigt wurde. Getrennt von den
+  // Herkuenften, weil es eine andere Frage beantwortet.
+  const [cameraConfirmations, setCameraConfirmations] = useState<CameraConfirmationsByNumber>({});
   const [planMatch, setPlanMatch] = useState<PlanMatchResult | null>(null);
   const [ports, setPorts] = useState<string[]>([]);
   const [wiznetDevices, setWiznetDevices] = useState<WiznetDevice[]>([]);
@@ -119,6 +131,15 @@ export function useBridge() {
                 [msg.cameraNumber]: {
                   ...(prev[msg.cameraNumber] ?? {}),
                   ...((msg.origins ?? {}) as Origins),
+                },
+              }));
+              // Zusammengefuehrt und nicht ersetzt, wie die Herkuenfte: eine
+              // Teilmeldung nennt nur die Felder, die sie traegt.
+              setCameraConfirmations((prev) => ({
+                ...prev,
+                [msg.cameraNumber]: {
+                  ...(prev[msg.cameraNumber] ?? {}),
+                  ...((msg.confirmations ?? {}) as Confirmations),
                 },
               }));
             }
@@ -238,7 +259,7 @@ export function useBridge() {
   );
 
   return {
-    status, cameras, cameraStates, cameraOrigins, ports, wiznetDevices, sonyUsbDevices, sonyMncDevices,
+    status, cameras, cameraStates, cameraOrigins, cameraConfirmations, ports, wiznetDevices, sonyUsbDevices, sonyMncDevices,
     hidDevices, controlSurfaceActive, tally, errorMsg, planMatch,
     send, setCameraConfig, connectCamera, disconnectCamera, removeCamera, sendCommand,
     listPorts, discoverWiznet, configureWiznet, discoverSonyUsb, discoverSonyMnc,

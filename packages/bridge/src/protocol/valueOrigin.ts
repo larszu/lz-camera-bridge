@@ -178,3 +178,206 @@ export function applyOrigins(
 /** Die Felder einer Teilmeldung — ohne die, die gar keinen Wert tragen. */
 export const feldnamen = (teil: Partial<CameraState>): PaintField[] =>
   (Object.keys(teil) as PaintField[]).filter((k) => teil[k] !== undefined);
+
+// ───────────────────────────────────────────────────────────────────────────
+// Bedarf 102 (P3) — bestaetigt ist nicht dauerhaft bestaetigt.
+//
+// ─── DER BEFUND ────────────────────────────────────────────────────────────
+//
+//   > Parameters changed in the camera's own menu or web UI never update the
+//   > control surface; an ND filter change executes but THE DISPLAYED
+//   > VARIABLE STAYS STALE, and SHORTENING THE POLL INTERVAL FROM 3000ms TO
+//   > 200ms CHANGES NOTHING.
+//
+// Belegt an `bitfocus/companion-module-canon-ptz#53` (November 2024), mit dem
+// Reporter woertlich zitiert.
+//
+// Die Bedarfs-Datenbank nennt die Massnahme ebenso woertlich:
+//
+//   > TIMESTAMP EVERY STORED VALUE WITH WHEN IT WAS LAST CONFIRMED, and
+//   > SURFACE STALENESS RATHER THAN HIDING IT.
+//
+// ─── WAS BEDARF 46 SCHON LEISTET, UND WAS NICHT ────────────────────────────
+//
+// `ValueOrigin` trennt oben `commanded` von `confirmed`. Das beantwortet:
+// „hat die Kamera das je gesagt?" Es beantwortet NICHT: „gilt das noch?"
+//
+// Und genau das ist der Fall aus dem Beleg. Wer am Kameramenue den ND-Filter
+// dreht, aendert einen Wert, den das Pult einmal korrekt gelesen hat. Die
+// Herkunft bleibt `confirmed` — und ist ab diesem Augenblick eine Aussage
+// ueber die Vergangenheit. Ein Alter macht den Unterschied sichtbar; das
+// Nachschaerfen des Poll-Takts nicht, wie der Reporter gemessen hat.
+//
+// ─── WARUM DAS ALTER NICHT GEGEN EINE FESTE SEKUNDENZAHL LAEUFT ────────────
+//
+// „Aelter als fuenf Sekunden" waere geraten. Gemessen wird gegen den TAKT DES
+// JEWEILIGEN WEGES: ein Weg, der jede Sekunde fragt und seit dreissig
+// Sekunden nichts bestaetigt hat, fragt nicht mehr — bei einem Weg, der alle
+// zwei Sekunden fragt, heisst dieselbe halbe Minute etwas anderes.
+//
+// Und ein Weg, auf dem die KAMERA VON SICH AUS meldet, bekommt gar kein
+// Verfallsdatum: dort ist Stille die Aussage „nichts hat sich geaendert".
+// Ein Alter als Fehler zu zeigen, waere dort falsch.
+// ───────────────────────────────────────────────────────────────────────────
+
+/**
+ * Wann ein Feld zuletzt vom Geraet BESTAETIGT wurde — Millisekunden seit
+ * Epoche, so wie der Aufrufer sie hereingibt.
+ *
+ * Nur bestaetigte Werte stehen hier. Ein Kommando LOESCHT den Eintrag (siehe
+ * `applyConfirmations`), es setzt ihn nicht: was die Kamera vor dem Kommando
+ * gemeldet hat, ist danach keine Aussage mehr ueber das, was jetzt gilt.
+ */
+export type Confirmations = Partial<Record<PaintField, number>>
+
+/**
+ * Wie eine Bestaetigung auf diesem Weg ueberhaupt zustande kommt.
+ *
+ * Das ist keine Vorliebe, sondern der Unterschied zwischen „wir fragen" und
+ * „die Kamera meldet". Nur im ersten Fall ist Ausbleiben ein Befund.
+ */
+export type ConfirmCadence =
+  /** Wir fragen in diesem Takt. Ausbleiben heisst: es wird nicht mehr gefragt. */
+  | { kind: 'poll'; everyMs: number }
+  /** Die Kamera meldet von sich aus. Stille heisst: nichts hat sich geaendert. */
+  | { kind: 'push' }
+  /** Dieser Weg liest gar nichts zurueck (`MODE_READBACK` ist leer). */
+  | { kind: 'none' }
+
+/**
+ * Der Takt je Weg — jede Zeile im Quelltext dieses Repos nachgelesen.
+ *
+ * Wo eine Zahl steht, steht daneben, wo sie herkommt. Was nichts zurueckliest,
+ * bekommt `none` und nicht etwa einen erfundenen Takt.
+ */
+export const MODE_CADENCE: Readonly<Record<ConnectionMode, ConfirmCadence>> = {
+  // `CcuClient`: Nachricht 0x50 kommt UNAUFGEFORDERT von der CCU — der Client
+  // beantwortet sie nur (`handleMessage50`, dann `buildMessageResponse`). Der
+  // 1000-ms-Timer daneben ist ein HEARTBEAT, keine Zustandsabfrage. Also
+  // `push`: bleibt die Meldung aus, hat sich nichts geaendert.
+  tcp: { kind: 'push' },
+  serial: { kind: 'push' },
+  // `LumixClient`: `setInterval(() => this.pollState(), this.pollInterval)`,
+  // Vorgabe 2000 ms.
+  'lumix-http': { kind: 'poll', everyMs: 2000 },
+  // `SonyMncClient.startPolling`: `}, 1000)`.
+  'sony-mnc': { kind: 'poll', everyMs: 1000 },
+  // `BMDeviceClient`: `}, 1000)`.
+  blackmagic: { kind: 'poll', everyMs: 1000 },
+  // `CanonCcapiClient`: `this.pollMs = opts.pollInterval ?? 2000`.
+  'canon-ccapi': { kind: 'poll', everyMs: 2000 },
+  // Die uebrigen stehen in `MODE_READBACK` mit leerer Liste: sie lesen nichts
+  // zurueck, also gibt es auch nichts, das altern koennte.
+  'sony-usb': { kind: 'none' },
+  zcam: { kind: 'none' },
+  'panasonic-ptz': { kind: 'none' },
+  visca: { kind: 'none' },
+  jvc: { kind: 'none' },
+  birddog: { kind: 'none' },
+}
+
+/**
+ * Ab wie vielen ausgelassenen Takten ein Wert auffaellt bzw. als ueberholt
+ * gilt.
+ *
+ * Drei, weil ein einzelner ausgelassener Takt jedes Netz kennt und eine
+ * Meldung darueber nur Rauschen waere. Zehn, weil dann nicht mehr von einem
+ * Aussetzer die Rede sein kann.
+ */
+export const AGING_POLLS = 3
+export const STALE_POLLS = 10
+
+export type Freshness =
+  /** Innerhalb des erwarteten Takts bestaetigt. */
+  | 'frisch'
+  /** Mehr als `AGING_POLLS` Takte her — auffaellig, noch kein Befund. */
+  | 'alternd'
+  /** Mehr als `STALE_POLLS` Takte her. Der Wert beschreibt die Vergangenheit. */
+  | 'ueberholt'
+  /** Nie bestaetigt — entweder noch nicht, oder dieser Weg liest gar nicht. */
+  | 'unbestaetigt'
+
+/**
+ * Wie belastbar ein gespeicherter Wert JETZT ist.
+ *
+ * `now` kommt vom Aufrufer: dieses Modul liest keine Uhr, sonst waere es
+ * nicht pruefbar.
+ *
+ * Auf einem `push`-Weg gibt es kein `alternd` und kein `ueberholt`. Das ist
+ * keine Nachlaessigkeit, sondern die Bedeutung von Stille auf so einem Weg —
+ * wer daraus einen Befund macht, meldet jede ruhige Kamera als Problem, und
+ * eine Meldung, die immer ansteht, wird abgeschaltet.
+ */
+export const freshness = (
+  confirmedAt: number | undefined,
+  now: number,
+  cadence: ConfirmCadence,
+): Freshness => {
+  if (confirmedAt === undefined) return 'unbestaetigt'
+  // Als `switch` und nicht als Kette von `if`s, und das ist der Punkt: faellt
+  // ein Zweig weg, hat die Funktion einen Pfad ohne Rueckgabewert und der
+  // Typpruefer meldet es. Als `if`-Kette rutschte der `push`-Fall in die
+  // Poll-Rechnung, `cadence.everyMs` waere `undefined`, jeder Vergleich
+  // gegen NaN falsch — und das Ergebnis waere zufaellig wieder `frisch`.
+  // Eine Regel, die nur aus Versehen stimmt, ist keine.
+  switch (cadence.kind) {
+    case 'none':
+      return 'unbestaetigt'
+    case 'push':
+      return 'frisch'
+    case 'poll': {
+      const alter = now - confirmedAt
+      if (alter > cadence.everyMs * STALE_POLLS) return 'ueberholt'
+      if (alter > cadence.everyMs * AGING_POLLS) return 'alternd'
+      return 'frisch'
+    }
+  }
+}
+
+/**
+ * DIE ENGSTELLE fuer die Zeitstempel — dieselbe Regel wie `applyOrigins`,
+ * damit Herkunft und Alter nicht auseinanderlaufen koennen.
+ *
+ * Ein Kommando LOESCHT den Zeitstempel des Feldes. Ihn stehenzulassen waere
+ * die stillste Art zu luegen: die Anzeige zeigte dann das Alter einer
+ * Bestaetigung, die einen ANDEREN Wert betraf.
+ */
+export function applyConfirmations(
+  vorher: Confirmations | undefined,
+  mode: ConnectionMode | undefined,
+  felder: readonly PaintField[],
+  kind: 'read' | 'command',
+  now: number,
+): Confirmations {
+  const out: Confirmations = { ...(vorher ?? {}) }
+  for (const f of felder) {
+    if (kind === 'read' && mode !== undefined && readsBack(mode, f)) out[f] = now
+    else delete out[f]
+  }
+  return out
+}
+
+/**
+ * Was das Pult braucht, um ein Alter zu beurteilen — FERTIG GERECHNET.
+ *
+ * Es bekommt weder die Takt-Tabelle noch die Schwellen, sondern zwei Zahlen
+ * in Millisekunden. Damit gibt es die Konstanten `AGING_POLLS`/`STALE_POLLS`
+ * weiterhin genau einmal, hier; dieselbe Regel wie bei `neverReadsBack`.
+ *
+ * `null` heisst: dieser Weg hat keine Verfallsfrist. Entweder meldet die
+ * Kamera von sich aus (dann heisst Stille „nichts hat sich geaendert"), oder
+ * er liest gar nichts zurueck — dann gibt es auch keinen Zeitstempel, der
+ * altern koennte.
+ */
+export interface FreshnessLimits {
+  agingAfterMs: number
+  staleAfterMs: number
+}
+
+export const freshnessLimits = (cadence: ConfirmCadence): FreshnessLimits | null =>
+  cadence.kind === 'poll'
+    ? {
+        agingAfterMs: cadence.everyMs * AGING_POLLS,
+        staleAfterMs: cadence.everyMs * STALE_POLLS,
+      }
+    : null
