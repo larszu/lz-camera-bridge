@@ -44,3 +44,24 @@ jobs:
       # Warnung steht am Ende jedes Laufs, und genau deshalb liest sie keiner.
       - name: Actions laufen auf einer unterstuetzten Node-Version
         run: npm run actions:check
+
+      # BEDARF 48 — der multicam-planner traegt eine KOPIE des Paint-Teils von
+      # `packages/web-rcp/src/capabilities.ts`, weil er zur Planungszeit
+      # kennzeichnet, wo sich Farbtemperatur und Schwarzabgleich nicht
+      # fernstellen lassen. Laeuft die Kopie weg, steht auf einem gedruckten
+      # Blatt eine Zusicherung, die dieses Repo nie gegeben hat.
+      #
+      # Der Checkout gelingt mit dem Standard-Token, weil larszu/multicam-planner
+      # OEFFENTLICH ist. Umgekehrt ging es nicht: in der Suite scheiterte
+      # derselbe Guard am Checkout DIESES Repos ("Not Found", Lauf
+      # 34092050711) — privat, und ein fremdes GITHUB_TOKEN kommt nicht heran.
+      # Er hat sich dort uebersprungen und der Job war gruen.
+      - name: Checkout multicam-planner
+        uses: actions/checkout@v5
+        continue-on-error: true
+        with:
+          repository: larszu/multicam-planner
+          path: upstream/multicam-planner
+
+      - name: Faehigkeits-Tabelle des multicam-planners stimmt noch
+        run: npm run caps:parity -- --planner upstream/multicam-planner
