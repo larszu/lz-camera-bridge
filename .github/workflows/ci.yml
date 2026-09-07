@@ -45,6 +45,14 @@ jobs:
       - name: Actions laufen auf einer unterstuetzten Node-Version
         run: npm run actions:check
 
+      # Nutzer-Rueckmeldung 2026-09-07: "die ui ist nicht konsistent. lege
+      # globale ui regeln fest die fuer alle repos gelten." Die Regeln stehen
+      # in ADR-007 der av-planner-suite; dieser Check haelt sie hier — fuer
+      # das Dashboard. Die Nachbauten der Sony-Steuersoftware und der
+      # AW-RP150 bleiben ausdruecklich draussen.
+      - name: Oberflaechen-Regeln (ADR-007)
+        run: npm run brand:check
+
       # BEDARF 48 — der multicam-planner traegt eine KOPIE des Paint-Teils von
       # `packages/web-rcp/src/capabilities.ts`, weil er zur Planungszeit
       # kennzeichnet, wo sich Farbtemperatur und Schwarzabgleich nicht

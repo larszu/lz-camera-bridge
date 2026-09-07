@@ -18,6 +18,7 @@
     "electron:build": "npm run build --workspace=packages/web-rcp && npm run dist --workspace=packages/electron-app",
     "electron:dist": "npm run build --workspace=packages/web-rcp && npm run dist:win --workspace=packages/electron-app",
     "caps:parity": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/planner-caps-parity.ts",
-    "actions:check": "node scripts/actions-node-runtime.mjs"
+    "actions:check": "node scripts/actions-node-runtime.mjs",
+    "brand:check": "node scripts/brand-tokens-check.mjs"
   }
 }

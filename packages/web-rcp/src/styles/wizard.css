@@ -19,8 +19,8 @@
   max-height: 90vh;
   background: #1c1c1e;
   border: 1px solid #333;
-  border-radius: 12px;
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.7);
+  border-radius: 0;
+  box-shadow: none;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -63,7 +63,7 @@
 .wizard-step-dot {
   width: 28px;
   height: 28px;
-  border-radius: 50%;
+  border-radius: 0;
   background: #2a2a2a;
   border: 1px solid #444;
   color: #666;
@@ -127,14 +127,14 @@
   background: #1a1a1a;
   border-left: 3px solid #333;
   padding: 10px 14px;
-  border-radius: 4px;
+  border-radius: 0;
   margin: 0;
 }
 
 .wizard-step__hint code {
   background: #2a2a2a;
   padding: 1px 5px;
-  border-radius: 3px;
+  border-radius: 0;
   color: var(--rcp-blue, #0088ff);
   font-size: 12px;
 }
@@ -152,7 +152,7 @@
   gap: 14px;
   background: #222;
   border: 1px solid #2e2e2e;
-  border-radius: 8px;
+  border-radius: 0;
   padding: 12px 14px;
 }
 
@@ -187,7 +187,7 @@
   gap: 14px;
   background: #222;
   border: 1px solid #333;
-  border-radius: 8px;
+  border-radius: 0;
   padding: 14px 16px;
   cursor: pointer;
   text-align: left;
@@ -213,7 +213,7 @@
 .wizard-radio {
   width: 16px;
   height: 16px;
-  border-radius: 50%;
+  border-radius: 0;
   border: 2px solid #555;
   transition: border-color 0.15s;
   position: relative;
@@ -228,7 +228,7 @@
   position: absolute;
   inset: 3px;
   background: var(--rcp-blue, #0088ff);
-  border-radius: 50%;
+  border-radius: 0;
 }
 
 .wizard-camera-card__body {
@@ -256,7 +256,7 @@
   background: #0088ff22;
   color: var(--rcp-blue, #0088ff);
   border: 1px solid #0088ff44;
-  border-radius: 10px;
+  border-radius: 0;
   padding: 1px 7px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -287,7 +287,7 @@
 .wizard-input {
   background: #2a2a2a;
   border: 1px solid #3a3a3a;
-  border-radius: 6px;
+  border-radius: 0;
   color: #ddd;
   font-size: 13px;
   padding: 8px 10px;
@@ -315,7 +315,7 @@ select.wizard-input {
 .wizard-done-icon {
   width: 64px;
   height: 64px;
-  border-radius: 50%;
+  border-radius: 0;
   background: #1a3a1a;
   border: 2px solid var(--rcp-green, #00cc44);
   color: var(--rcp-green, #00cc44);
@@ -328,7 +328,7 @@ select.wizard-input {
 .wizard-summary {
   background: #222;
   border: 1px solid #2e2e2e;
-  border-radius: 8px;
+  border-radius: 0;
   padding: 12px 16px;
   width: 100%;
   box-sizing: border-box;
@@ -367,7 +367,7 @@ select.wizard-input {
 
 .wizard-btn {
   padding: 9px 22px;
-  border-radius: 6px;
+  border-radius: 0;
   font-size: 13px;
   font-weight: 600;
   border: none;

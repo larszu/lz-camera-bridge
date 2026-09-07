@@ -2,22 +2,41 @@
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* ADR-007 (av-planner-suite) — die Tokens des DASHBOARDS zeigen auf die
+   Marken-Palette der Suite. Die Regelnamen bleiben unveraendert; die
+   Umstellung der Oberflaeche ist dieser Block. Werte und Rollen:
+   `@avplan/ui`, `src/brand.ts` (aus dem Brand Guide 2.0).
+
+   WAS AUSDRUECKLICH NICHT DAZUGEHOERT: `styles/sony-rcp.css` und
+   `styles/ptz-panel.css`. Die sind Nachbauten — das eine der Sony-
+   Steuersoftware, das andere der AW-RP150. Ihre Farben sind kein
+   Geschmack, sondern Wiedererkennung: wer das Geraet kennt, findet den
+   Knopf blind. Eine Marken-Regel fuer Planungswerkzeuge ist kein Grund,
+   ein Instrument umzulackieren. */
 :root {
-  --bg: #1a1a1e;
-  --surface: #252529;
-  --surface2: #2f2f35;
-  --border: #3a3a42;
-  --text: #e8e8f0;
-  --text-muted: #888898;
-  --accent: #4a9eff;
-  --danger: #e84343;
-  --success: #2ecc71;
-  --warning: #f39c12;
-  --radius: 6px;
+  --bg: #132040;          /* Deep Navy — Grund */
+  --surface: #1D324F;     /* Zumpe Navy — Karten */
+  --surface2: #24405F;    /* abgeleitet — erhoben */
+  --border: rgba(246, 245, 240, 0.14);
+  --text: #E1ECEF;        /* Eisblau — Fliesstext auf Dunkel */
+  --text-muted: #8C9CB3;  /* Stahlblau — Meta, Platzhalter */
+  /* Aktionsflaeche der Marke: Off-White, darauf Navy — 13:1 statt 4:1. */
+  --accent: #F6F5F0;
+  --accent-text: #132040;
+  /* Status: nur Meldungen. */
+  --danger: #B04A3F;
+  --success: #2F7D5C;
+  --warning: #C8892B;
+  /* Das Aufnahmelicht: Fokusring und Aufnahme-/Live-Zustand. Nie Flaeche,
+     nie Text, nie zweimal in einem Sichtfeld. In einer Kamera-Bruecke hat
+     es seine woertliche Bedeutung. Fehlerrot ist --danger. */
+  --signal: #D6402E;
+  /* Keine Rundungen (Guide S. 10). Der Name bleibt fuer die Aufrufer. */
+  --radius: 0;
 }
 
 body {
-  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-family: 'Public Sans', system-ui, 'Segoe UI', Roboto, Arial, sans-serif;
   background: var(--bg);
   color: var(--text);
   min-height: 100vh;
@@ -43,7 +62,7 @@ body {
   background: #5a1a1a;
   color: #ff8888;
   padding: 4px 10px;
-  border-radius: var(--radius);
+  border-radius: 0;
   font-size: 12px;
 }
 
@@ -80,7 +99,7 @@ body {
   background: #5a1a1a;
   color: #ff8888;
   padding: 12px;
-  border-radius: var(--radius);
+  border-radius: 0;
   font-size: 12px;
   border: 1px solid #ff4444;
 }
@@ -99,7 +118,7 @@ body {
 .panel {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: 0;
   padding: 14px 16px;
 }
 
@@ -117,7 +136,7 @@ body {
   display: flex;
   gap: 0;
   margin-bottom: 12px;
-  border-radius: var(--radius);
+  border-radius: 0;
   overflow: hidden;
   border: 1px solid var(--border);
 }
@@ -136,7 +155,7 @@ body {
 .mode-tab:hover { color: var(--text); }
 .mode-tab--active {
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-text);
 }
 
 .serial-port-row {
@@ -148,7 +167,7 @@ body {
 
 .btn--sm {
   padding: 5px 10px;
-  border-radius: var(--radius);
+  border-radius: 0;
   border: 1px solid var(--border);
   background: var(--surface2);
   color: var(--text);
@@ -186,7 +205,7 @@ body {
   background: var(--bg);
   border: 1px solid var(--border);
   color: var(--text);
-  border-radius: var(--radius);
+  border-radius: 0;
   padding: 6px 8px;
   font-size: 13px;
   width: 100%;
@@ -212,17 +231,17 @@ body {
 .status-dot {
   width: 8px;
   height: 8px;
-  border-radius: 50%;
+  border-radius: 0;
   display: inline-block;
 }
-.status-dot--ok { background: var(--success); box-shadow: 0 0 6px var(--success); }
+.status-dot--ok { background: var(--success); box-shadow: none; }
 .status-dot--err { background: var(--border); }
 
 /* ─── Buttons ─────────────────────────────────────────────────────────────── */
 
 .btn {
   padding: 7px 16px;
-  border-radius: var(--radius);
+  border-radius: 0;
   border: none;
   cursor: pointer;
   font-size: 13px;
@@ -231,7 +250,10 @@ body {
 }
 .btn:hover { opacity: 0.85; }
 .btn:disabled { opacity: 0.4; cursor: default; }
-.btn--primary { background: var(--accent); color: #fff; }
+/* Der Punkt macht sichtbar, welcher der EINE primaere Knopf ist (ADR-007). */
+.btn--primary { background: var(--accent); color: var(--accent-text);
+  display: inline-flex; align-items: center; gap: 7px; }
+.btn--primary::before { content: ''; width: 6px; height: 6px; background: var(--signal); flex: none; }
 .btn--danger { background: var(--danger); color: #fff; }
 
 /* ─── RCP Dashboard ───────────────────────────────────────────────────────── */
@@ -247,7 +269,7 @@ body {
 .rcp__section {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: 0;
   padding: 14px 16px;
 }
 
@@ -270,7 +292,7 @@ body {
 .dial {
   background: var(--surface2);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: 0;
   padding: 10px;
   display: flex;
   flex-direction: column;
@@ -310,7 +332,7 @@ body {
 
 .toggle {
   padding: 8px 18px;
-  border-radius: var(--radius);
+  border-radius: 0;
   border: 1px solid var(--border);
   background: var(--surface2);
   color: var(--text);
@@ -329,7 +351,7 @@ body {
 .select-group {
   background: var(--surface2);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: 0;
   padding: 10px;
   display: flex;
   flex-direction: column;
@@ -347,7 +369,7 @@ body {
   background: var(--bg);
   border: 1px solid var(--border);
   color: var(--text);
-  border-radius: var(--radius);
+  border-radius: 0;
   padding: 6px 8px;
   font-size: 13px;
 }
@@ -380,7 +402,7 @@ body {
 .wiznet-card {
   background: var(--surface2);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: 0;
   padding: 10px 12px;
 }
 
@@ -436,12 +458,12 @@ body {
 .wizard {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 0;
   width: 90%;
   max-width: 520px;
   max-height: 90vh;
   overflow-y: auto;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  box-shadow: none;
 }
 
 .wizard__header {
@@ -480,7 +502,7 @@ body {
 .wizard__step-dot {
   width: 28px;
   height: 28px;
-  border-radius: 50%;
+  border-radius: 0;
   background: var(--bg);
   border: 2px solid var(--border);
   display: flex;
@@ -496,7 +518,7 @@ body {
 .wizard__step--active .wizard__step-dot {
   background: var(--accent);
   border-color: var(--accent);
-  color: #000;
+  color: var(--accent-text);
 }
 
 .wizard__step--done .wizard__step-dot {
@@ -549,7 +571,7 @@ body {
   flex: 1;
   background: var(--surface2);
   border: 2px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: 0;
   padding: 16px;
   cursor: pointer;
   text-align: center;
@@ -603,7 +625,7 @@ body {
 .wizard__field select {
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: 0;
   padding: 8px 10px;
   font-size: 14px;
   color: var(--text);
@@ -630,7 +652,7 @@ body {
 .wizard__summary {
   background: var(--surface2);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: 0;
   padding: 12px;
   margin-bottom: 16px;
 }
@@ -668,4 +690,18 @@ body {
 .wizard__nav {
   display: flex;
   gap: 8px;
+}
+
+
+/* ── ADR-007: Tastatur-Fokus ────────────────────────────────────────────────
+   2 px Tally-Rot, 3 px Abstand. Gilt fuer das Dashboard; die Nachbauten in
+   styles/sony-rcp.css und styles/ptz-panel.css behalten ihre eigenen
+   Zustaende. */
+.app button:focus-visible,
+.app a:focus-visible,
+.app input:focus-visible,
+.app select:focus-visible,
+.app textarea:focus-visible {
+  outline: 2px solid var(--signal);
+  outline-offset: 3px;
 }
