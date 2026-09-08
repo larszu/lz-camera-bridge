@@ -100,6 +100,21 @@ human — and where there is none, there is no match. See
 | `packages/electron-app` | Desktop wrapper around the web UI |
 | `packages/firmware` | WIZ108SR serial↔TCP bridge firmware (C) |
 
+**Source language:** `en`. New user-facing text goes in English. That is not a
+preference but a measurement: the UI already carries roughly 140 English spots
+against 32 German ones, and its vocabulary is the technical one anyway — Iris,
+Gain, ND, Paint. Rewriting the English into German to then put „Blende" next to
+`WB` costs work and makes the result worse. Decided 2026-09-08 (E-17);
+`multicam-planner` is English-source as well, while `cable-planner` and
+`light-planner` are German-source. The machine-readable copy of this
+declaration sits in `package.json` under `avplan.sourceLanguage`.
+
+The German spots that are still there are a **mixed-language product**, not a
+translation backlog — the same dialog shows both. `npm run lang:check` counts
+them and holds the count at the level measured when the check was introduced:
+while that cleanup is open, the existing ones may stay, but the mix must not
+grow. Translating some means lowering the limit in the same commit.
+
 ## Getting started
 
 ```bash

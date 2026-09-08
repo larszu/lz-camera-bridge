@@ -53,6 +53,14 @@ jobs:
       - name: Oberflaechen-Regeln (ADR-007)
         run: npm run brand:check
 
+      # E-17/E-20 + B-26: dieses Repo ist englisch-quellig, und die deutschen
+      # Reste in der Oberflaeche sind ein SPRACHMIX, kein Rueckstand — derselbe
+      # Dialog zeigt beides. Der Lauf haelt ihre Zahl bei der Grenze, die beim
+      # Einfuehren gemessen wurde: der Bestand darf bleiben, solange B-26 offen
+      # ist, wachsen darf er nicht.
+      - name: Quellsprache und Sprachmix
+        run: npm run lang:check
+
       # BEDARF 48 — der multicam-planner traegt eine KOPIE des Paint-Teils von
       # `packages/web-rcp/src/capabilities.ts`, weil er zur Planungszeit
       # kennzeichnet, wo sich Farbtemperatur und Schwarzabgleich nicht

@@ -4,6 +4,9 @@
   "private": true,
   "description": "Universal camera-control bridge: one software RCP + touch PTZ panel and a normalizing command bus for Sony, Canon, Panasonic, Blackmagic, Z CAM, JVC, BirdDog and generic VISCA PTZ cameras — with Bitfocus Companion and USB control-panel input.",
   "license": "UNLICENSED",
+  "avplan": {
+    "sourceLanguage": "en"
+  },
   "workspaces": [
     "packages/*"
   ],
@@ -18,6 +21,7 @@
     "electron:build": "npm run build --workspace=packages/web-rcp && npm run dist --workspace=packages/electron-app",
     "electron:dist": "npm run build --workspace=packages/web-rcp && npm run dist:win --workspace=packages/electron-app",
     "caps:parity": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/planner-caps-parity.ts",
+    "lang:check": "node scripts/quellsprache-check.mjs",
     "actions:check": "node scripts/actions-node-runtime.mjs",
     "brand:check": "node scripts/brand-tokens-check.mjs"
   }
