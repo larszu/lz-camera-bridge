@@ -2,14 +2,15 @@
   "name": "@sony-camera-bridge/electron-app",
   "version": "1.0.1",
   "private": true,
-  "description": "Camera Bridge – Desktop UI",
+  "description": "Camera Bridge \u2013 Desktop UI",
   "author": "Camera Bridge",
   "main": "dist/main.js",
   "scripts": {
     "dev": "tsc && electron dist/main.js",
     "build": "tsc",
     "dist": "npm run build && electron-builder",
-    "dist:win": "npm run build && electron-builder --win"
+    "dist:win": "npm run build && electron-builder --win",
+    "dist:mac": "npm run build && electron-builder --mac --x64 --arm64"
   },
   "dependencies": {},
   "devDependencies": {

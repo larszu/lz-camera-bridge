@@ -40,8 +40,26 @@ nsis:
 mac:
   target:
     - dmg
-  icon: assets/icon.icns
+  # `assets/icon.icns` stand hier und EXISTIERT NICHT. Aufgefallen ist das
+  # nie, weil noch nie ein mac-Build gelaufen ist — der Eintrag war eine
+  # Absichtserklaerung, keine Konfiguration, und der erste Lauf waere daran
+  # abgebrochen.
+  #
+  # Jetzt zeigt er auf das PNG; electron-builder erzeugt daraus die .icns,
+  # verlangt dafuer aber MINDESTENS 512x512. Das vorhandene Bild war 256x256
+  # (ein Platzhalter, siehe assets/generate-icon.py) und ist deshalb auf 512
+  # verdoppelt worden — nearest neighbour, ganzzahliger Faktor: dasselbe Bild
+  # in gross, kein neues.
+  icon: assets/icon.png
   category: public.app-category.video
+  # Keine gekaufte Signatur. Die Ad-hoc-Signatur ist noetig, damit Gatekeeper
+  # auf Apple Silicon die Anwendung ueberhaupt startet statt sie als
+  # "beschaedigt" abzuweisen. CSC_IDENTITY_AUTO_DISCOVERY wird im Workflow
+  # BEWUSST nicht auf false gesetzt: das Flag kuerzt die explizite Ad-hoc-
+  # Identitaet ab, und heraus faellt ein voellig unsigniertes Programm.
+  identity: "-"
+  hardenedRuntime: false
+  gatekeeperAssess: false
 
 linux:
   target:

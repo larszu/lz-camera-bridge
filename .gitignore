@@ -7,3 +7,7 @@ Thumbs.db
 
 # lokale Build-Logs (nicht einchecken)
 build.log
+
+# Die gebaute Projektseite (scripts/build-site.py). Sie entsteht in CI neu;
+# eine eingecheckte Kopie waere ein zweiter Stand derselben Doku.
+_site/
