@@ -27,7 +27,7 @@ interface Props {
   onComplete: (config: Partial<BridgeConfig>) => void;
 }
 
-const STEPS = ['Willkommen', 'Kameratyp', 'Verbindung', 'Fertig'];
+const STEPS = ['Welcome', 'Camera type', 'Connection', 'Done'];
 
 export function FirstStartWizard({ onComplete }: Props) {
   const [step, setStep] = useState(0);
@@ -148,17 +148,17 @@ export function FirstStartWizard({ onComplete }: Props) {
         <div className="wizard-footer">
           {step > 0 && (
             <button className="wizard-btn wizard-btn--secondary" onClick={() => setStep(s => s - 1)}>
-              Zurück
+              Back
             </button>
           )}
           <div style={{ flex: 1 }} />
           {step < STEPS.length - 1 ? (
             <button className="wizard-btn wizard-btn--primary" onClick={() => setStep(s => s + 1)}>
-              {step === 0 ? 'Einrichten' : 'Weiter'}
+              {step === 0 ? 'Set up' : 'Next'}
             </button>
           ) : (
             <button className="wizard-btn wizard-btn--success" onClick={handleFinish}>
-              Starten
+              Start
             </button>
           )}
         </div>
@@ -171,12 +171,12 @@ export function FirstStartWizard({ onComplete }: Props) {
 function StepWelcome() {
   return (
     <div className="wizard-step">
-      <h2 className="wizard-step__title">Willkommen</h2>
+      <h2 className="wizard-step__title">Welcome</h2>
       <p className="wizard-step__desc">
-        <strong>Camera Bridge</strong> ist ein universeller Kamera-Hub: eine
-        Software-Oberfläche (RCP + PTZ) und ein Command-Bus, der Sony, Canon,
-        Panasonic, Blackmagic, Z CAM, JVC, BirdDog und generische VISCA-PTZ
-        markenübergreifend steuert – dazu Bitfocus Companion und USB-Bedienpulte.
+        <strong>Camera Bridge</strong> is a universal camera hub: one software
+        surface (RCP + PTZ) and a command bus that drives Sony, Canon, Panasonic,
+        Blackmagic, Z CAM, JVC, BirdDog and generic VISCA PTZ across brands —
+        plus Bitfocus Companion and USB control panels.
       </p>
       <div className="wizard-feature-list">
         <div className="wizard-feature">
@@ -190,20 +190,20 @@ function StepWelcome() {
           <span className="wizard-feature__icon">🕹️</span>
           <div>
             <div className="wizard-feature__name">PTZ-Steuerung (Touch)</div>
-            <div className="wizard-feature__desc">AW-RP150-Panel für VISCA/Sony BRC-SRG, Panasonic AW, BirdDog, JVC</div>
+            <div className="wizard-feature__desc">AW-RP150 panel for VISCA/Sony BRC-SRG, Panasonic AW, BirdDog, JVC</div>
           </div>
         </div>
         <div className="wizard-feature">
           <span className="wizard-feature__icon">🎛️</span>
           <div>
             <div className="wizard-feature__name">Companion & USB-Pult</div>
-            <div className="wizard-feature__desc">Streamdeck-API + HID-Bedienpult steuern jede verbundene Kamera</div>
+            <div className="wizard-feature__desc">Streamdeck API + HID control panel drive any connected camera</div>
           </div>
         </div>
       </div>
       <p className="wizard-step__hint">
-        Dieser Assistent hilft dir, die erste Kamera einzurichten. Du kannst die
-        Einstellungen jederzeit im Connection-Panel ändern.
+        This wizard helps you set up the first camera. You can change the
+        settings at any time in the connection panel.
       </p>
     </div>
   );
@@ -212,24 +212,24 @@ function StepWelcome() {
 /* ── Step 1: Camera Type ─────────────────────────────────────────────── */
 function StepCameraType({ value, onChange }: { value: CameraType; onChange: (v: CameraType) => void }) {
   const options: { id: CameraType; label: string; sub: string; badge?: string }[] = [
-    { id: 'sony-tcp', label: 'Sony CCU – TCP / Netzwerk', sub: 'WIZ108SR Adapter oder direkte Netzwerkverbindung (700PTP)', badge: 'empfohlen' },
-    { id: 'sony-serial', label: 'Sony CCU – RS-422 Seriell', sub: 'Direkte 8-Pin RS-422 Verbindung via COM-Port' },
-    { id: 'sony-usb', label: 'Sony Alpha / Cinema – USB', sub: 'FX3, FX6, FX9, A7 IV, A7S III, A1 … via PTP (kein SDK nötig)' },
-    { id: 'sony-mnc', label: 'Sony – WiFi (Monitor & Control)', sub: 'FX3/FX6/FX9 im Streaming-Modus über WLAN/LAN' },
+    { id: 'sony-tcp', label: 'Sony CCU – TCP / Netzwerk', sub: 'WIZ108SR adapter or a direct network connection (700PTP)', badge: 'recommended' },
+    { id: 'sony-serial', label: 'Sony CCU – RS-422 Seriell', sub: 'Direct 8-pin RS-422 connection via COM port' },
+    { id: 'sony-usb', label: 'Sony Alpha / Cinema – USB', sub: 'FX3, FX6, FX9, A7 IV, A7S III, A1 … via PTP (no SDK needed)' },
+    { id: 'sony-mnc', label: 'Sony – WiFi (Monitor & Control)', sub: 'FX3/FX6/FX9 in streaming mode over Wi-Fi/LAN' },
     { id: 'canon', label: 'Canon EOS – CCAPI', sub: 'R5, R6, R7, R8, R10, R50, 1D X III … via HTTP (CCAPI)' },
-    { id: 'lumix', label: 'Panasonic Lumix – WiFi / LAN', sub: 'HTTP CGI Protokoll (S1, S5, GH5, GH6, BGH1, BS1H…)' },
+    { id: 'lumix', label: 'Panasonic Lumix – WiFi / LAN', sub: 'HTTP CGI protocol (S1, S5, GH5, GH6, BGH1, BS1H…)' },
     { id: 'blackmagic', label: 'Blackmagic – REST', sub: 'Pocket 4K/6K, Cinema 6K, Studio/URSA (Firmware 8.6+)' },
-    { id: 'zcam', label: 'Z CAM – HTTP', sub: 'E2, E2-M4, E2-S6, E2-F6/F8 – HTTP-Control-API' },
-    { id: 'panasonic-ptz', label: 'Panasonic PTZ – AW', sub: 'AW-UE150/UE100/HE130… – HTTP CGI (AW-Protokoll)' },
-    { id: 'visca', label: 'VISCA over IP – PTZ', sub: 'PTZOptics, Marshall, AVer, Sony/Pana PTZ … (eine API, viele Marken)' },
-    { id: 'jvc', label: 'JVC ConnectedCam – HTTP', sub: 'GY-HC900/HC500, GY-HM250… – Web-API' },
+    { id: 'zcam', label: 'Z CAM – HTTP', sub: 'E2, E2-M4, E2-S6, E2-F6/F8 – HTTP control API' },
+    { id: 'panasonic-ptz', label: 'Panasonic PTZ – AW', sub: 'AW-UE150/UE100/HE130… – HTTP CGI (AW protocol)' },
+    { id: 'visca', label: 'VISCA over IP – PTZ', sub: 'PTZOptics, Marshall, AVer, Sony/Pana PTZ … (one API, many brands)' },
+    { id: 'jvc', label: 'JVC ConnectedCam – HTTP', sub: 'GY-HC900/HC500, GY-HM250… – web API' },
     { id: 'birddog', label: 'BirdDog – REST', sub: 'BirdDog NDI PTZ (P100/P200/P400, Maki, Eyes)' },
   ];
 
   return (
     <div className="wizard-step">
-      <h2 className="wizard-step__title">Kameratyp wählen</h2>
-      <p className="wizard-step__desc">Welche Kamera möchtest du als erstes einrichten?</p>
+      <h2 className="wizard-step__title">Choose a camera type</h2>
+      <p className="wizard-step__desc">Which camera would you like to set up first?</p>
       <div className="wizard-camera-list">
         {options.map(opt => (
           <button
@@ -275,16 +275,16 @@ interface StepConnectionProps {
 function StepConnection(p: StepConnectionProps) {
   return (
     <div className="wizard-step">
-      <h2 className="wizard-step__title">Verbindungsdetails</h2>
+      <h2 className="wizard-step__title">Connection details</h2>
 
       {p.cameraType === 'sony-tcp' && (
         <>
           <p className="wizard-step__desc">
-            Gib die IP-Adresse und den Port des Sony CCU Adapters ein (z.B. WIZ108SR).
+            Enter the IP address and port of the Sony CCU adapter (e.g. WIZ108SR).
           </p>
           <div className="wizard-form">
             <label className="wizard-label">
-              IP-Adresse / Hostname
+              IP address / hostname
               <input
                 className="wizard-input"
                 value={p.tcpHost}
@@ -304,8 +304,8 @@ function StepConnection(p: StepConnectionProps) {
             </label>
           </div>
           <p className="wizard-step__hint">
-            Standard-Port für Sony 700PTP ist <code>7700</code>. Der WIZ108SR Adapter kann
-            automatisch über den Discover-Button gefunden werden.
+            The default port for Sony 700PTP is <code>7700</code>. The WIZ108SR adapter
+            can be found automatically with the discover button.
           </p>
         </>
       )}
@@ -313,7 +313,7 @@ function StepConnection(p: StepConnectionProps) {
       {p.cameraType === 'sony-serial' && (
         <>
           <p className="wizard-step__desc">
-            Wähle den COM-Port für die RS-422 Verbindung.
+            Pick the COM port for the RS-422 connection.
           </p>
           <div className="wizard-form">
             <label className="wizard-label">
@@ -339,7 +339,7 @@ function StepConnection(p: StepConnectionProps) {
             </label>
           </div>
           <p className="wizard-step__hint">
-            Sony CCU RS-422 läuft standardmäßig mit <code>38400 Baud</code>.
+            Sony CCU RS-422 runs at <code>38400 baud</code> by default.
           </p>
         </>
       )}
@@ -347,15 +347,15 @@ function StepConnection(p: StepConnectionProps) {
       {p.cameraType === 'sony-usb' && (
         <>
           <p className="wizard-step__desc">
-            Verbinde die Kamera (z.B. FX3) per USB-C mit diesem Rechner und stelle sie
-            auf <strong>„PC Remote"</strong> (USB-Steuerung).
+            Connect the camera (e.g. FX3) to this machine over USB-C and set it to
+            <strong>"PC Remote"</strong> (USB control).
           </p>
           <p className="wizard-step__hint">
-            Die Kamera wird beim Verbinden automatisch per USB erkannt (Sony Vendor‑ID
-            0x054C). Die Steuerung läuft direkt über das Sony‑PTP‑Protokoll – kein
-            Sony‑SDK nötig, nur das optionale Modul <code>usb</code> auf dem Zielrechner
-            (<code>npm install usb --workspace=packages/bridge</code>). Iris, ISO/Gain,
-            Verschlusszeit, Farbtemperatur, Rec und Auto‑WB werden unterstützt.
+            The camera is detected over USB on connect (Sony vendor ID 0x054C).
+            Control runs straight over the Sony PTP protocol — no Sony SDK needed,
+            only the optional <code>usb</code> module on the target machine
+            (<code>npm install usb --workspace=packages/bridge</code>). Iris, ISO/gain,
+            shutter, colour temperature, Rec and auto WB are supported.
           </p>
         </>
       )}
@@ -363,12 +363,12 @@ function StepConnection(p: StepConnectionProps) {
       {p.cameraType === 'lumix' && (
         <>
           <p className="wizard-step__desc">
-            Gib die IP-Adresse der Lumix Kamera ein. Im Direct WiFi Modus ist die
-            Standard-IP <code>192.168.54.1</code>.
+            Enter the IP address of the Lumix camera. In direct Wi-Fi mode the
+            default IP is <code>192.168.54.1</code>.
           </p>
           <div className="wizard-form">
             <label className="wizard-label">
-              Kamera IP-Adresse
+              Camera IP address
               <input
                 className="wizard-input"
                 value={p.lumixHost}
@@ -388,8 +388,8 @@ function StepConnection(p: StepConnectionProps) {
             </label>
           </div>
           <p className="wizard-step__hint">
-            Aktiviere auf der Lumix den Modus <strong>„Remote Shooting"</strong> unter
-            Menü → WiFi → PC Remote. Verbinde diesen PC mit dem WLAN der Kamera.
+            On the Lumix, switch on <strong>"Remote Shooting"</strong> under
+            Menu → Wi-Fi → PC Remote, and join this machine to the camera's Wi-Fi.
           </p>
         </>
       )}
@@ -397,11 +397,11 @@ function StepConnection(p: StepConnectionProps) {
       {p.cameraType === 'canon' && (
         <>
           <p className="wizard-step__desc">
-            Gib die IP-Adresse und den Port der Canon-Kamera (CCAPI) ein.
+            Enter the IP address and port of the Canon camera (CCAPI).
           </p>
           <div className="wizard-form">
             <label className="wizard-label">
-              Kamera IP-Adresse
+              Camera IP address
               <input
                 className="wizard-input"
                 value={p.canonHost}
@@ -421,9 +421,9 @@ function StepConnection(p: StepConnectionProps) {
             </label>
           </div>
           <p className="wizard-step__hint">
-            Die <strong>CCAPI</strong> muss einmalig per Canon <em>EOS Utility</em> aktiviert
-            werden. Danach zeigt die Kamera IP und Port im Netzwerk-Menü an.
-            Unterstützt: Iris, ISO, Verschluss, Farbtemperatur, Rec.
+            The <strong>CCAPI</strong> has to be enabled once with Canon
+            <em>EOS Utility</em>. After that the camera shows its IP and port in the
+            network menu. Supported: iris, ISO, shutter, colour temperature, Rec.
           </p>
         </>
       )}
@@ -431,11 +431,11 @@ function StepConnection(p: StepConnectionProps) {
       {p.cameraType === 'blackmagic' && (
         <>
           <p className="wizard-step__desc">
-            Gib die IP-Adresse oder den Hostnamen der Blackmagic-Kamera ein.
+            Enter the IP address or hostname of the Blackmagic camera.
           </p>
           <div className="wizard-form">
             <label className="wizard-label">
-              IP-Adresse / Hostname
+              IP address / hostname
               <input
                 className="wizard-input"
                 value={p.bmHost}
@@ -445,8 +445,9 @@ function StepConnection(p: StepConnectionProps) {
             </label>
           </div>
           <p className="wizard-step__hint">
-            Erfordert Blackmagic-Kameras mit <strong>REST-API</strong> (Firmware 8.6+).
-            CCU-Regler werden auf die Farbkorrektur (Lift/Gamma/Gain) gemappt.
+            Requires Blackmagic cameras with the <strong>REST API</strong>
+            (firmware 8.6+). CCU controls map onto colour correction
+            (lift/gamma/gain).
           </p>
         </>
       )}
@@ -454,12 +455,12 @@ function StepConnection(p: StepConnectionProps) {
       {p.cameraType === 'sony-mnc' && (
         <>
           <p className="wizard-step__desc">
-            Gib die IP-Adresse der Sony-Kamera (WiFi/LAN) ein oder nutze den
-            Netzwerk-Scan im Connection-Panel.
+            Enter the IP address of the Sony camera (Wi-Fi/LAN), or use the network
+            scan in the connection panel.
           </p>
           <div className="wizard-form">
             <label className="wizard-label">
-              Kamera IP-Adresse
+              Camera IP address
               <input
                 className="wizard-input"
                 value={p.mncHost}
@@ -479,8 +480,8 @@ function StepConnection(p: StepConnectionProps) {
             </label>
           </div>
           <p className="wizard-step__hint">
-            Aktiviere an der Kamera den <strong>„Monitor &amp; Control"</strong>- bzw.
-            Streaming-Modus. Erkennung im Netzwerk erfolgt per SSDP.
+            Switch the camera into <strong>"Monitor &amp; Control"</strong> or
+            streaming mode. Discovery on the network runs over SSDP.
           </p>
         </>
       )}
@@ -488,11 +489,11 @@ function StepConnection(p: StepConnectionProps) {
       {GENERIC_WIZARD[p.cameraType] && (
         <>
           <p className="wizard-step__desc">
-            Gib IP-Adresse und Port der Kamera ein ({GENERIC_WIZARD[p.cameraType].label}).
+            Enter the camera's IP address and port ({GENERIC_WIZARD[p.cameraType].label}).
           </p>
           <div className="wizard-form">
             <label className="wizard-label">
-              IP-Adresse / Hostname
+              IP address / hostname
               <input
                 className="wizard-input"
                 value={p.camHost}
@@ -512,8 +513,8 @@ function StepConnection(p: StepConnectionProps) {
           </div>
           <p className="wizard-step__hint">
             {p.cameraType === 'visca'
-              ? 'VISCA over IP läuft meist über UDP (PTZOptics 1259, Sony 52381). Eine Implementierung steuert viele PTZ-Marken.'
-              : 'HTTP-/REST-API der Kamera. Iris, Gain, WB, Zoom/PTZ je nach Modell.'}
+              ? 'VISCA over IP usually runs over UDP (PTZOptics 1259, Sony 52381). One implementation drives many PTZ brands.'
+              : 'The camera\'s HTTP/REST API. Iris, gain, WB, zoom/PTZ depending on the model.'}
           </p>
         </>
       )}
@@ -536,62 +537,62 @@ function StepDone({ cameraType, config }: { cameraType: CameraType; config: Part
   return (
     <div className="wizard-step wizard-step--done">
       <div className="wizard-done-icon">✓</div>
-      <h2 className="wizard-step__title">Alles bereit!</h2>
+      <h2 className="wizard-step__title">All set!</h2>
       <p className="wizard-step__desc">
-        Die Verbindung wurde konfiguriert. Klicke auf <strong>Starten</strong> um die
-        App zu öffnen und die Kamera zu verbinden.
+        The connection is configured. Click <strong>Start</strong> to open the app
+        and connect the camera.
       </p>
       <div className="wizard-summary">
         <div className="wizard-summary__row">
-          <span className="wizard-summary__key">Kameratyp</span>
+          <span className="wizard-summary__key">Camera type</span>
           <span className="wizard-summary__val">{label}</span>
         </div>
         {config.tcpHost && (
           <div className="wizard-summary__row">
-            <span className="wizard-summary__key">Adresse</span>
+            <span className="wizard-summary__key">Address</span>
             <span className="wizard-summary__val">{config.tcpHost}:{config.tcpPort}</span>
           </div>
         )}
         {config.serialPath && (
           <div className="wizard-summary__row">
-            <span className="wizard-summary__key">COM-Port</span>
+            <span className="wizard-summary__key">COM port</span>
             <span className="wizard-summary__val">{config.serialPath} @ {config.baudRate}</span>
           </div>
         )}
         {config.lumixHost && (
           <div className="wizard-summary__row">
-            <span className="wizard-summary__key">Adresse</span>
+            <span className="wizard-summary__key">Address</span>
             <span className="wizard-summary__val">{config.lumixHost}:{config.lumixPort}</span>
           </div>
         )}
         {config.canonHost && (
           <div className="wizard-summary__row">
-            <span className="wizard-summary__key">Adresse</span>
+            <span className="wizard-summary__key">Address</span>
             <span className="wizard-summary__val">{config.canonHost}:{config.canonPort}</span>
           </div>
         )}
         {config.bmHost && (
           <div className="wizard-summary__row">
-            <span className="wizard-summary__key">Adresse</span>
+            <span className="wizard-summary__key">Address</span>
             <span className="wizard-summary__val">{config.bmHost}</span>
           </div>
         )}
         {config.mncHost && (
           <div className="wizard-summary__row">
-            <span className="wizard-summary__key">Adresse</span>
+            <span className="wizard-summary__key">Address</span>
             <span className="wizard-summary__val">{config.mncHost}:{config.mncPort}</span>
           </div>
         )}
         {config.camHost && (
           <div className="wizard-summary__row">
-            <span className="wizard-summary__key">Adresse</span>
+            <span className="wizard-summary__key">Address</span>
             <span className="wizard-summary__val">{config.camHost}:{config.camPort}</span>
           </div>
         )}
       </div>
       <p className="wizard-step__hint">
-        Im Connection-Panel kannst du die Kamera mit einem Klick verbinden und
-        weitere Kameras hinzufügen.
+        In the connection panel you can connect the camera with one click and add
+        more cameras.
       </p>
     </div>
   );

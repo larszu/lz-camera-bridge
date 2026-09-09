@@ -25,11 +25,11 @@ type WizardStep = 'mode' | 'network' | 'serial' | 'peer' | 'confirm';
 const STEPS: WizardStep[] = ['mode', 'network', 'serial', 'peer', 'confirm'];
 
 const STEP_TITLES: Record<WizardStep, string> = {
-  mode: 'Betriebsmodus',
-  network: 'Netzwerk',
-  serial: 'Serielle Schnittstelle',
-  peer: 'Gegenstelle',
-  confirm: 'Bestätigen',
+  mode: 'Mode',
+  network: 'Network',
+  serial: 'Serial port',
+  peer: 'Peer',
+  confirm: 'Confirm',
 };
 
 export function WiznetConfigWizard({ device, onClose, onConfigure }: Props) {
@@ -113,10 +113,10 @@ export function WiznetConfigWizard({ device, onClose, onConfigure }: Props) {
         <div className="wizard__content">
           {step === 'mode' && (
             <div className="wizard__section">
-              <h3>Betriebsmodus wählen</h3>
+              <h3>Choose the operating mode</h3>
               <p className="wizard__hint">
-                <strong>Kamera (Server):</strong> Wartet auf eingehende Verbindungen. Verwenden an der Kamera/CCU-Seite.<br />
-                <strong>RCP (Client):</strong> Verbindet sich aktiv zu einer Gegenstelle. Verwenden am Panel/RCP.
+                <strong>Camera (server):</strong> waits for incoming connections. Use this on the camera/CCU side.<br />
+                <strong>RCP (client):</strong> actively connects to a peer. Use this at the panel/RCP.
               </p>
               <div className="wizard__mode-select">
                 <button
@@ -124,8 +124,8 @@ export function WiznetConfigWizard({ device, onClose, onConfigure }: Props) {
                   onClick={() => updateConfig('mode', 'server')}
                 >
                   <span className="wizard__mode-icon">📹</span>
-                  <span className="wizard__mode-title">Kamera (Server)</span>
-                  <span className="wizard__mode-desc">Empfängt Befehle</span>
+                  <span className="wizard__mode-title">Camera (server)</span>
+                  <span className="wizard__mode-desc">Receives commands</span>
                 </button>
                 <button
                   className={`wizard__mode-btn ${config.mode === 'client' ? 'wizard__mode-btn--active' : ''}`}
@@ -141,14 +141,14 @@ export function WiznetConfigWizard({ device, onClose, onConfigure }: Props) {
 
           {step === 'network' && (
             <div className="wizard__section">
-              <h3>Netzwerkeinstellungen</h3>
+              <h3>Network settings</h3>
               <label className="wizard__field">
                 <input
                   type="checkbox"
                   checked={config.dhcp}
                   onChange={(e) => updateConfig('dhcp', e.target.checked)}
                 />
-                <span>DHCP verwenden (automatische IP)</span>
+                <span>Use DHCP (automatic IP)</span>
               </label>
               {!config.dhcp && (
                 <>
@@ -196,28 +196,28 @@ export function WiznetConfigWizard({ device, onClose, onConfigure }: Props) {
 
           {step === 'serial' && (
             <div className="wizard__section">
-              <h3>Serielle Schnittstelle (RS-422)</h3>
+              <h3>Serial port (RS-422)</h3>
               <p className="wizard__hint">
-                Sony 700PTP/SPP verwendet <strong>38400 Baud, 8 Datenbits, 1 Stoppbit, Odd Parity</strong>.
+                Sony 700PTP/SPP uses <strong>38400 baud, 8 data bits, 1 stop bit, odd parity</strong>.
               </p>
               <label className="wizard__field">
-                <span>Baudrate</span>
+                <span>Baud rate</span>
                 <select
                   value={config.baud}
                   onChange={(e) => updateConfig('baud', parseInt(e.target.value, 10))}
                 >
-                  <option value={38400}>38400 (Standard)</option>
+                  <option value={38400}>38400 (default)</option>
                   <option value={19200}>19200</option>
                   <option value={9600}>9600</option>
                 </select>
               </label>
               <label className="wizard__field">
-                <span>Parität</span>
+                <span>Parity</span>
                 <select
                   value={config.parity}
                   onChange={(e) => updateConfig('parity', e.target.value as 'odd' | 'even' | 'none')}
                 >
-                  <option value="odd">Odd (Standard für Sony)</option>
+                  <option value="odd">Odd (default for Sony)</option>
                   <option value="even">Even</option>
                   <option value="none">None</option>
                 </select>
@@ -227,14 +227,14 @@ export function WiznetConfigWizard({ device, onClose, onConfigure }: Props) {
 
           {step === 'peer' && (
             <div className="wizard__section">
-              <h3>Gegenstelle konfigurieren</h3>
+              <h3>Configure the peer</h3>
               {config.mode === 'client' ? (
                 <>
                   <p className="wizard__hint">
-                    Im Client-Modus verbindet sich dieser Adapter aktiv zur angegebenen Gegenstelle (Kamera/CCU).
+                    In client mode this adapter actively connects to the peer you give it (camera/CCU).
                   </p>
                   <label className="wizard__field">
-                    <span>Ziel-IP (Kamera/CCU)</span>
+                    <span>Target IP (camera/CCU)</span>
                     <input
                       type="text"
                       value={config.peer_ip}
@@ -255,8 +255,8 @@ export function WiznetConfigWizard({ device, onClose, onConfigure }: Props) {
                 </>
               ) : (
                 <p className="wizard__hint">
-                  Im Server-Modus wartet dieser Adapter auf eingehende Verbindungen auf Port <strong>{config.port}</strong>.
-                  Keine Gegenstelle nötig — Clients (RCP/Web-Dashboard) verbinden sich hierher.
+                  In server mode this adapter waits for incoming connections on port <strong>{config.port}</strong>.
+                  No peer needed — clients (RCP/web dashboard) connect to it.
                 </p>
               )}
             </div>
@@ -264,20 +264,20 @@ export function WiznetConfigWizard({ device, onClose, onConfigure }: Props) {
 
           {step === 'confirm' && (
             <div className="wizard__section">
-              <h3>Konfiguration bestätigen</h3>
+              <h3>Confirm the configuration</h3>
               <div className="wizard__summary">
                 <div className="wizard__summary-row">
-                  <span>Modus:</span>
-                  <strong>{config.mode === 'server' ? 'Kamera (Server)' : 'RCP (Client)'}</strong>
+                  <span>Mode:</span>
+                  <strong>{config.mode === 'server' ? 'Camera (server)' : 'RCP (client)'}</strong>
                 </div>
                 <div className="wizard__summary-row">
-                  <span>IP-Adresse:</span>
-                  <strong>{config.dhcp ? 'DHCP (automatisch)' : config.ip}</strong>
+                  <span>IP address:</span>
+                  <strong>{config.dhcp ? 'DHCP (automatic)' : config.ip}</strong>
                 </div>
                 {!config.dhcp && (
                   <>
                     <div className="wizard__summary-row">
-                      <span>Subnetz:</span>
+                      <span>Subnet:</span>
                       <strong>{config.subnet}</strong>
                     </div>
                     <div className="wizard__summary-row">
@@ -296,13 +296,13 @@ export function WiznetConfigWizard({ device, onClose, onConfigure }: Props) {
                 </div>
                 {config.mode === 'client' && (
                   <div className="wizard__summary-row">
-                    <span>Gegenstelle:</span>
+                    <span>Peer:</span>
                     <strong>{config.peer_ip}:{config.peer_port}</strong>
                   </div>
                 )}
               </div>
               <p className="wizard__hint">
-                Nach dem Speichern startet der Adapter neu und übernimmt die neue Konfiguration.
+                After saving, the adapter restarts and takes on the new configuration.
               </p>
             </div>
           )}
@@ -310,21 +310,21 @@ export function WiznetConfigWizard({ device, onClose, onConfigure }: Props) {
 
         <div className="wizard__footer">
           <button className="btn" onClick={onClose} disabled={submitting}>
-            Abbrechen
+            Cancel
           </button>
           <div className="wizard__nav">
             {stepIndex > 0 && (
               <button className="btn" onClick={goBack} disabled={submitting}>
-                ← Zurück
+                ← Back
               </button>
             )}
             {step !== 'confirm' ? (
               <button className="btn btn--primary" onClick={goNext}>
-                Weiter →
+                Next →
               </button>
             ) : (
               <button className="btn btn--primary" onClick={handleSubmit} disabled={submitting}>
-                {submitting ? 'Speichern...' : 'Konfiguration speichern'}
+                {submitting ? 'Saving…' : 'Save configuration'}
               </button>
             )}
           </div>

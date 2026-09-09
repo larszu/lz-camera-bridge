@@ -25,7 +25,7 @@ export type CameraOriginsByNumber = Record<number, Origins>;
  * Reglern waere zwanzigmal derselbe Satz die Sorte Hinweis, die man nach dem
  * dritten Mal nicht mehr sieht.
  */
-export const UNCONFIRMED_NOTE = 'gesendet, nicht zurückgelesen';
+export const UNCONFIRMED_NOTE = 'sent, not read back';
 
 /**
  * Der Satz fuer einen Weg, der GAR NICHTS zurueckliest.
@@ -35,8 +35,8 @@ export const UNCONFIRMED_NOTE = 'gesendet, nicht zurückgelesen';
  * und die Aussage geht in ihr unter.
  */
 export const NO_READBACK_NOTE =
-  'Dieser Weg liest nichts zurück: alle Werte hier sind das, was zuletzt gesendet ' +
-  'wurde — keine Aussage darüber, was an der Kamera steht.';
+  'This path reads nothing back: every value here is what was last sent — it says ' +
+  'nothing about what the camera is actually set to.';
 
 /**
  * Ist dieser Wert unbestaetigt?
@@ -117,19 +117,27 @@ export const freshnessOf = (
  * Pult, das „falsch" behauptet, wo es „ungeprueft" meint, wird beim ersten
  * Fehlalarm nicht mehr geglaubt.
  */
-export const STALE_NOTE = 'zuletzt bestätigt vor';
+export const STALE_NOTE = 'last confirmed';
 
 /** Die Klasse, die einen alternden bzw. ueberholten Wert kennzeichnet. */
 export const AGING_CLASS = 'rcp-aging';
 export const STALE_CLASS = 'rcp-stale';
 
-/** „vor 12 s" / „vor 3 min" — kurz, weil es neben einer Zahl steht. */
+/**
+ * „12 s ago" / „3 min ago" — kurz, weil es neben einer Zahl steht.
+ *
+ * B-26: die Reihenfolge dreht sich mit der Sprache. Im Deutschen stand die
+ * Praeposition VOR der Zahl („vor 12 s"), im Englischen steht sie DAHINTER
+ * („12 s ago") — wer nur die Woerter tauscht und `STALE_NOTE` davorsetzt,
+ * bekommt „last confirmed ago 12 s". Deshalb traegt diese Funktion das „ago"
+ * selbst, und `STALE_NOTE` ist auf „last confirmed" gekuerzt.
+ */
 export const alterText = (confirmedAt: number, now: number): string => {
   const s = Math.max(0, Math.round((now - confirmedAt) / 1000));
-  if (s < 60) return `vor ${s} s`;
+  if (s < 60) return `${s} s ago`;
   const m = Math.round(s / 60);
-  if (m < 60) return `vor ${m} min`;
-  return `vor ${Math.round(m / 60)} h`;
+  if (m < 60) return `${m} min ago`;
+  return `${Math.round(m / 60)} h ago`;
 };
 
 /**

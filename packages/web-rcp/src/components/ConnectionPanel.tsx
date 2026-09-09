@@ -218,14 +218,14 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices,
       {mode === 'sony-usb' && (
         <div className="connection-row">
           <div className="field">
-            <label>Kamera (USB)</label>
+            <label>Camera (USB)</label>
             <div className="serial-port-row">
               <select
                 value={usbDeviceId}
                 onChange={(e) => setUsbDeviceId(e.target.value)}
                 className="select-group__select"
               >
-                {sonyUsbDevices.length === 0 && <option value="">– keine Kamera gefunden –</option>}
+                {sonyUsbDevices.length === 0 && <option value="">– no camera found –</option>}
                 {sonyUsbDevices.map((d) => (
                   <option key={d.id} value={d.id}>
                     {d.model}{d.serialNumber ? ` (${d.serialNumber})` : ''}
@@ -236,12 +236,12 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices,
             </div>
           </div>
           <div className="field field--sm">
-            <label>Kamera-Nr.</label>
+            <label>Camera no.</label>
             <input value={ccuId} onChange={(e) => setCcuId(e.target.value)} placeholder="0" type="number" />
           </div>
           <div className="field" style={{ alignSelf: 'flex-end', paddingBottom: '0.25rem' }}>
             <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
-              Kamera in „PC Remote" (USB-Steuerung) versetzen
+              Put the camera into "PC Remote" (USB control)
             </span>
           </div>
         </div>
@@ -250,7 +250,7 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices,
       {mode === 'lumix-http' && (
         <div className="connection-row">
           <div className="field">
-            <label>Kamera IP (WiFi/LAN)</label>
+            <label>Camera IP (Wi-Fi/LAN)</label>
             <input value={lumixHost} onChange={(e) => setLumixHost(e.target.value)} placeholder="192.168.54.1" />
           </div>
           <div className="field field--sm">
@@ -268,7 +268,7 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices,
       {mode === 'canon-ccapi' && (
         <div className="connection-row">
           <div className="field">
-            <label>Canon Kamera IP (CCAPI)</label>
+            <label>Canon camera IP (CCAPI)</label>
             <input value={canonHost} onChange={(e) => setCanonHost(e.target.value)} placeholder="192.168.1.2" />
           </div>
           <div className="field field--sm">
@@ -286,11 +286,11 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices,
       {mode === 'blackmagic' && (
         <div className="connection-row">
           <div className="field">
-            <label>Blackmagic Kamera IP / Hostname</label>
+            <label>Blackmagic camera IP / hostname</label>
             <input value={bmHost} onChange={(e) => setBmHost(e.target.value)} placeholder="192.168.1.50" />
           </div>
           <div className="field field--sm">
-            <label>Kamera-Nr.</label>
+            <label>Camera no.</label>
             <input value={ccuId} onChange={(e) => setCcuId(e.target.value)} placeholder="0" type="number" />
           </div>
           <div className="field" style={{ alignSelf: 'flex-end', paddingBottom: '0.25rem' }}>
@@ -304,7 +304,7 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices,
       {mode === 'sony-mnc' && (
         <div className="connection-row">
           <div className="field">
-            <label>Sony Kamera IP (WiFi)</label>
+            <label>Sony camera IP (Wi-Fi)</label>
             <div className="serial-port-row">
               <input value={mncHost} onChange={(e) => setMncHost(e.target.value)} placeholder="192.168.122.1" />
               <button className="btn btn--sm" onClick={onDiscoverSonyMnc} title="Netzwerk (SSDP) scannen">⟳</button>
@@ -328,7 +328,7 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices,
           </div>
           <div className="field" style={{ alignSelf: 'flex-end', paddingBottom: '0.25rem' }}>
             <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
-              „Monitor &amp; Control" / Streaming-Modus an der Kamera aktivieren
+              Enable "Monitor &amp; Control" / streaming mode on the camera
             </span>
           </div>
         </div>
@@ -337,7 +337,7 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices,
       {genericMeta && (
         <div className="connection-row">
           <div className="field">
-            <label>Kamera IP / Hostname</label>
+            <label>Camera IP / hostname</label>
             <input value={camHost} onChange={(e) => setCamHost(e.target.value)} placeholder="192.168.1.100" />
           </div>
           <div className="field field--sm">
@@ -345,7 +345,7 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices,
             <input value={camPort} onChange={(e) => setCamPort(e.target.value)} type="number" />
           </div>
           <div className="field field--sm">
-            <label>Kamera-Nr.</label>
+            <label>Camera no.</label>
             <input value={ccuId} onChange={(e) => setCcuId(e.target.value)} placeholder="0" type="number" />
           </div>
           {mode === 'jvc' && (
@@ -385,7 +385,7 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices,
         </div>
         <div className="serial-port-row">
           <select value={hidSel} onChange={(e) => setHidSel(e.target.value)} className="select-group__select">
-            <option value="">– Gerät wählen –</option>
+            <option value="">– select device –</option>
             {hidDevices.map((d) => {
               const id = `${d.vendorId}:${d.productId}:${d.path ?? ''}`;
               return (
@@ -395,7 +395,7 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices,
               );
             })}
           </select>
-          <button className="btn btn--sm" onClick={onListHidDevices} title="HID-Geräte scannen">⟳</button>
+          <button className="btn btn--sm" onClick={onListHidDevices} title="Scan HID devices">⟳</button>
         </div>
         <div className="connection-actions" style={{ marginTop: 6 }}>
           {controlSurfaceActive ? (
@@ -414,8 +414,8 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices,
           )}
         </div>
         <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-          Das Pult steuert die aktuell verbundene Kamera (jede Marke). Default-Mapping
-          ggf. an dein Gerät anpassen.
+          The panel controls the camera currently connected (any brand). Adjust the default
+          mapping to your device if needed.
         </span>
       </div>
 

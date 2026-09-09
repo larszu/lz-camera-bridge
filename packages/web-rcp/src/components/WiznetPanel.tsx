@@ -23,7 +23,7 @@ export function WiznetPanel({ devices, onDiscover, onConfigure, onSelectDevice }
 
       {devices.length === 0 ? (
         <div className="wiznet-empty">
-          Keine Geräte gefunden. Klicke <strong>Scan</strong> um das Netzwerk zu durchsuchen.
+          No devices found. Click <strong>Scan</strong> to search the network.
         </div>
       ) : (
         <div className="wiznet-list">
@@ -36,21 +36,21 @@ export function WiznetPanel({ devices, onDiscover, onConfigure, onSelectDevice }
               <div className="wiznet-card__info">
                 <span><strong>IP:</strong> {d.ip}:{d.port}</span>
                 <span><strong>MAC:</strong> {d.mac}</span>
-                <span><strong>Modus:</strong> {d.mode === 'server' ? 'Kamera (Server)' : 'RCP (Client)'}</span>
+                <span><strong>Mode:</strong> {d.mode === 'server' ? 'Camera (server)' : 'RCP (client)'}</span>
                 <span><strong>Seriell:</strong> {d.baud} Baud, Parity: {d.parity}</span>
               </div>
               <div className="wiznet-card__actions">
                 <button
                   className="btn btn--sm"
                   onClick={() => setConfiguring(d)}
-                  title="Gerät konfigurieren"
+                  title="Configure device"
                 >
                   Einstellungen
                 </button>
                 <button
                   className="btn btn--primary btn--sm"
                   onClick={() => onSelectDevice(d)}
-                  title="Dieses Gerät als TCP-Ziel verwenden"
+                  title="Use this device as the TCP target"
                 >
                   Verbinden
                 </button>

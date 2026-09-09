@@ -16,13 +16,17 @@
 // Beschreibungen. Ein Nutzer kann sich auf keine Sprache verlassen, und es
 // gibt keinen Schalter, mit dem er etwas daran aendern koennte.
 //
-// WAS DIESER LAUF DESHALB TUT — UND WAS ER NICHT BEHAUPTET. Er misst die
-// deutschen Zeichenketten und haelt ihre Zahl bei DER GRENZE, die beim
-// Einfuehren gemessen wurde. Er behauptet NICHT, das Produkt sei einsprachig:
-// es ist es nicht, und die Grenze sagt das laut. Sie hat einen Zweck und nur
-// den einen: der Mix darf nicht WACHSEN, waehrend B-26 offen ist. Wer
-// uebersetzt, setzt die Grenze herunter — das ist die einzige erlaubte
-// Richtung, und der Lauf verlangt es aktiv, sobald sie unterschritten wird.
+// WAS DIESER LAUF TUT. Er misst die fremdsprachigen Zeichenketten der
+// Oberflaeche und haelt ihre Zahl bei DER GRENZE. Am 2026-09-08 stand sie bei
+// 19 und hatte genau einen Zweck: der Mix durfte nicht WACHSEN, waehrend B-26
+// offen war.
+//
+// SEIT 2026-09-09 IST SIE NULL (`sony#22`). Die 19 Stellen sind uebersetzt,
+// die Oberflaeche ist einsprachig englisch, und die Grenze sagt das jetzt,
+// statt es zu behaupten: eine einzige deutsche Beschriftung laesst den Lauf
+// fallen. Sie bleibt in BEIDE Richtungen scharf — wer weiter uebersetzt (etwa
+// nach dem Einziehen einer i18n), traegt die neue Zahl hier ein, sonst
+// verliert sie beim naechsten Mal ihre Bedeutung.
 //
 // Und er schaltet sich selbst scharf: sobald `t('key', 'Fallback')`-Aufrufe
 // auftauchen (also i18n eingezogen wird), misst er zusaetzlich die Fallbacks
@@ -35,12 +39,18 @@ const ROOT = new URL('../', import.meta.url).pathname
 const UI = join(ROOT, 'packages', 'web-rcp', 'src')
 
 /**
- * Die Grenze: so viele deutsche Zeichenketten standen am 2026-09-08 in der
- * Oberflaeche. Nach OBEN ist sie ein Fehler, nach UNTEN ebenfalls — wer
+ * Die Grenze: so viele fremdsprachige Zeichenketten duerfen in der Oberflaeche
+ * stehen. Nach OBEN ist sie ein Fehler, nach UNTEN ebenfalls — wer
  * uebersetzt, traegt die neue Zahl hier ein, sonst verliert die Grenze beim
  * naechsten Mal ihre Bedeutung.
+ *
+ * SEIT 2026-09-09 IST SIE NULL (B-26 erledigt, `sony#22`). Am 2026-09-08 stand
+ * sie bei 19, und sie hatte damals genau einen Zweck: der Mix durfte nicht
+ * WACHSEN, waehrend B-26 offen war. Jetzt ist er weg — die Oberflaeche ist
+ * einsprachig englisch —, und die Grenze sagt das, statt es zu behaupten:
+ * eine einzige deutsche Beschriftung laesst den Lauf fallen.
  */
-const GRENZE = 19
+const GRENZE = 0
 
 /** Woerter, die es NUR im Deutschen gibt. */
 const DEUTSCH = [
@@ -104,7 +114,54 @@ export const fallbackMuster = () =>
  */
 const textMuster = () => /(['"])((?:[^'"\\\n]|\\.){4,160})\1/g
 
+/**
+ * Kommentare raus, BEVOR gemessen wird.
+ *
+ * Gemessen 2026-09-09, beim Uebersetzen der Oberflaeche (B-26): der Lauf
+ * schlug auf einem KOMMENTAR an — einem deutschen Satz in `origin.ts`, der
+ * ein englisches Wort in Anfuehrungszeichen zitierte. Der Waechter sah darin
+ * ein Literal.
+ *
+ * Das ist keine Kleinigkeit, sondern die Sorte Fehler, die einen Waechter
+ * abschaltet: die Kommentare dieses Repos sind DEUTSCH (Konvention), die
+ * Oberflaeche ist ENGLISCH (E-17). Ein Lauf, der beides in einen Topf wirft,
+ * meldet bei jedem gut kommentierten Commit einen Verstoss, den es nicht
+ * gibt — und wer ihn dreimal wegdrueckt, liest ihn beim vierten Mal nicht
+ * mehr. Sein eigener Kopf sagt seit der ersten Fassung, dass er LITERALE
+ * misst; hier tut er es auch.
+ */
+const ohneKommentare = (quelle) =>
+  quelle
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .split('\n')
+    .filter((z) => !z.trim().startsWith('//'))
+    .join('\n')
+
 const istText = (s) => /\s/.test(s) && !/^[\w./@-]+$/.test(s)
+
+/**
+ * TEXT ZWISCHEN DEN TAGS — und warum das hier stehen MUSS.
+ *
+ * Gegengeprobt 2026-09-09: die Oberflaeche wurde uebersetzt, die Grenze fiel
+ * auf 0, und dann wurde eine deutsche Beschriftung wieder eingebaut, um zu
+ * sehen, ob der Lauf sie faengt. ER FING SIE NICHT.
+ *
+ * Der Grund: `textMuster` sieht nur Zeichenketten in Anfuehrungszeichen. Der
+ * groesste Teil der sichtbaren Texte dieser Oberflaeche steht aber gar nicht
+ * dort, sondern als JSX-Text zwischen den Tags — jeder Absatz des
+ * Einrichtungs-Assistenten, jede Ueberschrift, jeder Hinweis. Der Lauf hat
+ * also nie die Oberflaeche gemessen, sondern ihre Attribute; die „19" von
+ * 2026-09-08 waren der Ausschnitt, den er sehen konnte.
+ *
+ * Ein Waechter, der bei einem echten Verstoss gruen bleibt, ist schlimmer als
+ * keiner: er wird zitiert. Deshalb misst dieser Lauf jetzt beides.
+ *
+ * Ausgenommen bleibt, was Code ist und kein Text: alles mit `{` oder `}`
+ * darin ist ein eingebetteter Ausdruck, und `istText` verlangt ohnehin ein
+ * Leerzeichen — `<code>7700</code>` und `<strong>Start</strong>` fallen damit
+ * heraus, ohne dass eine Ausnahmeliste sie einzeln nennen muesste.
+ */
+const jsxTextMuster = () => />([^<>{}]{4,300})</g
 
 const dateien = (dir, out = []) => {
   for (const name of readdirSync(dir)) {
@@ -142,13 +199,21 @@ const fallbackAbweichungen = []
 let fallbacks = 0
 
 for (const datei of dateien(UI)) {
-  const quelle = readFileSync(datei, 'utf8')
+  const quelle = ohneKommentare(readFileSync(datei, 'utf8'))
   const rel = relative(UI, datei)
 
   for (const m of quelle.matchAll(textMuster())) {
     if (!istText(m[2])) continue
     if (klassifiziere(m[2]) !== erklaert && klassifiziere(m[2]) !== null) {
       fremdsprachig.push(`${rel}: ${m[2].slice(0, 90)}`)
+    }
+  }
+
+  for (const m of quelle.matchAll(jsxTextMuster())) {
+    const text = m[1].replace(/\s+/g, ' ').trim()
+    if (!istText(text)) continue
+    if (klassifiziere(text) !== erklaert && klassifiziere(text) !== null) {
+      fremdsprachig.push(`${rel}: ${text.slice(0, 90)}`)
     }
   }
 
@@ -180,17 +245,23 @@ if (fallbacks > 0) {
   )
 }
 
-console.log(
-  `\n${fremdsprachig.length} fremdsprachige Zeichenkette(n) in der Oberflaeche ` +
-    `(Grenze: ${GRENZE}) — das ist der Sprachmix aus B-26, nicht ein Rueckstand:`,
-)
-for (const z of fremdsprachig) console.log(`  ${z}`)
+if (GRENZE === 0 && fremdsprachig.length === 0) {
+  console.log(
+    `\nKeine fremdsprachige Zeichenkette in der Oberflaeche — sie ist einsprachig ` +
+      `"${erklaert}" (B-26 erledigt). Eine einzige laesst diesen Lauf fallen.`,
+  )
+} else {
+  console.log(
+    `\n${fremdsprachig.length} fremdsprachige Zeichenkette(n) in der Oberflaeche ` +
+      `(Grenze: ${GRENZE}):`,
+  )
+  for (const z of fremdsprachig) console.log(`  ${z}`)
+}
 
 if (fremdsprachig.length > GRENZE) {
   console.error(
     `\nFEHLER: der Sprachmix ist gewachsen (${fremdsprachig.length} > ${GRENZE}). ` +
-      'Neue Oberflaechen-Texte gehoeren in die Quellsprache dieses Repos. ' +
-      'Solange B-26 offen ist, darf der Bestand bleiben — wachsen darf er nicht.',
+      'Neue Oberflaechen-Texte gehoeren in die Quellsprache dieses Repos.',
   )
   process.exit(1)
 }

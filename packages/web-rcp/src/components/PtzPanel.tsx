@@ -212,7 +212,7 @@ export function PtzPanel({ cameraId = 1, disabled = false, onCommand }: PtzPanel
             onClick={() => setStoreMode((s) => !s)}
             disabled={disabled}
           >
-            {storeMode ? 'STORE: Ziel wählen…' : 'STORE'}
+            {storeMode ? 'STORE: pick a slot…' : 'STORE'}
           </button>
         </div>
 

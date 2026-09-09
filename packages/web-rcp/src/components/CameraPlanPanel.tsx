@@ -18,9 +18,9 @@ interface Props {
 
 /** Wie stark ein Beleg ist, in Worten. Ein Vorschlag darf nicht wie ein Befund aussehen. */
 const BELEG: Record<PlanMatchedBy, { text: string; klasse: string }> = {
-  model: { text: 'Modell gemessen', klasse: 'plan__badge--ok' },
-  number: { text: 'Nummer im Namen — Vorschlag', klasse: 'plan__badge--weak' },
-  manual: { text: 'von Hand', klasse: 'plan__badge--manual' },
+  model: { text: 'Model measured', klasse: 'plan__badge--ok' },
+  number: { text: 'Number in the name — proposal', klasse: 'plan__badge--weak' },
+  manual: { text: 'By hand', klasse: 'plan__badge--manual' },
 };
 
 export function CameraPlanPanel({ planMatch, onMatch, onApply }: Props) {
@@ -56,7 +56,7 @@ export function CameraPlanPanel({ planMatch, onMatch, onApply }: Props) {
             aussieht wie ein Knopf und nichts tut, ist die naechste Frage. */}
         {plan && planMatch && !uebernommen && (
           <button className="btn btn--sm btn--primary" onClick={() => { onApply(plan); setUebernommen(true); }}>
-            Übernehmen
+            Apply
           </button>
         )}
         {dateiname && <span className="plan__file">{dateiname}</span>}
@@ -64,8 +64,8 @@ export function CameraPlanPanel({ planMatch, onMatch, onApply }: Props) {
 
       {!planMatch && (
         <p className="plan__hint">
-          Die <code>camera-list</code> aus dem MultiCam-Planner laden. Der Abgleich sagt, welche
-          geplante Kamera auf welchem Slot sitzt — und womit das belegt ist.
+          Load the <code>camera-list</code> from the MultiCam planner. The match says which
+          planned camera sits on which slot — and what the evidence for that is.
         </p>
       )}
 
@@ -73,7 +73,7 @@ export function CameraPlanPanel({ planMatch, onMatch, onApply }: Props) {
         <div className="plan__cols">
           <div>
             <h4 className="plan__h">Zugeordnet <span className="plan__count">{zugeordnet.length}</span></h4>
-            {zugeordnet.length === 0 && <p className="plan__hint">Keine.</p>}
+            {zugeordnet.length === 0 && <p className="plan__hint">None.</p>}
             <ul className="plan__list">
               {zugeordnet.map((m) => (
                 <li key={m.planCameraId}>
@@ -88,8 +88,8 @@ export function CameraPlanPanel({ planMatch, onMatch, onApply }: Props) {
           </div>
 
           <div>
-            <h4 className="plan__h">Ohne Beleg <span className="plan__count">{offen.length}</span></h4>
-            {offen.length === 0 && <p className="plan__hint">Keine.</p>}
+            <h4 className="plan__h">Without evidence <span className="plan__count">{offen.length}</span></h4>
+            {offen.length === 0 && <p className="plan__hint">None.</p>}
             <ul className="plan__list">
               {offen.map((m) => (
                 <li key={m.planCameraId}>

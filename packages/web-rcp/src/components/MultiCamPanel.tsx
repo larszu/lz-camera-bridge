@@ -37,11 +37,11 @@ export function MultiCamPanel(p: Props) {
     <div className="multicam">
       <div className="multicam__bar">
         <span className="multicam__title">Multiview · {nums.length} Kamera{nums.length === 1 ? '' : 's'}</span>
-        <button className="btn btn--sm btn--primary" onClick={p.onAddCamera}>+ Kamera</button>
+        <button className="btn btn--sm btn--primary" onClick={p.onAddCamera}>+ Camera</button>
       </div>
 
       {nums.length === 0 && (
-        <div className="app__empty">Noch keine Kamera. „+ Kamera" fügt eine hinzu.</div>
+        <div className="app__empty">No cameras yet. "+ Camera" adds one.</div>
       )}
 
       <div className="multicam__grid">
@@ -66,8 +66,8 @@ export function MultiCamPanel(p: Props) {
                   <span
                     className={`multicam__card-plan ${cam.planMatchedBy === 'number' ? 'multicam__card-plan--weak' : ''}`}
                     title={cam.planMatchedBy === 'number'
-                      ? 'Aus der Nummer im Namen vorgeschlagen, nicht gemessen'
-                      : cam.planMatchedBy === 'model' ? 'Modell gemessen' : 'Von Hand zugeordnet'}
+                      ? 'Proposed from the number in the name, not measured'
+                      : cam.planMatchedBy === 'model' ? 'Model measured' : 'Assigned by hand'}
                   >
                     {cam.plan.label}
                     {cam.planMatchedBy === 'number' ? ' ?' : ''}

@@ -146,10 +146,10 @@ export default function App() {
           <div className="panel camera-list">
             <div className="camera-list__head">
               <span className="panel__title">Kameras</span>
-              <button className="btn btn--sm btn--primary" onClick={addCamera}>+ Kamera</button>
+              <button className="btn btn--sm btn--primary" onClick={addCamera}>+ Camera</button>
             </div>
             {camNumbers.length === 0 && (
-              <p className="camera-list__empty">Noch keine Kamera. „+ Kamera" fügt eine hinzu.</p>
+              <p className="camera-list__empty">No cameras yet. "+ Camera" adds one.</p>
             )}
             {camNumbers.map((n) => {
               const c = cameras[n];
@@ -206,7 +206,7 @@ export default function App() {
 
         <div className="app__rcp">
           {selected === null ? (
-            <div className="app__empty">Füge links eine Kamera hinzu, um sie zu steuern.</div>
+            <div className="app__empty">Add a camera on the left to control it.</div>
           ) : (
             <>
               <div className="panel-view-tabs">
