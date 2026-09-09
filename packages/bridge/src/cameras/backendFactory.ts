@@ -19,10 +19,16 @@ import { PanasonicPtzClient } from './PanasonicPtzClient.js';
 import { ViscaClient } from './ViscaClient.js';
 import { JvcClient } from './JvcClient.js';
 import { BirddogClient } from './BirddogClient.js';
+import { DemoCameraClient } from './DemoCameraClient.js';
 
 export type ConnectionMode =
   | 'tcp' | 'serial' | 'lumix-http' | 'sony-usb' | 'blackmagic' | 'sony-mnc' | 'canon-ccapi'
-  | 'zcam' | 'panasonic-ptz' | 'visca' | 'jvc' | 'birddog';
+  | 'zcam' | 'panasonic-ptz' | 'visca' | 'jvc' | 'birddog'
+  // A camera that is not there. Every other mode needs a real address, so
+  // without hardware the panel came up empty and every control was inert —
+  // you could not see the RCP work on a laptop. See `DemoCameraClient` for
+  // what it refuses to be.
+  | 'demo';
 
 /** Per-camera connection config (a subset carried by each camera slot). */
 export interface CameraConfig {
@@ -105,6 +111,12 @@ const GENERIC_PORT: Record<string, number> = { zcam: 80, 'panasonic-ptz': 80, vi
 export function makeBackend(cfg: CameraConfig): BuiltBackend {
   const mode = cfg.connectionMode ?? 'tcp';
   switch (mode) {
+    // Stands first because it is the only one that needs nothing: no host,
+    // no port, no device. `isDemo` rides along in the state so the surface
+    // can mark itself — a demo state that arrives indistinguishable from a
+    // real one is exactly the defect this repository argues against.
+    case 'demo':
+      return { backend: new DemoCameraClient(), mapState: identity };
     case 'tcp':
       return { backend: new CcuClient({ host: cfg.tcpHost ?? '192.168.1.10', port: cfg.tcpPort ?? 7700, ccuId: cfg.ccuId ?? 0 }), mapState: identity };
     case 'serial':

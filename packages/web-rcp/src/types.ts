@@ -22,7 +22,12 @@ export type CameraStatesByNumber = Record<number, CameraState>;
 
 export type ConnectionMode =
   | 'tcp' | 'serial' | 'lumix-http' | 'sony-usb' | 'blackmagic' | 'sony-mnc' | 'canon-ccapi'
-  | 'zcam' | 'panasonic-ptz' | 'visca' | 'jvc' | 'birddog';
+  | 'zcam' | 'panasonic-ptz' | 'visca' | 'jvc' | 'birddog'
+  // A camera that is not there — the only mode that needs no address. Every
+  // other one wants a host, a port or a USB device, so on a laptop the panel
+  // came up empty and every control was inert. The state carries `isDemo`,
+  // and the surface marks itself with it.
+  | 'demo';
 
 export interface BridgeConfig {
   connectionMode?: ConnectionMode;

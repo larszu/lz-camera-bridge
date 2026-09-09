@@ -53,6 +53,13 @@ jobs:
       - name: Oberflaechen-Regeln (ADR-007)
         run: npm run brand:check
 
+      # An den Reglern haengen Schwenk-/Neige-Geschwindigkeit, Zoom, Blende
+      # und Verstaerkung einer Kamera, die im Zweifel gerade auf Sendung ist.
+      # Wer danebengreift, verreisst ein Bild, das Zuschauer sehen.
+      # WCAG 2.2 SC 2.5.8 (Stufe AA) nennt 24 px.
+      - name: Schieberegler sind zu treffen (24 px, WCAG 2.5.8)
+        run: npm run slider:check
+
       # E-17/E-20 + B-26: dieses Repo ist englisch-quellig, und die deutschen
       # Reste in der Oberflaeche sind ein SPRACHMIX, kein Rueckstand — derselbe
       # Dialog zeigt beides. Der Lauf haelt ihre Zahl bei der Grenze, die beim

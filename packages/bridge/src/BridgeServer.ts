@@ -38,6 +38,7 @@
 
 import { WebSocketServer, WebSocket } from 'ws';
 import { createServer } from 'http';
+import { networkInterfaces } from 'os';
 import { Rs422Transport } from './transport/Rs422Transport.js';
 import { CameraState } from './protocol/CcuClient.js';
 import { makeBackend, CameraBackend, CameraConfig } from './cameras/backendFactory.js';
@@ -156,6 +157,24 @@ export class BridgeServer {
   start(): void {
     this.httpServer.listen(this.wsPort, () => {
       console.log(`[BridgeServer] WebSocket listening on ws://localhost:${this.wsPort}`);
+      // AND the addresses somebody can actually hand out.
+      //
+      // `listen` without a host binds every interface, so the bridge was
+      // always reachable from the network — and only `localhost` was ever
+      // printed. A control surface on a tablet is the normal case for this
+      // application, not the exception, and whoever sets it up has to be
+      // told where to point it.
+      //
+      // All detected addresses, not one guessed: on a machine with a Docker
+      // or VPN bridge the first one is often the wrong one, and whoever
+      // reads the list recognises their own.
+      for (const entries of Object.values(networkInterfaces())) {
+        for (const e of entries ?? []) {
+          if (e.family === 'IPv4' && !e.internal) {
+            console.log(`[BridgeServer]                     ws://${e.address}:${this.wsPort}  (same network)`);
+          }
+        }
+      }
     });
     this.companion.start();
   }

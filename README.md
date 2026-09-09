@@ -119,9 +119,46 @@ grow. Translating some means lowering the limit in the same commit.
 
 ```bash
 npm install            # workspaces install
-npm run dev            # bridge (ws://localhost:9700) + web UI (Vite)
+./dev.sh               # Linux / macOS — bridge + web UI, demo camera preselected
+npm run dev            # the same via npm (bridge backgrounded with `&`)
 npm test               # protocol framing unit tests
 ```
+
+### Try it without a camera
+
+Pick the **Demo (no camera)** tab in the connection panel and connect. The
+panel then talks to a state held in the bridge: move a control and the value
+follows, so the surface — RCP, joystick, layout — can be tried on a laptop.
+
+Before this, `npm run dev` always started but could not *show* anything:
+every backend in `backendFactory` needs a real address (a CCU on TCP, a VISCA
+port, a USB device in PC-Remote mode). Without one the panel came up empty
+and every control was inert.
+
+**It is not a camera simulator.** Nothing drifts, nothing is measured, and
+every value moved because a command moved it. The state carries an `isDemo`
+flag all the way to the dashboard, so a demo value can never be mistaken for
+a reading from a real device — that is the same line `valueOrigin.ts` draws
+between *commanded* and *confirmed*, and `test/demoKamera.test.ts` holds it:
+one case asserts that nothing changes over 600 ms with no command, another
+that `isDemo` survives `mapState`.
+
+`dev.sh` also cleans up after itself. `npm run dev` appends the bridge with
+`&` and leaves it: a Ctrl-C ends only the web UI, the bridge stays on port
+9700, and the next start fails on it.
+
+### Other devices on the same network
+
+The bridge binds every interface and now prints the addresses you can hand
+out, not just `localhost`:
+
+```
+[BridgeServer] WebSocket listening on ws://localhost:9700
+[BridgeServer]                     ws://192.168.1.42:9700  (same network)
+```
+
+All detected addresses are listed rather than one being guessed: on a machine
+with a Docker or VPN bridge the first one is often the wrong one.
 
 Build individually:
 

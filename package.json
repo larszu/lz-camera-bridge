@@ -24,6 +24,7 @@
     "caps:parity": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/planner-caps-parity.ts",
     "lang:check": "node scripts/quellsprache-check.mjs",
     "actions:check": "node scripts/actions-node-runtime.mjs",
-    "brand:check": "node scripts/brand-tokens-check.mjs"
+    "brand:check": "node scripts/brand-tokens-check.mjs",
+    "slider:check": "node scripts/slider-groesse-check.mjs"
   }
 }

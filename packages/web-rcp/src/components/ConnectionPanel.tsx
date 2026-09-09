@@ -117,6 +117,11 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices,
       cfg.canonHost = canonHost;
       cfg.canonPort = Number(canonPort);
       cfg.ccuId = Number(ccuId);
+    } else if (mode === 'demo') {
+      // Nichts weiter. Genau das ist der Punkt: der Demo-Weg braucht keine
+      // Adresse. Ohne diesen Zweig fiele er in den `else` unten und bekaeme
+      // einen seriellen Port zugewiesen, den es nicht gibt.
+      cfg.ccuId = Number(ccuId);
     } else if (genericMeta) {
       cfg.camHost = camHost;
       cfg.camPort = Number(camPort);
@@ -139,6 +144,9 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices,
       <h2 className="panel__title">Connection</h2>
 
       <div className="mode-tabs">
+        <button className={`mode-tab ${mode === 'demo' ? 'mode-tab--active' : ''}`} onClick={() => setMode('demo')}>
+          Demo (no camera)
+        </button>
         <button className={`mode-tab ${mode === 'tcp' ? 'mode-tab--active' : ''}`} onClick={() => setMode('tcp')}>
           TCP / Netzwerk (Sony)
         </button>
@@ -170,6 +178,21 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices,
           </button>
         ))}
       </div>
+
+      {mode === 'demo' && (
+        <div className="connection-row">
+          <p className="field" style={{ margin: 0 }}>
+            <strong>No camera, no address.</strong> The panel talks to a state
+            held in the bridge: move a control and the value follows, so the
+            surface can be tried on a laptop.
+            {' '}
+            It is <em>not</em> a camera simulator — nothing drifts, nothing is
+            measured, and every value moved because a command moved it. The
+            state carries an <code>isDemo</code> flag so it can never be
+            mistaken for a reading from a real device.
+          </p>
+        </div>
+      )}
 
       {mode === 'tcp' && (
         <div className="connection-row">

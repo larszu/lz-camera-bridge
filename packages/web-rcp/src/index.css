@@ -43,6 +43,76 @@ body {
   font-size: 13px;
 }
 
+/* ─── Schieberegler: 24 px Trefferflaeche (WCAG 2.2 SC 2.5.8) ─────────────
+ *
+ * Nutzer-Meldung 2026-09-09: „Passe auch die Ui von allen slidern an sodass
+ * man sie gut bedienen kann."
+ *
+ * GEMESSEN VORHER: fuer `input[type="range"]` stand in KEINEM der vier
+ * Stilblaetter etwas (index.css, wizard.css, ptz-panel.css, sony-rcp.css).
+ * Die sechs Regler trugen das Standardaussehen des Browsers — in WebKit rund
+ * 16 px hoch. WCAG 2.2, Erfolgskriterium 2.5.8 („Target Size (Minimum)",
+ * Stufe AA), nennt 24 px als Mindestmass fuer eine Trefferflaeche.
+ *
+ * DAS IST HIER KEINE KOSMETIK. An diesen Reglern haengen Schwenk- und
+ * Neige-Geschwindigkeit, Zoom, Blende und Verstaerkung einer Kamera, die im
+ * Zweifel gerade auf Sendung ist. Wer danebengreift, verreisst ein Bild, das
+ * Zuschauer sehen — und ein Regler, der zu klein ist, um ihn ruhig zu fassen,
+ * ist genau das Werkzeug, mit dem einem das passiert.
+ *
+ * Das ELEMENT wird 24 px hoch, nicht die Bahn: die Regler stehen in Zeilen
+ * neben Beschriftung und Wert, und ein 24 px hoher Balken sprengt jede davon.
+ * Der Griff bleibt ECKIG — der Marken-Guide legt „keine Rundungen" fest
+ * (`--radius: 0`), `brand:check` haelt es fest. Den Fokusring zeichnet die
+ * `.app input:focus-visible`-Regel weiter unten mit 3 px Abstand, also
+ * aussen; das passt hier.
+ *
+ * Firefox braucht seine eigenen Pseudo-Elemente; ohne sie bliebe es dort beim
+ * Standardaussehen, und die Messung staende nur fuer einen Browser. */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 24px;            /* Trefferflaeche, nicht Bahnhoehe */
+  background: transparent; /* die Bahn zeichnen die Pseudo-Elemente */
+  cursor: pointer;
+  touch-action: manipulation;
+}
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 6px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  background: var(--accent);
+  border: 2px solid var(--surface2);
+  border-radius: 0;
+  /* Der Griff sitzt auf der Bahn, nicht daneben: (6 px Bahn - 18 px Griff)
+     / 2 = -6 px, plus 1 px Rahmen der Bahn. */
+  margin-top: -7px;
+  cursor: pointer;
+}
+input[type="range"]::-moz-range-track {
+  height: 6px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+}
+input[type="range"]::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  background: var(--accent);
+  border: 2px solid var(--surface2);
+  border-radius: 0;
+  cursor: pointer;
+}
+input[type="range"]:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 /* ─── App Layout ──────────────────────────────────────────────────────────── */
 
 .app { display: flex; flex-direction: column; min-height: 100vh; }

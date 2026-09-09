@@ -84,6 +84,22 @@ export type Origins = Partial<Record<PaintField, ValueOrigin>>;
  * Nachlaessigkeit, sondern die Aussage: dieser Weg liest es nicht zurueck.
  */
 export const MODE_READBACK: Readonly<Record<ConnectionMode, readonly PaintField[]>> = {
+  // Der Demo-Weg haelt den Zustand SELBST und gibt ihn nach jedem Befehl
+  // zurueck. Das ist die vollstaendigste Rueckmeldung ueberhaupt — und sie
+  // sagt trotzdem nichts ueber eine Kamera aus, weil da keine ist.
+  //
+  // Genau deshalb steht hier die volle Liste und nicht `[]`: die Oberflaeche
+  // soll den Demo-Betrieb so behandeln, wie sie eine antwortende Kamera
+  // behandelt (Werte gelten als `confirmed`, nichts altert weg). Dass es
+  // keine Kamera ist, steht an einer anderen Stelle — `isDemo` im Zustand —
+  // und nicht hier. Eine leere Liste waere die falsche Art, es zu sagen:
+  // sie hiesse „liest nicht zurueck", und dann zeigte das Pult jeden
+  // gezogenen Regler als unbestaetigt an, obwohl er unmittelbar antwortet.
+  demo: [
+    'iris', 'masterBlack', 'blackR', 'blackG', 'blackB', 'whiteR', 'whiteG', 'whiteB',
+    'masterGain', 'masterGamma', 'saturation', 'shutterSpeed', 'ndFilter',
+    'masterWhiteClip', 'detailLevel', 'bars', 'cameraPower',
+  ],
   // `CcuClient.handleMessage50` wertet den Message-50-Strom der CCU aus und
   // setzt in `applyStateFromCommand` genau diese Felder. Der einzige Weg mit
   // nennenswerter Rueckmeldung.
@@ -251,6 +267,11 @@ export type ConfirmCadence =
  * bekommt `none` und nicht etwa einen erfundenen Takt.
  */
 export const MODE_CADENCE: Readonly<Record<ConnectionMode, ConfirmCadence>> = {
+  // `DemoCameraClient` sendet `stateChanged` unmittelbar nach jedem Befehl
+  // und sonst nie. Das ist `push` im Wortsinn: Stille heisst, dass sich
+  // nichts geaendert hat — hier sogar zwingend, weil ausser Befehlen nichts
+  // etwas aendern KANN. Kein Drift, kein Rauschen, kein Timer.
+  demo: { kind: 'push' },
   // `CcuClient`: Nachricht 0x50 kommt UNAUFGEFORDERT von der CCU — der Client
   // beantwortet sie nur (`handleMessage50`, dann `buildMessageResponse`). Der
   // 1000-ms-Timer daneben ist ein HEARTBEAT, keine Zustandsabfrage. Also

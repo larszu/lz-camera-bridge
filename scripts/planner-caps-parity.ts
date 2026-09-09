@@ -93,7 +93,26 @@ if (!union) {
   );
   process.exit(1);
 }
-const bridgeWege = [...union[1].matchAll(/'([a-z0-9-]+)'/g)].map((m) => m[1]).sort();
+/**
+ * Wege, die es NUR HIER gibt und im Planer nichts zu suchen haben.
+ *
+ * `demo` ist eine Kamera, die nicht da ist — ein Werkzeug der Werkbank, um
+ * das Pult ohne Hardware zu bedienen. Der Planer plant echte Aufbauten: dort
+ * waere sie eine Kameraposition, die man auf ein Blatt drucken und aufbauen
+ * kann. Genau das darf nicht sein.
+ *
+ * Die Liste steht hier und nicht im Planer, weil die Entscheidung hier
+ * faellt — und sie steht als LISTE und nicht als `if`, damit der naechste
+ * solche Weg eine Zeile mit Begruendung braucht und keinen Sonderfall im
+ * Vergleich. Was nicht drinsteht, MUSS der Planer kennen; daran aendert sich
+ * nichts.
+ */
+const NUR_WERKBANK: readonly string[] = ['demo'];
+
+const bridgeWege = [...union[1].matchAll(/'([a-z0-9-]+)'/g)]
+  .map((m) => m[1])
+  .filter((w) => !NUR_WERKBANK.includes(w))
+  .sort();
 if (bridgeWege.length < 10) {
   console.error(
     `FEHLER: nur ${bridgeWege.length} Verbindungswege aus ${TYPEN} gelesen — das ist zu wenig, ` +
@@ -114,6 +133,20 @@ for (const w of bridgeWege) {
 for (const w of planerWege) {
   if (!bridgeWege.includes(w)) {
     fehler.push(`Weg "${w}" steht im Planer, dieses Repo kennt ihn nicht (mehr).`);
+  }
+}
+
+// Die Gegenprobe zur Ausnahme: ein Werkbank-Weg darf NICHT im Planer stehen.
+// Ohne sie waere `NUR_WERKBANK` eine Einbahnstrasse — der Weg fiele hier aus
+// dem Vergleich und koennte im Planer trotzdem auftauchen, ohne dass es
+// jemand meldet.
+for (const w of NUR_WERKBANK) {
+  if (planerWege.includes(w)) {
+    fehler.push(
+      `Weg "${w}" ist ein Werkbank-Weg und steht trotzdem im Planer. Er gehoert ` +
+        'dort nicht hin: der Planer plant Aufbauten, und eine Kamera, die es ' +
+        'nicht gibt, laesst sich nicht aufbauen.',
+    );
   }
 }
 

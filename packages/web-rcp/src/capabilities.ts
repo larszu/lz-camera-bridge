@@ -17,6 +17,16 @@ const NONE: CameraCapabilities = {
 };
 
 const MODE_CAPS: Record<ConnectionMode, Partial<CameraCapabilities>> = {
+  // The demo camera. Its list is the paint set `DemoCameraClient` actually
+  // applies — read off its switch, not wished for. AWB/ABB/auto-iris stay
+  // off because it does not implement them, and a demo that claimed a
+  // capability the real backends lack would teach the wrong panel: someone
+  // would lay out a button that has nothing behind it anywhere.
+  demo: {
+    iris: true, masterBlack: true, blackBalance: true, whiteBalance: true,
+    masterGain: true, masterGamma: true, saturation: true, ndFilter: true,
+    shutter: true, bars: true,
+  },
   // Sony CCU 700PTP (TCP + RS-422): full CCU paint. AWB/ABB/Auto-Iris stay
   // disabled deliberately: Sony's 700 protocol is NDA-only and no public
   // source documents those auto-setup command codes (verified against the
