@@ -148,7 +148,7 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices,
           Demo (no camera)
         </button>
         <button className={`mode-tab ${mode === 'tcp' ? 'mode-tab--active' : ''}`} onClick={() => setMode('tcp')}>
-          TCP / Netzwerk (Sony)
+          TCP / network (Sony)
         </button>
         <button className={`mode-tab ${mode === 'serial' ? 'mode-tab--active' : ''}`} onClick={() => setMode('serial')}>
           8-Pin RS-422 Seriell
@@ -255,7 +255,7 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices,
                   </option>
                 ))}
               </select>
-              <button className="btn btn--sm" onClick={onDiscoverSonyUsb} title="USB neu scannen">⟳</button>
+              <button className="btn btn--sm" onClick={onDiscoverSonyUsb} title="Rescan USB">⟳</button>
             </div>
           </div>
           <div className="field field--sm">
@@ -330,7 +330,7 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices,
             <label>Sony camera IP (Wi-Fi)</label>
             <div className="serial-port-row">
               <input value={mncHost} onChange={(e) => setMncHost(e.target.value)} placeholder="192.168.122.1" />
-              <button className="btn btn--sm" onClick={onDiscoverSonyMnc} title="Netzwerk (SSDP) scannen">⟳</button>
+              <button className="btn btn--sm" onClick={onDiscoverSonyMnc} title="Scan network (SSDP)">⟳</button>
             </div>
             {sonyMncDevices.length > 0 && (
               <select
@@ -446,7 +446,7 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices,
         <span className={`status-dot status-dot--${wsStatus === 'connected' ? 'ok' : 'err'}`} />
         <span>Bridge: {wsStatus}</span>
         <span className={`status-dot status-dot--${cameraConnected ? 'ok' : 'err'} ml-16`} />
-        <span>Kamera: {cameraConnected ? 'Verbunden' : 'Offline'}</span>
+        <span>Camera: {cameraConnected ? 'Connected' : 'Offline'}</span>
         {mode === 'serial' && serialPath && (
           <span className="ml-16" style={{ color: 'var(--text-muted)' }}>({serialPath})</span>
         )}

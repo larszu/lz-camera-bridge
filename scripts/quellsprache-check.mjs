@@ -62,6 +62,11 @@ const DEUTSCH = [
   'dieses', 'nach', 'bei', 'über', 'ueber', 'ohne', 'durch', 'gegen', 'sowie',
   'damit', 'wieder', 'immer', 'jede', 'jeder', 'jedes', 'alle', 'allen',
   'wählen', 'wähle', 'möchtest', 'einrichten', 'Gerät', 'Geräte', 'Kamera',
+  // Nachgetragen 2026-09-15: genau die Woerter, die in der Oberflaeche
+  // standen, waehrend dieser Lauf gruen meldete. Sie sind keine Vorsorge,
+  // sondern Befunde — jedes davon hat hier gestanden.
+  'Kameras', 'Einzelansicht', 'Ansicht', 'Verbunden', 'Kamera-Plan',
+  'scannen', 'Netzwerk', 'geplante',
 ]
 
 /**
@@ -137,7 +142,42 @@ const ohneKommentare = (quelle) =>
     .filter((z) => !z.trim().startsWith('//'))
     .join('\n')
 
-const istText = (s) => /\s/.test(s) && !/^[\w./@-]+$/.test(s)
+/**
+ * Ist dieses Literal ueberhaupt Text?
+ *
+ * Bis zum 2026-09-15 stand hier `/\s/.test(s)` — ein Literal MUSSTE ein
+ * Leerzeichen haben. Gegengeprobt hat das `'Verbunden'` verschluckt, das in
+ * einem Ternaer mitten in der Oberflaeche stand. Ein einzelnes Wort ist kein
+ * Bezeichner, nur weil es allein steht.
+ *
+ * Die Unterscheidung laeuft jetzt ueber `bezeichner`: was kein Leerzeichen
+ * hat UND `_`, `/` oder `@` traegt, ist ein Pfad oder ein Schluessel; was
+ * `--` traegt, ist ein Klassenname. Alles andere geht an `klassifiziere`,
+ * und DIE entscheidet — sie meldet nur bei einem Sprachmerkmal. `'sony-tcp'`
+ * kommt damit durch und faellt dort still heraus, weil es keines hat.
+ */
+const bezeichner = (s) => /--/.test(s) || (!/\s/.test(s) && /[_/@]/.test(s))
+
+const istText = (s) => /\p{L}{3}/u.test(s) && !bezeichner(s)
+
+/**
+ * Dasselbe fuer JSX-TEXT — nur ohne die Leerzeichen-Bedingung.
+ *
+ * `istText` verlangt ein Leerzeichen, weil ein Literal ohne eines meist ein
+ * Bezeichner ist (`btn--sm`, `sony-tcp`). Zwischen zwei Tags gilt das NICHT:
+ * dort ist ein einzelnes Wort eine Beschriftung, und zwar oft die wichtigste
+ * auf der Seite. Gemessen standen hier `Einzelansicht`, `Kameras` und
+ * `Kamera-Plan` als vollstaendiger Inhalt eines Elements — drei deutsche
+ * Beschriftungen in einer Oberflaeche, die einsprachig englisch sein soll,
+ * und alle drei fielen durch diese eine Bedingung.
+ *
+ * Beide teilen sich `bezeichner`. Der alte Test `!/^[\w./@-]+$/` hat genau
+ * die drei Befunde verschluckt, um derentwillen diese Funktion entstand:
+ * `Kameras` ist `^[\w]+$`, sieht fuer ihn also aus wie ein Bezeichner.
+ * Gegengeprobt am 2026-09-15 mit dreizehn wieder eingebauten deutschen
+ * Zeilen — mit der alten Bedingung rutschten drei durch, mit dieser keine.
+ */
+const istJsxText = (s) => /\p{L}{3}/u.test(s) && !bezeichner(s)
 
 /**
  * TEXT ZWISCHEN DEN TAGS — und warum das hier stehen MUSS.
@@ -162,6 +202,41 @@ const istText = (s) => /\s/.test(s) && !/^[\w./@-]+$/.test(s)
  * heraus, ohne dass eine Ausnahmeliste sie einzeln nennen muesste.
  */
 const jsxTextMuster = () => />([^<>{}]{4,300})</g
+
+/**
+ * JSX-TEXT MIT EINGEBETTETEM AUSDRUCK — der Bereich, in dem die Zeilen
+ * stehen, die dieser Lauf bis zum 2026-09-15 NICHT sah.
+ *
+ * `jsxTextMuster` schliesst `{` und `}` aus. Das war richtig gedacht — ein
+ * eingebetteter Ausdruck ist Code und kein Text — und im Ergebnis falsch:
+ * die Klammer schliesst nicht den Ausdruck aus, sondern DIE GANZE ZEILE, in
+ * der er steht. Gemessen standen in dieser Oberflaeche vier solche Zeilen,
+ * alle deutsch, alle sichtbar, alle gruen gemeldet:
+ *
+ *   <span>Kamera: {cameraConnected ? 'Verbunden' : 'Offline'}</span>
+ *   <span className="plan__slot">Kamera {m.cameraNumber}</span>
+ *   Ohne geplante Kamera am Bus: {…map((n) => `Kamera ${n}`)…}
+ *   Multiview · {nums.length} Kamera{nums.length === 1 ? '' : 's'}
+ *
+ * Und das ist kein Zufall: eine Beschriftung mit einer Zahl darin ist genau
+ * die, die jemand aus Stuecken zusammensetzt — also die mit dem hoechsten
+ * Risiko, dass Wortstellung und Mehrzahl einer Sprache verlorengehen. Die
+ * letzte oben haengte an das deutsche Wort „Kamera" eine ENGLISCHE
+ * Pluralregel.
+ *
+ * Gemessen wird der Text OHNE die Ausdruecke: `{…}` faellt heraus, der Rest
+ * bleibt. Der Ausdruck darf dabei EINE Ebene tief verschachteln und `>`
+ * enthalten — beides ist noetig und beides war im ersten Anlauf nicht drin:
+ * `{…map((n) => \`Kamera \${n}\`)…}` traegt einen Pfeil (also ein `>`, das
+ * das Muster sonst fuer das naechste Tag haelt) und ein `\${…}` in einem
+ * Vorlagen-Literal (also eine zweite Klammerebene). Genau diese Zeile
+ * rutschte in der Gegenprobe durch.
+ *
+ * ZWEI Ebenen deckt es nicht ab, und das ist die Grenze dieses Musters, kein
+ * Versehen: regulaere Ausdruecke koennen beliebige Verschachtelung nicht.
+ */
+const AUSDRUCK = '\\{(?:[^{}]|\\{[^{}]*\\})*\\}'
+const jsxTextMitAusdruckMuster = () => new RegExp(`>((?:[^<>]|${AUSDRUCK})*?)<`, 'g')
 
 const dateien = (dir, out = []) => {
   for (const name of readdirSync(dir)) {
@@ -209,11 +284,21 @@ for (const datei of dateien(UI)) {
     }
   }
 
-  for (const m of quelle.matchAll(jsxTextMuster())) {
-    const text = m[1].replace(/\s+/g, ' ').trim()
-    if (!istText(text)) continue
-    if (klassifiziere(text) !== erklaert && klassifiziere(text) !== null) {
-      fremdsprachig.push(`${rel}: ${text.slice(0, 90)}`)
+  // Beide JSX-Muster in EINEN Topf: das zweite findet alles, was das erste
+  // findet, plus die Zeilen mit eingebettetem Ausdruck. Ohne `gesehen` stuende
+  // jede Zeile ohne Ausdruck zweimal im Bericht — und eine Grenze, die
+  // doppelt zaehlt, ist keine.
+  const gesehen = new Set()
+  for (const muster of [jsxTextMuster(), jsxTextMitAusdruckMuster()]) {
+    for (const m of quelle.matchAll(muster)) {
+      // Die Ausdruecke raus, der Text bleibt: `Kamera {n}` wird zu `Kamera`.
+      const text = m[1].replace(/\{[^{}]*\}/g, ' ').replace(/\s+/g, ' ').trim()
+      if (!istJsxText(text)) continue
+      if (gesehen.has(text)) continue
+      gesehen.add(text)
+      if (klassifiziere(text) !== erklaert && klassifiziere(text) !== null) {
+        fremdsprachig.push(`${rel}: ${text.slice(0, 90)}`)
+      }
     }
   }
 

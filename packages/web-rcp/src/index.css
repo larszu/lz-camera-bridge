@@ -33,6 +33,57 @@
   --signal: #D6402E;
   /* Keine Rundungen (Guide S. 10). Der Name bleibt fuer die Aufrufer. */
   --radius: 0;
+
+  /* Die Mindesthoehe eines Bedienpunkts — dieselbe Zahl wie in den fuenf
+     Planern der Suite (B-77). WCAG 2.2 SC 2.5.8 setzt den Boden bei 24 px,
+     SC 2.5.5 empfiehlt 44; 32 liegt dazwischen und auf dem 8-px-Raster aus
+     ADR-007. Diese Oberflaeche wird im Regieraum auf einem Tablet bedient,
+     nicht mit der Maus am Schreibtisch. */
+  --ziel: 32px;
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   JEDER BEDIENPUNKT TRAEGT EINEN FINGER (B-77).
+
+   GEMESSEN am 2026-09-15 mit der Sonde aus der Suite (`bedienbar:check`),
+   die diese Oberflaeche zum ersten Mal ueberhaupt angesehen hat: der
+   Ansichts-Umschalter im Kopf war 25 px hoch („Single view" 106x25,
+   „Multiview" 81x25), „+ Camera" 29 px. In allen drei Breiten, also nicht
+   ein Umbruch-Unfall, sondern die Regel.
+
+   Warum das hier und nicht in den Knopf-Regeln steht: `padding` allein
+   entscheidet die Hoehe nicht — die Schriftgroesse tut es mit. `.rcp-btn`
+   setzt `font-size: 10px`, und 6 px Polsterung oben und unten ergeben
+   darueber 25 px. Ein `min-height` ist die einzige Angabe, die die Hoehe
+   ZUSICHERT, statt sie sich ergeben zu lassen.
+
+   Schieberegler, Kaestchen und Radioknoepfe sind ausgenommen: sie sind
+   flach gebaut und werden ueber ihren Griff bedient (`slider:check` misst
+   sie getrennt). */
+button, select, textarea, summary, [role='button'],
+input:not([type='checkbox']):not([type='radio']):not([type='range']) {
+  min-height: var(--ziel);
+}
+button, summary, [role='button'] {
+  min-width: var(--ziel);
+}
+
+/* AUSGENOMMEN: die beiden Instrumenten-Nachbauten.
+
+   `.rcp-panel` ist die Sony-Steuersoftware, `.ptz-panel` die AW-RP150. Der
+   Kopf dieser Datei sagt, warum sie nicht nach Marke aussehen: wer das
+   Geraet kennt, findet den Knopf blind, und ihre Dichte ist Teil dieser
+   Wiedererkennung. Ein 32-px-Boden wuerde ihr Raster auseinanderziehen.
+
+   NICHT GEMESSEN, und das ist der ehrliche Teil: ob ihre Knoepfe einen
+   Finger tragen. Die Sonde sieht sie nicht, weil sie ohne eingerichtete
+   Kamera gar nicht erscheinen — sie misst den Leerzustand. Diese Ausnahme
+   ist also eine ENTSCHEIDUNG (Nachbau schlaegt Raster) und keine Messung.
+   Wer sie umdreht, braucht zuerst einen Lauf, der eine Kamera anlegt. */
+.rcp-panel button, .rcp-panel select, .rcp-panel input,
+.ptz-panel button, .ptz-panel select, .ptz-panel input {
+  min-height: 0;
+  min-width: 0;
 }
 
 body {

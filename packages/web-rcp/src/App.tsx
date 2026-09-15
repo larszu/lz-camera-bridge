@@ -111,7 +111,7 @@ export default function App() {
         <span className={`app__ws status-dot status-dot--${status === 'connected' ? 'ok' : 'err'}`} title={`Bridge: ${status}`} />
         <div className="app__viewtabs">
           <button className={`rcp-btn rcp-btn--sm ${viewMode === 'single' ? 'rcp-btn--primary' : 'rcp-btn--secondary'}`} onClick={() => setViewMode('single')}>
-            Einzelansicht
+            Single view
           </button>
           <button className={`rcp-btn rcp-btn--sm ${viewMode === 'multi' ? 'rcp-btn--primary' : 'rcp-btn--secondary'}`} onClick={() => setViewMode('multi')}>
             Multiview
@@ -145,7 +145,7 @@ export default function App() {
           {/* Camera list — every configured camera, live status */}
           <div className="panel camera-list">
             <div className="camera-list__head">
-              <span className="panel__title">Kameras</span>
+              <span className="panel__title">Cameras</span>
               <button className="btn btn--sm btn--primary" onClick={addCamera}>+ Camera</button>
             </div>
             {camNumbers.length === 0 && (

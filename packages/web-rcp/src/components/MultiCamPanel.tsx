@@ -36,7 +36,16 @@ export function MultiCamPanel(p: Props) {
   return (
     <div className="multicam">
       <div className="multicam__bar">
-        <span className="multicam__title">Multiview · {nums.length} Kamera{nums.length === 1 ? '' : 's'}</span>
+        {/* EIN Satz, nicht drei Stuecke. Hier stand
+            `{n} Kamera{n === 1 ? '' : 's'}` — ein deutsches Wort mit einer
+            ENGLISCHEN Pluralregel, zusammengesetzt aus drei Teilen. Die
+            Wortstellung und die Mehrzahl gehoeren zur Sprache: im Deutschen
+            hiesse es „Kameras", im Polnischen haengt die Form von der Zahl
+            ab, und keine dieser Regeln laesst sich aus Stuecken bauen. Der
+            ganze Satz steht deshalb hier als ganzer Satz. */}
+        <span className="multicam__title">
+          Multiview · {nums.length === 1 ? '1 camera' : `${nums.length} cameras`}
+        </span>
         <button className="btn btn--sm btn--primary" onClick={p.onAddCamera}>+ Camera</button>
       </div>
 

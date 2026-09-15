@@ -212,7 +212,7 @@ function StepWelcome() {
 /* ── Step 1: Camera Type ─────────────────────────────────────────────── */
 function StepCameraType({ value, onChange }: { value: CameraType; onChange: (v: CameraType) => void }) {
   const options: { id: CameraType; label: string; sub: string; badge?: string }[] = [
-    { id: 'sony-tcp', label: 'Sony CCU – TCP / Netzwerk', sub: 'WIZ108SR adapter or a direct network connection (700PTP)', badge: 'recommended' },
+    { id: 'sony-tcp', label: 'Sony CCU – TCP / network', sub: 'WIZ108SR adapter or a direct network connection (700PTP)', badge: 'recommended' },
     { id: 'sony-serial', label: 'Sony CCU – RS-422 Seriell', sub: 'Direct 8-pin RS-422 connection via COM port' },
     { id: 'sony-usb', label: 'Sony Alpha / Cinema – USB', sub: 'FX3, FX6, FX9, A7 IV, A7S III, A1 … via PTP (no SDK needed)' },
     { id: 'sony-mnc', label: 'Sony – WiFi (Monitor & Control)', sub: 'FX3/FX6/FX9 in streaming mode over Wi-Fi/LAN' },

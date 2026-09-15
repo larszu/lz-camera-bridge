@@ -41,7 +41,7 @@ export function CameraPlanPanel({ planMatch, onMatch, onApply }: Props) {
   return (
     <div className="plan">
       <div className="plan__bar">
-        <span className="plan__title">Kamera-Plan</span>
+        <span className="plan__title">Camera plan</span>
         <input
           type="file"
           accept="application/json,.json"
@@ -77,7 +77,7 @@ export function CameraPlanPanel({ planMatch, onMatch, onApply }: Props) {
             <ul className="plan__list">
               {zugeordnet.map((m) => (
                 <li key={m.planCameraId}>
-                  <span className="plan__slot">Kamera {m.cameraNumber}</span>
+                  <span className="plan__slot">Camera {m.cameraNumber}</span>
                   <span className="plan__label">{m.label}</span>
                   {m.matchedBy && (
                     <span className={`plan__badge ${BELEG[m.matchedBy].klasse}`}>{BELEG[m.matchedBy].text}</span>
@@ -100,7 +100,7 @@ export function CameraPlanPanel({ planMatch, onMatch, onApply }: Props) {
             </ul>
             {planMatch.unmatchedSlots.length > 0 && (
               <p className="plan__hint">
-                Ohne geplante Kamera am Bus: {planMatch.unmatchedSlots.map((n) => `Kamera ${n}`).join(', ')}
+                No planned camera on the bus: {planMatch.unmatchedSlots.map((n) => `Camera ${n}`).join(', ')}
               </p>
             )}
           </div>
