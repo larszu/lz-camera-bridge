@@ -16,7 +16,7 @@ export function WiznetPanel({ devices, onDiscover, onConfigure, onSelectDevice }
     <div className="panel panel--wiznet">
       <div className="panel__header">
         <h2 className="panel__title">WIZ108SR Adapter</h2>
-        <button className="btn btn--sm" onClick={onDiscover} title="Netzwerk scannen">
+        <button className="btn btn--sm" onClick={onDiscover} title="Scan network">
           Scan
         </button>
       </div>
