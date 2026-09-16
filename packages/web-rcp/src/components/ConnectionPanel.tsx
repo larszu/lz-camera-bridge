@@ -59,11 +59,13 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices,
   const [viscaSerialPath, setViscaSerialPath] = useState(config.viscaSerialPath ?? '');
   const [viscaBaudRate, setViscaBaudRate] = useState(String(config.viscaBaudRate ?? 9600));
   const [viscaAddress, setViscaAddress] = useState(String(config.viscaAddress ?? 1));
+  const [djiPath, setDjiPath] = useState(config.djiPath ?? '');
+  const [djiBaudRate, setDjiBaudRate] = useState(String(config.djiBaudRate ?? 115200));
 
   const genericMeta = GENERIC_MODES.find((g) => g.id === mode);
 
   useEffect(() => {
-    if (mode === 'serial' || mode === 'visca-serial') onListPorts();
+    if (mode === 'serial' || mode === 'visca-serial' || mode === 'dji-osmo' || mode === 'dji-ronin') onListPorts();
     if (mode === 'sony-usb') onDiscoverSonyUsb();
     if (mode === 'sony-mnc') onDiscoverSonyMnc();
   }, [mode, onListPorts, onDiscoverSonyUsb, onDiscoverSonyMnc]);
@@ -77,6 +79,8 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices,
     if (config.viscaSerialPath) setViscaSerialPath(config.viscaSerialPath);
     if (config.viscaBaudRate) setViscaBaudRate(String(config.viscaBaudRate));
     if (config.viscaAddress !== undefined) setViscaAddress(String(config.viscaAddress));
+    if (config.djiPath) setDjiPath(config.djiPath);
+    if (config.djiBaudRate) setDjiBaudRate(String(config.djiBaudRate));
     if (config.ccuId !== undefined) setCcuId(String(config.ccuId));
     if (config.lumixHost) setLumixHost(config.lumixHost);
     if (config.lumixPort) setLumixPort(String(config.lumixPort));
@@ -132,6 +136,9 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices,
       // Adresse. Ohne diesen Zweig fiele er in den `else` unten und bekaeme
       // einen seriellen Port zugewiesen, den es nicht gibt.
       cfg.ccuId = Number(ccuId);
+    } else if (mode === 'dji-osmo' || mode === 'dji-ronin') {
+      cfg.djiPath = djiPath;
+      cfg.djiBaudRate = Number(djiBaudRate);
     } else if (mode === 'visca-serial') {
       cfg.viscaSerialPath = viscaSerialPath;
       cfg.viscaBaudRate = Number(viscaBaudRate);
@@ -169,6 +176,12 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices,
         </button>
         <button className={`mode-tab ${mode === 'visca-serial' ? 'mode-tab--active' : ''}`} onClick={() => setMode('visca-serial')}>
           VISCA RS-232
+        </button>
+        <button className={`mode-tab ${mode === 'dji-ronin' ? 'mode-tab--active' : ''}`} onClick={() => setMode('dji-ronin')}>
+          DJI Ronin (gimbal)
+        </button>
+        <button className={`mode-tab ${mode === 'dji-osmo' ? 'mode-tab--active' : ''}`} onClick={() => setMode('dji-osmo')}>
+          DJI Osmo Pocket (gimbal)
         </button>
         <button className={`mode-tab ${mode === 'sony-usb' ? 'mode-tab--active' : ''}`} onClick={() => setMode('sony-usb')}>
           Sony USB (FX3/FX6/A7)
@@ -287,6 +300,45 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices,
             the same as the 8-pin RS-422 tab &ndash; that is Sony&rsquo;s 9-pin
             protocol on a different cable.
           </p>
+        </div>
+      )}
+
+      {(mode === 'dji-osmo' || mode === 'dji-ronin') && (
+        <div className="connection-row">
+          <div className="field">
+            <label>{mode === 'dji-ronin' ? 'SLCAN adapter' : 'Serial device'}</label>
+            <div className="serial-port-row">
+              <select value={djiPath} onChange={(e) => setDjiPath(e.target.value)} className="select-group__select">
+                <option value="">Select port</option>
+                {ports.map((p) => (<option key={p} value={p}>{p}</option>))}
+              </select>
+              <button className="btn btn--sm" onClick={onListPorts} title="Reload ports">R</button>
+            </div>
+          </div>
+          <div className="field field--sm">
+            <label>Baud Rate</label>
+            <select value={djiBaudRate} onChange={(e) => setDjiBaudRate(e.target.value)} className="select-group__select">
+              <option value="115200">115200</option>
+              <option value="921600">921600</option>
+            </select>
+          </div>
+          {mode === 'dji-ronin' ? (
+            <p className="field-hint">
+              DJI R SDK over CAN, reached through a USB SLCAN adapter (CANable,
+              USBtin, Lawicel) on the gimbal&rsquo;s focus-wheel port.
+              <strong> RS 2 and RS 3 Pro only</strong> &ndash; RS 3 and RSC 2 look
+              the same and do not speak the SDK. Pan/tilt and go-to-angle only:
+              a gimbal carries a camera, it is not one.
+            </p>
+          ) : (
+            <p className="field-hint">
+              DUML over a serial (CDC) device. <strong>Note:</strong> DJI publishes
+              no control interface for the Pocket series, and its USB-C port serves
+              storage and UVC webcam &ndash; the documented control path is
+              Bluetooth LE. Use this tab only if the camera (or an adapter) exposes
+              a serial device. See docs/dji-gimbal.md.
+            </p>
+          )}
         </div>
       )}
 

@@ -144,6 +144,11 @@ export const MODE_READBACK: Readonly<Record<ConnectionMode, readonly PaintField[
   // kein Feld des Bildzustands abgebildet — also liest auch dieser Weg
   // nichts zurueck.
   'visca-serial': [],
+  // Gimbals melden Telemetrie (Lage des Kopfes), aber KEIN Feld des
+  // Bildzustands -- Blende und Gain gehoeren der Kamera darauf. Also liest
+  // dieser Weg nichts von dem zurueck, was das Pult anzeigt.
+  'dji-osmo': [],
+  'dji-ronin': [],
   // `JvcClient` pollt zwar (`GetCamStatusMinimum` alle 3 s), bildet die
   // Antwort aber auf kein Feld des Bildzustands ab. Die beiden
   // `stateChanged` stehen in `handleRcpCommand`.
@@ -300,6 +305,8 @@ export const MODE_CADENCE: Readonly<Record<ConnectionMode, ConfirmCadence>> = {
   'panasonic-ptz': { kind: 'none' },
   visca: { kind: 'none' },
   'visca-serial': { kind: 'none' },
+  'dji-osmo': { kind: 'none' },
+  'dji-ronin': { kind: 'none' },
   jvc: { kind: 'none' },
   birddog: { kind: 'none' },
 }
