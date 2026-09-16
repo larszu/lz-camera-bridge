@@ -22,6 +22,18 @@ import { EventEmitter } from 'events';
 import dgram from 'dgram';
 import { CameraState } from '../protocol/CcuClient.js';
 import { GenericCameraClient } from './GenericCameraClient.js';
+import { ViscaSerialTransport, buildIfClearBroadcast, viscaKopf } from '../transport/ViscaSerialTransport.js';
+
+/**
+ * Wie dieser Client auf dem Draht liegt.
+ *
+ * Der Befehlssatz darunter ist DERSELBE -- siehe ViscaSerialTransport.ts.
+ * Getrennt ist nur die Huelle: auf IP optional Sonys 8-Byte-Kopf mit
+ * Sequenzzaehler, auf RS-232 das nackte Paket.
+ */
+export type ViscaLink =
+  | { art: 'ip'; host: string; port: number; sonyHeader?: boolean }
+  | { art: 'seriell'; path: string; baudRate?: number; adresse?: number };
 
 /** Split a byte into two VISCA nibble bytes (0x0H, 0x0L). */
 function nibbles(value: number): [number, number] {
@@ -57,13 +69,36 @@ export class ViscaClient extends EventEmitter implements GenericCameraClient {
   private socket: dgram.Socket | null = null;
   private connected = false;
   private _state: CameraState = {};
+  /** Nur im seriellen Betrieb gesetzt. */
+  private seriell: ViscaSerialTransport | null = null;
+  private readonly link: ViscaLink;
+  /**
+   * Erstes Byte jedes Kommandos. Auf IP praktisch immer 0x81 (Adresse 1),
+   * am Kabel die konfigurierte Adresse der Kette -- deshalb hier gemerkt
+   * und nicht in jedem Kommando fest hingeschrieben.
+   */
+  private readonly kopf: number;
 
-  constructor(host: string, port = 1259, sonyHeader?: boolean) {
+  constructor(host: string, port?: number, sonyHeader?: boolean);
+  constructor(link: ViscaLink);
+  constructor(hostOrLink: string | ViscaLink, port = 1259, sonyHeader?: boolean) {
     super();
-    this.host = host;
-    this.port = port;
-    // Sony BRC/SRG use port 52381 with the transport header; raw otherwise.
-    this.sonyHeader = sonyHeader ?? port === SONY_VISCA_PORT;
+    this.link = typeof hostOrLink === 'string'
+      ? { art: 'ip', host: hostOrLink, port, sonyHeader }
+      : hostOrLink;
+
+    if (this.link.art === 'seriell') {
+      this.host = this.link.path;
+      this.port = 0;
+      this.sonyHeader = false;
+      this.kopf = viscaKopf(this.link.adresse ?? 1);
+    } else {
+      this.host = this.link.host;
+      this.port = this.link.port;
+      // Sony BRC/SRG use port 52381 with the transport header; raw otherwise.
+      this.sonyHeader = this.link.sonyHeader ?? this.link.port === SONY_VISCA_PORT;
+      this.kopf = 0x81;
+    }
   }
 
   get isConnected(): boolean {
@@ -71,6 +106,19 @@ export class ViscaClient extends EventEmitter implements GenericCameraClient {
   }
 
   async connect(): Promise<unknown> {
+    if (this.link.art === 'seriell') {
+      this.seriell = new ViscaSerialTransport({ path: this.link.path, baudRate: this.link.baudRate });
+      this.seriell.on('error', (err) => this.emit('error', err));
+      this.seriell.on('paket', (paket: Buffer) => this.emit('visca', paket));
+      await this.seriell.open();
+      // Haengende Kommandos in der ganzen Kette abraeumen, bevor eigene
+      // kommen -- eine Kamera, die noch auf eine alte Antwort wartet, nimmt
+      // sonst nichts Neues an.
+      await this.seriell.write(buildIfClearBroadcast()).catch(() => {});
+      this.connected = true;
+      this.emit('connected', { path: this.link.path, baudRate: this.link.baudRate ?? 9600, variant: 'seriell' });
+      return { path: this.link.path };
+    }
     this.socket = dgram.createSocket('udp4');
     this.socket.on('error', (err) => this.emit('error', err));
     if (this.sonyHeader) {
@@ -87,6 +135,10 @@ export class ViscaClient extends EventEmitter implements GenericCameraClient {
 
   disconnect(): void {
     this.connected = false;
+    if (this.seriell) {
+      this.seriell.close();
+      this.seriell = null;
+    }
     try {
       this.socket?.close();
     } catch {
@@ -97,6 +149,10 @@ export class ViscaClient extends EventEmitter implements GenericCameraClient {
   }
 
   private sendRaw(buf: Buffer): Promise<void> {
+    if (this.link.art === 'seriell') {
+      if (!this.seriell) return Promise.reject(new Error('Serieller VISCA-Port ist nicht offen'));
+      return this.seriell.write(buf);
+    }
     return new Promise((resolve, reject) => {
       if (!this.socket) return reject(new Error('VISCA socket not open'));
       this.socket.send(buf, this.port, this.host, (err) => (err ? reject(err) : resolve()));
@@ -104,7 +160,14 @@ export class ViscaClient extends EventEmitter implements GenericCameraClient {
   }
 
   private send(bytes: number[], payloadType = SONY_PAYLOAD_COMMAND): Promise<void> {
-    const payload = Buffer.from(bytes);
+    // Die Kommandos unten sind mit 0x81 (Adresse 1) geschrieben. Am Kabel
+    // kann die Kamera eine andere Adresse haben; hier wird sie eingesetzt,
+    // damit die Kodierung NUR EINMAL existiert und nicht je Adresse kopiert
+    // werden muss. 0x88 ist Rundruf und bleibt unangetastet.
+    const adressiert = bytes.length > 0 && (bytes[0] & 0xf0) === 0x80 && bytes[0] !== 0x88
+      ? [this.kopf, ...bytes.slice(1)]
+      : bytes;
+    const payload = Buffer.from(adressiert);
     if (!this.sonyHeader) return this.sendRaw(payload);
     const packet = wrapSonyVisca(payload, this.sequence, payloadType);
     this.sequence = (this.sequence + 1) >>> 0;

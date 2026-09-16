@@ -138,6 +138,12 @@ export const MODE_READBACK: Readonly<Record<ConnectionMode, readonly PaintField[
   'panasonic-ptz': [],
   // `ViscaClient`: `setIris`, `setMasterGain`, `setCameraPower` — dito.
   visca: [],
+  // Derselbe `ViscaClient`, nur am Kabel statt auf IP: dieselben Kommandos,
+  // dieselben `stateChanged` aus `handleRcpCommand`. Antworten der Kamera
+  // (ACK/Completion) werden als `visca`-Ereignis durchgereicht, aber auf
+  // kein Feld des Bildzustands abgebildet — also liest auch dieser Weg
+  // nichts zurueck.
+  'visca-serial': [],
   // `JvcClient` pollt zwar (`GetCamStatusMinimum` alle 3 s), bildet die
   // Antwort aber auf kein Feld des Bildzustands ab. Die beiden
   // `stateChanged` stehen in `handleRcpCommand`.
@@ -293,6 +299,7 @@ export const MODE_CADENCE: Readonly<Record<ConnectionMode, ConfirmCadence>> = {
   zcam: { kind: 'none' },
   'panasonic-ptz': { kind: 'none' },
   visca: { kind: 'none' },
+  'visca-serial': { kind: 'none' },
   jvc: { kind: 'none' },
   birddog: { kind: 'none' },
 }
