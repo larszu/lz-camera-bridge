@@ -1,4 +1,4 @@
-# Camera Bridge
+# LZ Camera Bridge
 
 A universal camera-control hub. One software interface — a broadcast-style
 **RCP** (paint controls) and a touch **PTZ panel** modelled on the Panasonic
@@ -6,13 +6,46 @@ AW‑RP150 — plus a normalizing **command bus** that drives cameras from many
 vendors over their native protocols. The same commands also reach every camera
 from a Bitfocus **Companion** surface or a USB **control panel**.
 
-![Camera Bridge – Web-Oberfläche mit dem Einrichtungs-Assistenten](docs/screenshot.png)
+![LZ Camera Bridge – Web-Oberfläche mit dem Einrichtungs-Assistenten](docs/screenshot.png)
+
+> **Name vs. repository slug.** The product is **LZ Camera Bridge**; the
+> repository is still `larszu/sony-camera-bridge`, and that mismatch is
+> deliberate (decided 2026-09-16), not an oversight someone forgot to clean up.
+> Renaming a repository moves the Pages address and every clone URL, so it is
+> a separate decision from renaming the product. Everything that *is* the
+> product carries the new name — window title, installer, executable, app id,
+> package names, Companion module id. Everything that is a **coordinate** —
+> GitHub URLs, the Pages address, `BRIDGE_SOURCE.repo` in the multicam-planner
+> — still says `sony-camera-bridge`, because that is where the files actually
+> live. Do not "tidy" one side into the other: a coordinate that points
+> nowhere is worse than an inconsistent name.
 
 > **Status:** the bridge, protocols and UI are real and build clean; a
 > committed unit-test suite covers the protocol framing. Where a family was
 > verified against public docs or an official reference it is marked
 > **verified** below. Items marked *tuning* need a first on-camera test to
 > confirm value encodings. Nothing ships as a fake/demo device.
+
+## Download
+
+**One installation is the whole tool.** The installer for Windows and macOS
+carries the control surface *and* the bridge; the bridge starts with the
+application, on `ws://localhost:9700`, and stops with it.
+
+**https://github.com/larszu/sony-camera-bridge/releases**
+
+That was not always true, and the difference matters if you read an older note:
+until 2026-09-16 the installer shipped the panel alone. It came up looking
+complete and reconnected every three seconds against a bridge that nobody had
+started — you were expected to run a second process out of a clone of this repo,
+and nothing in the application said so. Now the panel finds its bridge because
+the application brought it.
+
+A separate bridge is still perfectly legal, and for a control room it is the
+normal case: run the bridge where the cameras are and point tablets at it (see
+*Other devices on the same network*). If port 9700 is already taken the
+application says so and uses the bridge that is already running, instead of
+failing silently.
 
 ## The web page
 
@@ -26,11 +59,14 @@ Pages site it still builds — that is a real check — and skips only the
 publishing step, with a warning and the one missing step in the run summary.
 A run that must stay red for a click nobody made teaches people to ignore red.
 
-Measured 2026-09-09: **built, not published.** The build runs and passes; the
-`deploy` job is skipped because this repo has no Pages site yet. That switch is
-the one thing no workflow can flip (`GITHUB_TOKEN` may not create a site):
-Settings → Pages → Source → **GitHub Actions**. After that the next push
-publishes by itself — nothing in this repo needs changing.
+Measured 2026-09-16: **published.** The Pages site exists, and the `deploy` job
+now runs through — the switch that no workflow can flip (`GITHUB_TOKEN` may not
+create a site) has been thrown. Every push to `master` publishes by itself.
+
+What the page carries is the README and `docs/`, rendered — **not the UI
+itself.** That is deliberate and not an omission: `web-rcp` is a client that
+needs the bridge, and on a Pages address it would look like the application
+while operating no camera. The running program comes from the installer below.
 
 ---
 ## Supported cameras
@@ -48,10 +84,25 @@ publishes by itself — nothing in this repo needs changing.
 | VISCA over IP (PTZOptics, Marshall, AVer, Sony BRC/SRG) | `visca` | UDP :1259 (raw) / :52381 (Sony header) | **verified** |
 | JVC ConnectedCam / KY‑PZ | `jvc` | Digest login + `/cgi-bin/api.cgi` | verified vocabulary (some steps *tuning*) |
 | BirdDog NDI PTZ | `birddog` | VISCA :52381 + REST :8080 | verified endpoints (*tuning*) |
+| VISCA on a serial line (same heads, RS‑232/422 wiring) | `visca-serial` | RS‑232 8N1, 9600 default, daisy‑chain address 1–7 | framing unit‑tested; *not yet on a camera* |
+| DJI Ronin RS 2 / RS 3 Pro | `dji-ronin` | DJI R SDK over CAN 1 Mbit/s via USB SLCAN adapter | framing unit‑tested; *not yet on a gimbal*² |
+| DJI Osmo Pocket 3 / 4 | `dji-osmo` | DUML over a serial (CDC) device | framing unit‑tested; *not yet on a gimbal*³ |
 
 ¹ Sony's 700 protocol is NDA-only; no public source documents the auto‑setup
 command codes, so those buttons stay disabled rather than guessing at a
 broadcast CCU. See `packages/web-rcp/src/capabilities.ts`.
+
+² **RS 2 and RS 3 Pro only.** RS 3 and RSC 2 look the same and do not speak the
+SDK. Needs a USB SLCAN adapter (CANable, USBtin, Lawicel) on the focus‑wheel
+port — not SocketCAN, which is Linux‑only.
+
+³ DJI publishes no control interface for the Pocket series, and its USB‑C port
+serves storage and UVC webcam — **there is no USB control path.** The one
+publicly reverse‑engineered route is Bluetooth LE; what ships here is DUML over
+a serial device, and the BLE seam is prepared but not filled. Both gimbals move
+the head only: a gimbal carries a camera, it is not one, so paint controls stay
+greyed out. The full picture, including which constants to turn first if a
+device stays silent, is in [`docs/dji-gimbal.md`](docs/dji-gimbal.md).
 
 ## Control surfaces
 
@@ -115,8 +166,8 @@ human — and where there is none, there is no match. See
 |---|---|
 | `packages/bridge` | Node/TypeScript bridge server, camera clients, protocols, HID input |
 | `packages/web-rcp` | React UI (RCP + PTZ panel, connection wizard) |
-| `packages/companion-module-sony-camera-bridge` | Bitfocus Companion module |
-| `packages/electron-app` | Desktop wrapper around the web UI |
+| `packages/companion-module-lz-camera-bridge` | Bitfocus Companion module |
+| `packages/electron-app` | Desktop application: the web UI **and** the bridge, bundled into one installer |
 | `packages/firmware` | WIZ108SR serial↔TCP bridge firmware (C) |
 
 **Source language:** `en`. New user-facing text goes in English. That is not a
@@ -204,6 +255,12 @@ cameras open the joystick panel automatically; paint cameras open the RCP.
 - **Sony FX/Alpha USB:** put the camera in *PC Remote* mode; install the `usb`
   module on the host.
 - **Canon:** activate CCAPI once via Canon's tool, then enter the shown IP/port.
+- **VISCA on a cable:** the *VISCA RS‑232* tab. Most heads ship at 9600 baud,
+  address 1. Not the same as the *8‑Pin RS‑422* tab next to it — that is Sony's
+  9‑pin protocol on a different cable with different framing (odd parity).
+- **DJI gimbals:** the *DJI Ronin* and *DJI Osmo Pocket* tabs move the head
+  only. Read [`docs/dji-gimbal.md`](docs/dji-gimbal.md) first — it says what is
+  proven and what is not, and there is no USB control path for the Pocket.
 
 ## License
 

@@ -8,7 +8,7 @@ const __dirname = path.dirname(__filename)
 const moduleRoot = path.resolve(__dirname, '..')
 const repoRoot = path.resolve(moduleRoot, '..', '..')
 const devRoot = path.join(repoRoot, 'companion-dev')
-const targetRoot = path.join(devRoot, 'companion-module-sony-camera-bridge')
+const targetRoot = path.join(devRoot, 'companion-module-lz-camera-bridge')
 
 fs.mkdirSync(devRoot, { recursive: true })
 fs.mkdirSync(targetRoot, { recursive: true })

@@ -20,10 +20,17 @@ import { ViscaClient } from './ViscaClient.js';
 import { JvcClient } from './JvcClient.js';
 import { BirddogClient } from './BirddogClient.js';
 import { DemoCameraClient } from './DemoCameraClient.js';
+import { DjiOsmoClient } from './DjiOsmoClient.js';
+import { DjiRoninClient } from './DjiRoninClient.js';
 
 export type ConnectionMode =
   | 'tcp' | 'serial' | 'lumix-http' | 'sony-usb' | 'blackmagic' | 'sony-mnc' | 'canon-ccapi'
-  | 'zcam' | 'panasonic-ptz' | 'visca' | 'jvc' | 'birddog'
+  | 'zcam' | 'panasonic-ptz' | 'visca' | 'visca-serial' | 'jvc' | 'birddog'
+  // Gimbals. Sie tragen kein Bild, sie bewegen nur den Kopf -- Blende und
+  // Gain gehoeren der Kamera darauf.
+  // (Kein Semikolon in diesem Block: valueOrigin.test.ts liest die Union
+  // bis zum ersten, und ein Semikolon im Kommentar schnitte sie ab.)
+  | 'dji-osmo' | 'dji-ronin'
   // A camera that is not there. Every other mode needs a real address, so
   // without hardware the panel came up empty and every control was inert —
   // you could not see the RCP work on a laptop. See `DemoCameraClient` for
@@ -42,6 +49,10 @@ export interface CameraConfig {
   mncHost?: string; mncPort?: number;
   canonHost?: string; canonPort?: number;
   camHost?: string; camPort?: number; camUser?: string; camPass?: string;
+  /** VISCA ueber RS-232: Port, Baudrate und Adresse in der Kette (1..7). */
+  viscaSerialPath?: string; viscaBaudRate?: number; viscaAddress?: number;
+  /** DJI-Gimbals: serieller Pfad (Osmo: CDC, Ronin: SLCAN-Stecker). */
+  djiPath?: string; djiBaudRate?: number;
 }
 
 /** One uniform interface every camera backend satisfies. */
@@ -136,6 +147,26 @@ export function makeBackend(cfg: CameraConfig): BuiltBackend {
     case 'canon-ccapi':
       if (!cfg.canonHost) throw new Error('Keine Canon-Kamera-IP konfiguriert');
       return { backend: new CanonCcapiClient({ host: cfg.canonHost, port: cfg.canonPort ?? 8080 }), mapState: identity };
+    case 'dji-osmo': {
+      if (!cfg.djiPath) throw new Error('Kein Geraetepfad fuer den Osmo-Gimbal konfiguriert');
+      return { backend: new DjiOsmoClient(cfg.djiPath, cfg.djiBaudRate ?? 115200), mapState: identity };
+    }
+    case 'dji-ronin': {
+      if (!cfg.djiPath) throw new Error('Kein Pfad zum SLCAN-Stecker konfiguriert');
+      return { backend: new DjiRoninClient(cfg.djiPath, cfg.djiBaudRate ?? 115200), mapState: identity };
+    }
+    case 'visca-serial': {
+      if (!cfg.viscaSerialPath) throw new Error('Kein serieller Port fuer VISCA konfiguriert');
+      return {
+        backend: new ViscaClient({
+          art: 'seriell',
+          path: cfg.viscaSerialPath,
+          baudRate: cfg.viscaBaudRate ?? 9600,
+          adresse: cfg.viscaAddress ?? 1,
+        }),
+        mapState: identity,
+      };
+    }
     case 'zcam': case 'panasonic-ptz': case 'visca': case 'jvc': case 'birddog': {
       const host = cfg.camHost;
       if (!host) throw new Error('Keine Kamera-IP konfiguriert');

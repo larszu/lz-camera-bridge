@@ -102,7 +102,7 @@ export function FirstStartWizard({ onComplete }: Props) {
         <div className="wizard-header">
           <div className="wizard-logo">
             <span className="wizard-logo-icon">◎</span>
-            <span className="wizard-logo-text">Camera Bridge</span>
+            <span className="wizard-logo-text">LZ Camera Bridge</span>
           </div>
           <div className="wizard-steps">
             {STEPS.map((s, i) => (
@@ -173,7 +173,7 @@ function StepWelcome() {
     <div className="wizard-step">
       <h2 className="wizard-step__title">Welcome</h2>
       <p className="wizard-step__desc">
-        <strong>Camera Bridge</strong> is a universal camera hub: one software
+        <strong>LZ Camera Bridge</strong> is a universal camera hub: one software
         surface (RCP + PTZ) and a command bus that drives Sony, Canon, Panasonic,
         Blackmagic, Z CAM, JVC, BirdDog and generic VISCA PTZ across brands —
         plus Bitfocus Companion and USB control panels.

@@ -1,5 +1,5 @@
 {
-  "name": "sony-camera-bridge",
+  "name": "lz-camera-bridge",
   "version": "1.0.0",
   "private": true,
   "description": "Universal camera-control bridge: one software RCP + touch PTZ panel and a normalizing command bus for Sony, Canon, Panasonic, Blackmagic, Z CAM, JVC, BirdDog and generic VISCA PTZ cameras \u2014 with Bitfocus Companion and USB control-panel input.",
@@ -15,8 +15,8 @@
     "bridge": "npm run dev --workspace=packages/bridge",
     "web": "npm run dev --workspace=packages/web-rcp",
     "dev": "npm run bridge & npm run web",
-    "companion-module": "npm run build --workspace=packages/companion-module-sony-camera-bridge",
-    "companion-module:dev": "npm run dev --workspace=packages/companion-module-sony-camera-bridge",
+    "companion-module": "npm run build --workspace=packages/companion-module-lz-camera-bridge",
+    "companion-module:dev": "npm run dev --workspace=packages/companion-module-lz-camera-bridge",
     "electron": "npm run dev --workspace=packages/electron-app",
     "electron:build": "npm run build --workspace=packages/web-rcp && npm run dist --workspace=packages/electron-app",
     "electron:dist": "npm run build --workspace=packages/web-rcp && npm run dist:win --workspace=packages/electron-app",

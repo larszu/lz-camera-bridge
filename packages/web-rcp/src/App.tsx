@@ -107,7 +107,7 @@ export default function App() {
     <div className="app">
       {showWizard && <FirstStartWizard onComplete={handleWizardComplete} />}
       <header className="app__header">
-        <span className="app__title">Camera Bridge</span>
+        <span className="app__title">LZ Camera Bridge</span>
         <span className={`app__ws status-dot status-dot--${status === 'connected' ? 'ok' : 'err'}`} title={`Bridge: ${status}`} />
         <div className="app__viewtabs">
           <button className={`rcp-btn rcp-btn--sm ${viewMode === 'single' ? 'rcp-btn--primary' : 'rcp-btn--secondary'}`} onClick={() => setViewMode('single')}>

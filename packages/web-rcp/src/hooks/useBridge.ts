@@ -1,5 +1,5 @@
 /**
- * WebSocket hook for the multi-camera Camera Bridge.
+ * WebSocket hook for the multi-camera LZ Camera Bridge.
  *
  * The bridge holds many camera slots keyed by number; this hook mirrors that:
  * `cameras` is the authoritative slot list (config + connected) from the

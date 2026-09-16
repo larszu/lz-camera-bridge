@@ -66,6 +66,15 @@ const MODE_CAPS: Record<ConnectionMode, Partial<CameraCapabilities>> = {
   'panasonic-ptz': { iris: true, bars: true, focus: true },
   // VISCA over IP.
   visca: { iris: true, masterGain: true, awb: true, focus: true },
+  // VISCA ueber RS-232. Identischer Befehlssatz wie ueber IP -- der Draht
+  // aendert die Huelle, nicht die Kommandos -- also auch identische
+  // Faehigkeiten. Stuende hier weniger, waeren Knopfe grundlos aus.
+  'visca-serial': { iris: true, masterGain: true, awb: true, focus: true },
+  // Gimbals: KEINE Bild-Faehigkeit. Ein Gimbal traegt eine Kamera, er ist
+  // keine. Stuende hier `iris: true`, boete das Pult einen Regler an, der
+  // ins Leere greift -- und das ist schlimmer als ein ausgegrauter.
+  'dji-osmo': {},
+  'dji-ronin': {},
   // JVC web API (Session + Digest, verified command vocabulary). Iris/gain
   // are step-based on this API; bars has no verified command.
   jvc: { iris: true, masterGain: true, colorTemp: true, awb: true, focus: true, record: true },
@@ -74,7 +83,9 @@ const MODE_CAPS: Record<ConnectionMode, Partial<CameraCapabilities>> = {
 };
 
 /** Modes whose backend implements ptz/setZoom/setFocus/presets. */
-export const PTZ_MODES: ConnectionMode[] = ['panasonic-ptz', 'visca', 'birddog', 'jvc'];
+export const PTZ_MODES: ConnectionMode[] = [
+  'panasonic-ptz', 'visca', 'visca-serial', 'birddog', 'jvc', 'dji-osmo', 'dji-ronin',
+];
 
 export function capabilitiesForMode(mode: ConnectionMode | undefined): CameraCapabilities {
   return { ...NONE, ...(mode ? MODE_CAPS[mode] ?? {} : {}) };

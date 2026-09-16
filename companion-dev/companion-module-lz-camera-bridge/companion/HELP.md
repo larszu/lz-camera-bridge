@@ -1,4 +1,4 @@
-## Sony Camera Bridge
+## LZ Camera Bridge
 
 Native Bitfocus Companion module for the local camera bridge.
 

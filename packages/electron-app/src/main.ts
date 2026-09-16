@@ -1,8 +1,14 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, ipcMain } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
+import { starteEingebauteBruecke, stoppeEingebauteBruecke, type BrueckenErgebnis } from './embeddedBridge.js';
 
 let mainWindow: BrowserWindow | null = null;
+
+// Der Zustand der Bruecke wird EINMAL beim Start ermittelt und gemerkt, weil
+// das Pult ihn abfragt, sobald es geladen hat -- und das ist spaeter als der
+// Start. Ohne dieses Feld ginge die Meldung eines Fehlversuchs verloren.
+let brueckenZustand: BrueckenErgebnis | null = null;
 
 function resolveUiEntry(): string {
   const candidates = [
@@ -30,7 +36,7 @@ function createMainWindow(): void {
     backgroundColor: '#101214',
     autoHideMenuBar: true,
     show: false,
-    title: 'Camera Bridge',
+    title: 'LZ Camera Bridge',
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -50,7 +56,26 @@ function createMainWindow(): void {
 }
 
 app.whenReady().then(() => {
+  // ZUERST die Bruecke, DANN das Fenster. Das Pult verbindet sich unmittelbar
+  // nach dem Laden; horcht dann noch nichts auf 9700, sieht der Nutzer beim
+  // Start einmal den Fehlversuch und wartet drei Sekunden auf den naechsten.
+  // Die Reihenfolge kostet nichts und erspart genau das.
+  brueckenZustand = starteEingebauteBruecke();
+  if (!brueckenZustand.laeuft) {
+    console.error(`[LZCameraBridge] ${brueckenZustand.fehler}`);
+  }
   createMainWindow();
+});
+
+// Das Pult fragt, woran es ist. Antwort kommt aus dem gemerkten Zustand.
+ipcMain.handle('bridge:status', (): BrueckenErgebnis =>
+  brueckenZustand ?? { laeuft: false, port: 9700, fehler: 'Die Bruecke wurde noch nicht gestartet.' });
+
+// Die Bruecke haelt Sockets und serielle Schnittstellen offen. Bliebe sie
+// beim Beenden stehen, waere der Port beim naechsten Start belegt -- und die
+// Anwendung meldete einen Fehler, dessen Ursache sie selbst war.
+app.on('will-quit', () => {
+  stoppeEingebauteBruecke();
 });
 
 app.on('activate', () => {

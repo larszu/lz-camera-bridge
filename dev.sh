@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Sony Camera Bridge — lokal starten (Linux / macOS)
+# LZ Camera Bridge — lokal starten (Linux / macOS)
 #
 # ─── WAS GEMELDET WURDE (Nutzer, 2026-09-09) ────────────────────────────────
 #
