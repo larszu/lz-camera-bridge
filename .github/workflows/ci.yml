@@ -60,6 +60,17 @@ jobs:
       - name: Schieberegler sind zu treffen (24 px, WCAG 2.5.8)
         run: npm run slider:check
 
+      # EIN PULT-TABLET IST DER NORMALFALL, nicht die Ausnahme — so steht es
+      # woertlich im Quelltext der Bruecke, und sie bindet deshalb jede
+      # Schnittstelle und nennt beim Start ihre LAN-Adressen. Die
+      # OBERFLAECHE, die dieses Tablet oeffnen soll, lag bis 2026-09-15 auf
+      # `localhost`; Vite sagte es bei jedem Start („Network: use --host to
+      # expose") und niemand las es als Befund. Eine Zusage, die zur Haelfte
+      # eingeloest ist, ist keine — wer sie aufbaut, steht vor einer Seite,
+      # die nicht aufgeht, und sucht den Fehler im WLAN.
+      - name: Bruecke und Pult sind beide im Netz
+        run: npm run netz:check
+
       # E-17/E-20 + B-26: dieses Repo ist englisch-quellig, und die deutschen
       # Reste in der Oberflaeche sind ein SPRACHMIX, kein Rueckstand — derselbe
       # Dialog zeigt beides. Der Lauf haelt ihre Zahl bei der Grenze, die beim

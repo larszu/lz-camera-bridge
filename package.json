@@ -25,6 +25,7 @@
     "lang:check": "node scripts/quellsprache-check.mjs",
     "actions:check": "node scripts/actions-node-runtime.mjs",
     "brand:check": "node scripts/brand-tokens-check.mjs",
-    "slider:check": "node scripts/slider-groesse-check.mjs"
+    "slider:check": "node scripts/slider-groesse-check.mjs",
+    "netz:check": "node scripts/pult-im-netz-check.mjs"
   }
 }
