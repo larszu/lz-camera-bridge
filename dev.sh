@@ -65,7 +65,17 @@ trap aufraeumen EXIT INT TERM
 
 echo
 echo "  Kamerapult laeuft."
-echo "    Oberflaeche:  siehe Vite-Ausgabe unten (meist http://localhost:5173/)"
+# 3700 und nicht 5173: `packages/web-rcp/vite.config.ts` setzt `server.port`
+# ausdruecklich. Hier stand Vites Vorgabe — ein Satz, der die Konfiguration
+# daneben nicht gelesen hat, und die Suite oeffnet 3700.
+echo "    Oberflaeche:  http://localhost:3700/"
+# UND DIE ADRESSE FUERS NETZ. Die Bruecke nennt ihre seit sony#24; die
+# Oberflaeche war bis 2026-09-15 gar nicht im Netz und konnte deshalb auch
+# keine nennen. Jetzt ist sie es (`host: true`), und ein Pult-Tablet braucht
+# genau diese Zeile — sonst muss jemand sie sich aus `ip addr` zusammensuchen.
+for _ip in $(node -p "Object.values(require('os').networkInterfaces()).flat().filter(e=>e.family==='IPv4'&&!e.internal).map(e=>e.address).join(' ')" 2>/dev/null); do
+  echo "                  http://$_ip:3700/  (im selben Netz)"
+done
 echo "    Bruecke:      ws://localhost:9700  (die Adressen fuers Netz nennt sie selbst)"
 echo
 echo "  Ohne Kamera: im Reiter „Demo (no camera)\" verbinden."
