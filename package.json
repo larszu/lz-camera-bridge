@@ -1,8 +1,8 @@
 {
   "name": "lz-camera-bridge",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "private": true,
-  "description": "Universal camera-control bridge: one software RCP + touch PTZ panel and a normalizing command bus for Sony, Canon, Panasonic, Blackmagic, Z CAM, JVC, BirdDog and generic VISCA PTZ cameras \u2014 with Bitfocus Companion and USB control-panel input.",
+  "description": "Universal camera-control bridge: one software RCP + touch PTZ panel and a normalizing command bus for Sony, Canon, Panasonic, Blackmagic, Z CAM, JVC, BirdDog and generic VISCA PTZ cameras — with Bitfocus Companion and USB control-panel input.",
   "license": "UNLICENSED",
   "avplan": {
     "sourceLanguage": "en"
