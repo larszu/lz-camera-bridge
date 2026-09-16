@@ -7,7 +7,7 @@
   "main": "dist/main.js",
   "repository": {
     "type": "git",
-    "url": "https://github.com/larszu/lz-camera-bridge.git"
+    "url": "https://github.com/larszu/sony-camera-bridge.git"
   },
   "scripts": {
     "dev": "npm run build && electron dist/main.js",

@@ -8,6 +8,18 @@ from a Bitfocus **Companion** surface or a USB **control panel**.
 
 ![LZ Camera Bridge – Web-Oberfläche mit dem Einrichtungs-Assistenten](docs/screenshot.png)
 
+> **Name vs. repository slug.** The product is **LZ Camera Bridge**; the
+> repository is still `larszu/sony-camera-bridge`, and that mismatch is
+> deliberate (decided 2026-09-16), not an oversight someone forgot to clean up.
+> Renaming a repository moves the Pages address and every clone URL, so it is
+> a separate decision from renaming the product. Everything that *is* the
+> product carries the new name — window title, installer, executable, app id,
+> package names, Companion module id. Everything that is a **coordinate** —
+> GitHub URLs, the Pages address, `BRIDGE_SOURCE.repo` in the multicam-planner
+> — still says `sony-camera-bridge`, because that is where the files actually
+> live. Do not "tidy" one side into the other: a coordinate that points
+> nowhere is worse than an inconsistent name.
+
 > **Status:** the bridge, protocols and UI are real and build clean; a
 > committed unit-test suite covers the protocol framing. Where a family was
 > verified against public docs or an official reference it is marked
@@ -20,7 +32,7 @@ from a Bitfocus **Companion** surface or a USB **control panel**.
 carries the control surface *and* the bridge; the bridge starts with the
 application, on `ws://localhost:9700`, and stops with it.
 
-**https://github.com/larszu/lz-camera-bridge/releases**
+**https://github.com/larszu/sony-camera-bridge/releases**
 
 That was not always true, and the difference matters if you read an older note:
 until 2026-09-16 the installer shipped the panel alone. It came up looking
@@ -40,7 +52,7 @@ failing silently.
 Every push to the default branch builds this repo's page from
 `.github/workflows/pages.yml` and publishes it:
 
-**https://larszu.github.io/lz-camera-bridge/**
+**https://larszu.github.io/sony-camera-bridge/**
 
 The workflow **asks the Pages API before it configures anything.** With no
 Pages site it still builds — that is a real check — and skips only the

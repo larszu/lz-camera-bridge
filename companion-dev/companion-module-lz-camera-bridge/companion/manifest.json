@@ -6,8 +6,8 @@
   "description": "Native Bitfocus Companion module for the Sony/Blackmagic camera bridge",
   "version": "0.1.0",
   "license": "UNLICENSED",
-  "repository": "https://github.com/local/lz-camera-bridge",
-  "bugs": "https://github.com/local/lz-camera-bridge/issues",
+  "repository": "https://github.com/local/sony-camera-bridge",
+  "bugs": "https://github.com/local/sony-camera-bridge/issues",
   "maintainers": [
     {
       "name": "GitHub Copilot",
