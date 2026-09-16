@@ -5,12 +5,16 @@
   "description": "Camera Bridge \u2013 Desktop UI",
   "author": "Camera Bridge",
   "main": "dist/main.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/larszu/sony-camera-bridge.git"
+  },
   "scripts": {
     "dev": "tsc && electron dist/main.js",
     "build": "tsc",
-    "dist": "npm run build && electron-builder",
-    "dist:win": "npm run build && electron-builder --win",
-    "dist:mac": "npm run build && electron-builder --mac --x64 --arm64"
+    "dist": "npm run build && electron-builder --publish never",
+    "dist:win": "npm run build && electron-builder --win --publish never",
+    "dist:mac": "npm run build && electron-builder --mac --x64 --arm64 --publish never"
   },
   "dependencies": {},
   "devDependencies": {

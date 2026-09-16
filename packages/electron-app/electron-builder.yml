@@ -2,6 +2,31 @@ appId: com.camerabridge.app
 productName: Camera Bridge
 copyright: Copyright © 2026
 
+# npmRebuild MUSS hier false sein, sonst schlaegt JEDER Release-Build fehl --
+# und zwar destruktiv. Grund ist der Monorepo-Zuschnitt DIESES Repos:
+#
+# electron-builder prueft in app-builder-lib/util/yarn.js, ob im appDir
+# (packages/electron-app) ein `node_modules` liegt. Liegt keines da, haelt es
+# die Produktions-Abhaengigkeiten fuer nicht installiert und ruft
+# `npm install --production` im appDir auf. Hier liegt aber NIE ein lokales
+# node_modules: es ist ein npm-Workspace, alles wird ins Repo-Root gehoistet.
+# Das `npm install --production` laeuft damit gegen den Workspace-Root und
+# entfernt dort ALLE devDependencies aus dem gemeinsamen node_modules --
+# electron-builder und app-builder-bin eingeschlossen. Direkt danach will
+# electron-builder `app-builder` starten, das es sich selbst geloescht hat:
+# `spawn .../app-builder-bin/<os>/app-builder ENOENT`, auf jedem OS.
+# (cable-planner ist ein Single-Package-Repo: dort existiert node_modules im
+# appDir, der Zweig wird nie betreten, deshalb faellt es dort nicht auf.)
+#
+# false ueberspringt install UND rebuild ("skipped dependencies rebuild").
+# Das ist hier korrekt, nicht bloss ein Workaround: die App hat leere
+# `dependencies`, keine nativen Module, und main.ts benutzt nur electron/fs/
+# path. Es gibt schlicht nichts zu installieren oder zu rebuilden -- die
+# Oberflaeche kommt ueber extraResources (web-rcp/dist), der Main-Prozess aus
+# dist/. Kommt je eine echte Laufzeit-Abhaengigkeit dazu, gehoert der
+# Monorepo-Install neu bedacht (z. B. eigenes node_modules im appDir).
+npmRebuild: false
+
 directories:
   output: release
   buildResources: assets
