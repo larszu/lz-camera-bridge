@@ -1,13 +1,13 @@
 {
-  "name": "@sony-camera-bridge/electron-app",
+  "name": "@lz-camera-bridge/electron-app",
   "version": "1.0.1",
   "private": true,
-  "description": "Camera Bridge – Desktop UI",
-  "author": "Camera Bridge",
+  "description": "LZ Camera Bridge – Desktop UI",
+  "author": "LZ Camera Bridge",
   "main": "dist/main.js",
   "repository": {
     "type": "git",
-    "url": "https://github.com/larszu/sony-camera-bridge.git"
+    "url": "https://github.com/larszu/lz-camera-bridge.git"
   },
   "scripts": {
     "dev": "npm run build && electron dist/main.js",

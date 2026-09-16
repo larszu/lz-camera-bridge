@@ -1,13 +1,13 @@
 {
   "$schema": "../node_modules/@companion-module/base/assets/manifest.schema.json",
-  "id": "sony-camera-bridge",
-  "name": "Sony Camera Bridge",
-  "shortname": "camera-bridge",
+  "id": "lz-camera-bridge",
+  "name": "LZ Camera Bridge",
+  "shortname": "lz-camera-bridge",
   "description": "Native Bitfocus Companion module for the Sony/Blackmagic camera bridge",
   "version": "0.1.0",
   "license": "UNLICENSED",
-  "repository": "https://github.com/local/sony-camera-bridge",
-  "bugs": "https://github.com/local/sony-camera-bridge/issues",
+  "repository": "https://github.com/local/lz-camera-bridge",
+  "bugs": "https://github.com/local/lz-camera-bridge/issues",
   "maintainers": [
     {
       "name": "GitHub Copilot",
@@ -22,6 +22,6 @@
   },
   "legacyIds": [],
   "manufacturer": "Custom",
-  "products": ["Sony Camera Bridge", "Blackmagic Bridge"],
+  "products": ["LZ Camera Bridge", "Blackmagic Bridge"],
   "keywords": ["sony", "blackmagic", "camera", "rcp", "bridge"]
 }

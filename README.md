@@ -1,4 +1,4 @@
-# Camera Bridge
+# LZ Camera Bridge
 
 A universal camera-control hub. One software interface — a broadcast-style
 **RCP** (paint controls) and a touch **PTZ panel** modelled on the Panasonic
@@ -6,7 +6,7 @@ AW‑RP150 — plus a normalizing **command bus** that drives cameras from many
 vendors over their native protocols. The same commands also reach every camera
 from a Bitfocus **Companion** surface or a USB **control panel**.
 
-![Camera Bridge – Web-Oberfläche mit dem Einrichtungs-Assistenten](docs/screenshot.png)
+![LZ Camera Bridge – Web-Oberfläche mit dem Einrichtungs-Assistenten](docs/screenshot.png)
 
 > **Status:** the bridge, protocols and UI are real and build clean; a
 > committed unit-test suite covers the protocol framing. Where a family was
@@ -20,7 +20,7 @@ from a Bitfocus **Companion** surface or a USB **control panel**.
 carries the control surface *and* the bridge; the bridge starts with the
 application, on `ws://localhost:9700`, and stops with it.
 
-**https://github.com/larszu/sony-camera-bridge/releases**
+**https://github.com/larszu/lz-camera-bridge/releases**
 
 That was not always true, and the difference matters if you read an older note:
 until 2026-09-16 the installer shipped the panel alone. It came up looking
@@ -40,7 +40,7 @@ failing silently.
 Every push to the default branch builds this repo's page from
 `.github/workflows/pages.yml` and publishes it:
 
-**https://larszu.github.io/sony-camera-bridge/**
+**https://larszu.github.io/lz-camera-bridge/**
 
 The workflow **asks the Pages API before it configures anything.** With no
 Pages site it still builds — that is a real check — and skips only the
@@ -154,7 +154,7 @@ human — and where there is none, there is no match. See
 |---|---|
 | `packages/bridge` | Node/TypeScript bridge server, camera clients, protocols, HID input |
 | `packages/web-rcp` | React UI (RCP + PTZ panel, connection wizard) |
-| `packages/companion-module-sony-camera-bridge` | Bitfocus Companion module |
+| `packages/companion-module-lz-camera-bridge` | Bitfocus Companion module |
 | `packages/electron-app` | Desktop application: the web UI **and** the bridge, bundled into one installer |
 | `packages/firmware` | WIZ108SR serial↔TCP bridge firmware (C) |
 

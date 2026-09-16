@@ -61,7 +61,7 @@ export function starteEingebauteBruecke(port = STANDARD_PORT): BrueckenErgebnis 
       laeuft: false,
       port,
       fehler: belegt
-        ? `Port ${port} ist belegt. Laeuft die Camera Bridge bereits -- als zweites Fenster oder von Hand gestartet? Das Pult verbindet sich mit der bereits laufenden Bruecke.`
+        ? `Port ${port} ist belegt. Laeuft die LZ Camera Bridge bereits -- als zweites Fenster oder von Hand gestartet? Das Pult verbindet sich mit der bereits laufenden Bruecke.`
         : `Die eingebaute Bruecke konnte nicht starten: ${text}`,
     };
   }

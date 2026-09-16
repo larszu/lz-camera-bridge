@@ -36,7 +36,7 @@ function createMainWindow(): void {
     backgroundColor: '#101214',
     autoHideMenuBar: true,
     show: false,
-    title: 'Camera Bridge',
+    title: 'LZ Camera Bridge',
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -62,7 +62,7 @@ app.whenReady().then(() => {
   // Die Reihenfolge kostet nichts und erspart genau das.
   brueckenZustand = starteEingebauteBruecke();
   if (!brueckenZustand.laeuft) {
-    console.error(`[CameraBridge] ${brueckenZustand.fehler}`);
+    console.error(`[LZCameraBridge] ${brueckenZustand.fehler}`);
   }
   createMainWindow();
 });

@@ -1,5 +1,5 @@
-appId: com.camerabridge.app
-productName: Camera Bridge
+appId: com.lzcamerabridge.app
+productName: LZ Camera Bridge
 copyright: Copyright © 2026
 
 # npmRebuild MUSS hier false sein, sonst schlaegt JEDER Release-Build fehl --
@@ -78,7 +78,7 @@ nsis:
   installerHeaderIcon: assets/icon.ico
   createDesktopShortcut: true
   createStartMenuShortcut: true
-  shortcutName: Camera Bridge
+  shortcutName: LZ Camera Bridge
   runAfterFinish: true
 
 mac:
@@ -106,11 +106,11 @@ mac:
   gatekeeperAssess: false
 
 linux:
-  # Ohne diese Zeile heisst die Binaerdatei `@sony-camera-bridgeelectron-app`:
+  # Ohne diese Zeile heisst die Binaerdatei `@lz-camera-bridgeelectron-app`:
   # auf Linux leitet electron-builder den Namen vom PAKETnamen ab (hier ein
   # scoped Name, dessen Schraegstrich wegfaellt), nicht von `productName`.
   # Auf Windows und macOS faellt das nicht auf, weil dort `productName` zieht.
-  executableName: camera-bridge
+  executableName: lz-camera-bridge
   target:
     - AppImage
   icon: assets/icon.png

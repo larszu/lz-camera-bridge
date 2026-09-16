@@ -75,7 +75,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v6
         with:
-          name: camera-bridge-${{ matrix.name }}
+          name: lz-camera-bridge-${{ matrix.name }}
           path: |
             packages/electron-app/release/*.exe
             packages/electron-app/release/*.dmg

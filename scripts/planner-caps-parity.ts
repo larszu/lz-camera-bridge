@@ -22,7 +22,7 @@
 //
 // WARUM DER GUARD HIER LIEGT UND NICHT DORT. Erst stand er in der Suite, die
 // ihre Nachbar-Repos ohnehin auscheckt. Gemessen (Lauf 34092050711): der
-// Checkout von `larszu/sony-camera-bridge` scheitert dort an „Not Found" —
+// Checkout von `larszu/lz-camera-bridge` scheitert dort an „Not Found" —
 // dieses Repo ist privat, und `GITHUB_TOKEN` eines anderen Repos kommt nicht
 // heran. Der Guard hat sich uebersprungen und der Job war gruen. Genau die
 // Sorte Pruefung, die schlimmer ist als keine.
@@ -186,9 +186,9 @@ if ((planer.MODE_PAINT.none ?? []).length > 0) {
 }
 
 // ── 5. Zeigt die Herkunftsangabe dorthin, wo wirklich geprueft wurde? ─────
-if (planer.BRIDGE_SOURCE.repo !== 'sony-camera-bridge') {
+if (planer.BRIDGE_SOURCE.repo !== 'lz-camera-bridge') {
   fehler.push(
-    `BRIDGE_SOURCE.repo ist "${planer.BRIDGE_SOURCE.repo}", geprueft wurde sony-camera-bridge.`,
+    `BRIDGE_SOURCE.repo ist "${planer.BRIDGE_SOURCE.repo}", geprueft wurde lz-camera-bridge.`,
   );
 }
 if (!CAPS.endsWith(planer.BRIDGE_SOURCE.file)) {

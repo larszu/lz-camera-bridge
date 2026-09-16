@@ -23,7 +23,7 @@
 # stattdessen in der Lauf-Zusammenfassung, wo sie jemand liest, der sie
 # braucht.
 #
-# DIESE DATEI LIEGT IN VIER REPOS (Broadcast-intercom, sony-camera-bridge,
+# DIESE DATEI LIEGT IN VIER REPOS (Broadcast-intercom, lz-camera-bridge,
 # tally-pi, pi-media-station) UND SOLL DORT ZEICHENGLEICH SEIN. Wer sie
 # aendert, aendert sie ueberall — sonst sehen zwei Projektseiten verschieden
 # aus, ohne dass jemand das entschieden haette.

@@ -1,4 +1,4 @@
-# Sony Camera Bridge — lokal starten (Windows)
+# LZ Camera Bridge — lokal starten (Windows)
 #
 # ─── WAS GEMELDET WURDE (Nutzer, 2026-09-15) ────────────────────────────────
 #

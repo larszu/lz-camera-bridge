@@ -19,7 +19,7 @@
 //
 //   > Model every paint value as COMMANDED VS CONFIRMED, sourced from a
 //   > per-model capability table; RENDER UNCONFIRMED VALUES DISTINCTLY and
-//   > NEVER FAKE A READOUT. Reuse and extend sony-camera-bridge
+//   > NEVER FAKE A READOUT. Reuse and extend lz-camera-bridge
 //   > capabilitiesForMode as the schema seed.
 //
 // ─── WAS HIER WIRKLICH PASSIERT (NACHGELESEN, NICHT VERMUTET) ──────────────
