@@ -2,7 +2,7 @@
   "name": "@sony-camera-bridge/electron-app",
   "version": "1.0.1",
   "private": true,
-  "description": "Camera Bridge \u2013 Desktop UI",
+  "description": "Camera Bridge – Desktop UI",
   "author": "Camera Bridge",
   "main": "dist/main.js",
   "repository": {
@@ -10,20 +10,27 @@
     "url": "https://github.com/larszu/sony-camera-bridge.git"
   },
   "scripts": {
-    "dev": "tsc && electron dist/main.js",
-    "build": "tsc",
+    "dev": "npm run build && electron dist/main.js",
+    "build": "tsc && node scripts/build-bridge.mjs",
     "dist": "npm run build && electron-builder --publish never",
     "dist:win": "npm run build && electron-builder --win --publish never",
     "dist:mac": "npm run build && electron-builder --mac --x64 --arm64 --publish never"
   },
-  "dependencies": {},
   "devDependencies": {
     "@types/finalhandler": "^1.2.3",
     "@types/node": "^22.0.0",
     "@types/serve-static": "^1.15.7",
     "electron": "34.5.8",
     "electron-builder": "^25.1.8",
+    "esbuild": "^0.28.2",
     "typescript": "^5.6.0"
   },
-  "license": "UNLICENSED"
+  "license": "UNLICENSED",
+  "dependencies": {
+    "serialport": "^12.0.0"
+  },
+  "optionalDependencies": {
+    "usb": "^2.14.0",
+    "node-hid": "^3.1.2"
+  }
 }

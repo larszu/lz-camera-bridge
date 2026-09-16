@@ -19,13 +19,32 @@ copyright: Copyright © 2026
 # appDir, der Zweig wird nie betreten, deshalb faellt es dort nicht auf.)
 #
 # false ueberspringt install UND rebuild ("skipped dependencies rebuild").
-# Das ist hier korrekt, nicht bloss ein Workaround: die App hat leere
-# `dependencies`, keine nativen Module, und main.ts benutzt nur electron/fs/
-# path. Es gibt schlicht nichts zu installieren oder zu rebuilden -- die
-# Oberflaeche kommt ueber extraResources (web-rcp/dist), der Main-Prozess aus
-# dist/. Kommt je eine echte Laufzeit-Abhaengigkeit dazu, gehoert der
-# Monorepo-Install neu bedacht (z. B. eigenes node_modules im appDir).
+#
+# Seit die Bruecke mitgeliefert wird, HAT die App native Abhaengigkeiten
+# (serialport, optional usb/node-hid) -- der Verzicht auf den Rebuild ist
+# trotzdem richtig, und zwar aus einem nachgesehenen Grund:
+# `@serialport/bindings-cpp` liefert **N-API**-Prebuilds
+# (`prebuilds/<platform>/node.napi.*.node`). N-API ist ABI-stabil ueber Node-
+# und Electron-Fassungen hinweg, die Binaerdatei passt also unveraendert in
+# Electron 34. `usb` und `node-hid` liefern ebenso Prebuilds und sind
+# zusaetzlich optional und lazy geladen (die Bruecke faengt ihr Fehlen ab).
+# Waere eines davon ein klassisches NAN-Modul, muesste hier `true` stehen --
+# und dann brauchte der Monorepo-Install die Loesung, die unten beschrieben
+# ist. Wer eine native Abhaengigkeit OHNE N-API-Prebuild hinzufuegt, muss
+# das hier aendern, sonst laedt sie im Installer nicht.
 npmRebuild: false
+
+# Aus einem asar-Archiv laesst sich KEIN natives Modul laden: `process.dlopen`
+# braucht einen echten Pfad im Dateisystem, und im Archiv gibt es keinen.
+# Ohne diese Zeilen startet die Bruecke im fertigen Installer nicht -- mit
+# genau der Meldung, die `embeddedBridge.ts` abfaengt, also sichtbar, aber
+# ohne Kamera. Die drei Module werden deshalb daneben ausgepackt.
+asarUnpack:
+  - "**/node_modules/@serialport/**"
+  - "**/node_modules/serialport/**"
+  - "**/node_modules/usb/**"
+  - "**/node_modules/node-hid/**"
+  - "**/*.node"
 
 directories:
   output: release
@@ -87,6 +106,11 @@ mac:
   gatekeeperAssess: false
 
 linux:
+  # Ohne diese Zeile heisst die Binaerdatei `@sony-camera-bridgeelectron-app`:
+  # auf Linux leitet electron-builder den Namen vom PAKETnamen ab (hier ein
+  # scoped Name, dessen Schraegstrich wegfaellt), nicht von `productName`.
+  # Auf Windows und macOS faellt das nicht auf, weil dort `productName` zieht.
+  executableName: camera-bridge
   target:
     - AppImage
   icon: assets/icon.png
