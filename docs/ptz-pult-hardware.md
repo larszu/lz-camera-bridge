@@ -110,6 +110,64 @@ ob das Ding nach zwei Jahren Tourbetrieb in der Mitte noch Ruhe gibt.
 Empfehlung: **Hall, 3 Achsen, Drehgriff.** Der Preisunterschied ist einmalig,
 das Zittern eines Potis begleitet einen bei jeder Probe.
 
+### 3.2.1 Der Gamepad-Weg — und warum er trotzdem der erste Schritt ist
+
+Ein Spiele-Controller ist ein USB-HID-Geraet mit zwei Analogsticks und zwei
+Analogtriggern. Er faellt damit in denselben `HidControlSurface`-Adapter wie
+alles andere in diesem Dokument. Der Unterschied zwischen den beiden Lagern
+ist aber nicht kosmetisch:
+
+| | PlayStation (DualSense / DualShock 4) | Xbox (Series / One) |
+|---|---|---|
+| Am USB | **Standard-HID.** Meldet Achsen und Trigger in einem festen Report, `node-hid` liest ihn direkt. | **Kein Standard-HID.** Microsoft fuehrt das GIP/XInput-Protokoll; unter Linux nimmt der `xpad`-Treiber das Geraet weg und gibt es als evdev aus, nicht als brauchbares hidraw. |
+| Ueber Bluetooth | HID, anderer Report als am Kabel | HID — hier geht es, weil die BT-Firmware einen Gamepad-Descriptor mitbringt |
+| Urteil | **nimm den** | nur ueber Bluetooth oder ueber einen zweiten Adapter auf evdev |
+
+Praktisch heisst das: **ein DualSense am Kabel ist der kuerzeste Weg zu einem
+fahrenden Kopf.** Kosten 0 EUR, wenn einer da ist, sonst rund 70.
+
+Was ein Gamepad kann, und das ist mehr, als man erwartet:
+
+- Linker Stick Pan/Tilt, die **analogen** Trigger L2/R2 auf Zoom ein und aus —
+  das ist naeher an einem PTZ-Pult als DigitalBirds zweiter Joystick.
+- Die Achsen liefern 8 bit, also 256 Stufen. **Fuer einen VISCA-Kopf ist das
+  nicht die Grenze:** das Protokoll kennt fuer Pan nur 24 Geschwindigkeiten
+  (`0x01`…`0x18`), fuer Tilt 20. Das Argument „16 bit" aus 3.3 gilt fuer die
+  Paint-Werte und fuer direkt angesteuerte Schrittmotoren, nicht fuer
+  VISCA-Fahrbefehle. Wer hier etwas anderes behauptet, verkauft Aufloesung,
+  die auf dem Draht gar nicht ankommt.
+- Rund ein Dutzend Tasten fuer Presets, bis das Stream Deck da ist.
+
+Warum es trotzdem nicht das Endergebnis ist, und diese drei Gruende sind
+koerperlich und nicht elektrisch:
+
+1. **Der Weg ist zu kurz.** Ein Gamepad-Stick hat rund 8 mm Auslenkung, ein
+   PTZ-Joystick gut das Dreifache. Die langsame Fahrt lebt vom Weg, nicht von
+   der Zahl der Stufen.
+2. **Die Feder ist falsch.** Ein Gamepad zentriert schnell und hart, weil es
+   fuer Zielen gebaut ist. Einen Schwenk ueber acht Sekunden haelt man damit
+   nicht ruhig.
+3. **Stick-Drift.** Die Sticks sind Potis und das bekannte Verschleissteil der
+   Bauart. Es gibt Hall-Ersatzmodule (GuliKit u. ae., ~25 EUR das Paar), die
+   genau das beheben — ein billiger Test, ob Hall den Unterschied macht, den
+   dieses Dokument behauptet.
+
+**Empfohlene Reihenfolge:** Gamepad zuerst. Die drei Luecken aus Abschnitt 6
+muessen ohnehin geschlossen werden, und sie lassen sich an einem Controller
+schliessen, der schon in der Schublade liegt. Erst wenn Pan/Tilt/Zoom damit
+sauber fahren, ist die Frage nach dem 400-EUR-Joystick ueberhaupt zu
+beantworten — und dann beantwortet sie die Hand und nicht das Datenblatt.
+
+Zwei Dinge dabei im Blick behalten:
+
+- **Die Byte-Offsets im Report unterscheiden sich je Modell und je
+  Anschlussart** (DualShock 4 und DualSense liegen anders, USB und Bluetooth
+  ebenfalls). Sie gehoeren einmal mit `hidraw` ausgemessen und dann in die
+  `HidBinding`-Tabelle geschrieben — nicht aus einem Forenbeitrag abgeschrieben.
+- **Companion sieht ein Gamepad nicht.** Es treibt Stream Decks und
+  Satellite-Flaechen, kein HID-Gamepad. Der Controller haengt also am Bridge-
+  Eingang, das Stream Deck an Companion. Zwei Wege, mit Absicht.
+
 ### 3.3 Achsen-Erfassung und Bedienelemente
 
 | # | Teil | Menge | ca. EUR | Warum |
@@ -139,6 +197,7 @@ das Zittern eines Potis begleitet einen bei jeder Probe.
 
 | Ausbau | ca. EUR |
 |---|---|
+| Erprobung (Gamepad am vorhandenen Rechner, siehe 3.2.1) | 0–70 |
 | Sparsam (Poti-Joystick, SD statt NVMe, gedrucktes Gehaeuse, Stream Deck MK.2) | 550–650 |
 | Empfohlen (Hall-Joystick 3 Achsen, NVMe, Alu-Pult, Stream Deck XL) | 1.050–1.300 |
 | Vollausbau (zusaetzlich Stream Deck +, motorisierter Fader, PoE) | 1.400–1.700 |
@@ -204,6 +263,8 @@ Eigenschaft der Gegenstelle und gehoert in den Geraeteweg, nicht ins Pult.
 - Ob Aktivkuehler, NVMe-HAT und PoE-HAT zusammen auf den Pi 5 passen.
 - Ob Companion und Bridge auf einem Pi 5 nebeneinander genug Luft haben — vor
   dem Gehaeusebau einmal auf einem nackten Pi messen.
+- Die Byte-Offsets des Gamepads aus 3.2.1, falls der Weg ueber die Erprobung
+  geht: einmal mit `hidraw` ausmessen, je Modell und je Anschlussart.
 
 ## Anhang A: Was der DB3-Kopf von unserem `ViscaClient` versteht
 
