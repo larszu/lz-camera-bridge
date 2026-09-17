@@ -54,17 +54,23 @@ packages/
   web-rcp/
 ```
 
-**Recommendation: build the B4 work here, as `packages/firmware-b4` plus a
-lens backend in the bridge.** A separate repository would duplicate the
-transport, the Companion surface, the CI gates and the release flow, and would
-leave two answers to "what is the current iris value".
+**Decided: the B4 work is built here, as `packages/firmware-b4` plus a lens
+backend in the bridge.** The owner settled this on 2026-09-17; the reasoning is
+recorded as
+[ADR-008](https://github.com/larszu/av-planner-suite/blob/main/docs/decisions/ADR-008-b4-objektivsteuerung-ablage.md)
+in `av-planner-suite`, where the suite's decisions live. A separate repository
+would have duplicated the transport, the Companion surface, the CI gates and the
+release flow, and would have left two answers to "what is the current iris
+value".
 
-The counter-argument is honest and should be weighed by the owner: the existing
-firmware is bare-metal `arm-none-eabi-gcc` with a hand-written `Makefile`, while
-the B4 target is an ESP32 with PoE under ESP-IDF or the Arduino core. That is a
-second toolchain in one repository. It is a cost, not a blocker — the packages
-build independently — but it is the one real argument for a separate repo, and
-it should be recorded as an ADR either way.
+The counter-argument was weighed and the cost accepted: the existing firmware is
+bare-metal `arm-none-eabi-gcc` with a hand-written `Makefile`, while the B4
+target is an ESP32 with PoE. That is a second toolchain in one repository — but
+the packages build independently, so the pain stays inside the toolchain and
+reaches nobody who only builds the bridge.
+
+**Still open**, and deliberately not settled by ADR-008: the runtime (ESP-IDF vs
+Arduino core), and whether `firmware-b4` is built in CI.
 
 ---
 

@@ -20,6 +20,29 @@ connector, and for reading zoom/focus demands as input devices.
 | [`claude-code-brief.md`](claude-code-brief.md) | The execution brief this work started from. **Partly outdated** — see below. |
 | [`../reuse-audit.md`](../reuse-audit.md) | What already exists in this repository and the other repositories, with a reuse verdict per criterion. |
 
+## Where this work lives
+
+Decided 2026-09-17 and recorded as
+[ADR-008](https://github.com/larszu/av-planner-suite/blob/main/docs/decisions/ADR-008-b4-objektivsteuerung-ablage.md)
+in `av-planner-suite`, where the suite's decisions live:
+
+| Part | Where |
+|---|---|
+| ESP32 firmware (iris, serial protocol, demands) | `packages/firmware-b4` |
+| Lens backend, frame handling | `packages/bridge/src/cameras/` and `protocol/`, like any other device family |
+| Operation | `packages/web-rcp` — **the same iris as every other camera** |
+| Source material, measurements | this folder |
+
+The reason, in one line: iris, focus and zoom are not an interface *to* this
+bridge, they are already the normalized commands *of* it, across eight camera
+clients. A separate repository would have produced a second iris that behaves
+differently from the first.
+
+**Not settled by ADR-008:** the runtime (ESP-IDF vs Arduino core) and whether
+`firmware-b4` is built in CI. The runtime has a concrete criterion rather than a
+matter of taste — the serial line runs inverted, and the inversion belongs in the
+UART's hardware setting, not in software.
+
 ## Corrections to the brief
 
 `claude-code-brief.md` is kept verbatim as the record of what was asked. Three
