@@ -152,21 +152,16 @@ koerperlich und nicht elektrisch:
    genau das beheben — ein billiger Test, ob Hall den Unterschied macht, den
    dieses Dokument behauptet.
 
-**Empfohlene Reihenfolge:** Gamepad zuerst. Die drei Luecken aus Abschnitt 6
-muessen ohnehin geschlossen werden, und sie lassen sich an einem Controller
-schliessen, der schon in der Schublade liegt. Erst wenn Pan/Tilt/Zoom damit
+**Empfohlene Reihenfolge:** Gamepad zuerst. Erst wenn Pan/Tilt/Zoom damit
 sauber fahren, ist die Frage nach dem 400-EUR-Joystick ueberhaupt zu
 beantworten — und dann beantwortet sie die Hand und nicht das Datenblatt.
+Der Adapter dafuer steht (Abschnitt 6); was am Geraet noch zu bestaetigen
+ist, steht in 6.3.
 
-Zwei Dinge dabei im Blick behalten:
-
-- **Die Byte-Offsets im Report unterscheiden sich je Modell und je
-  Anschlussart** (DualShock 4 und DualSense liegen anders, USB und Bluetooth
-  ebenfalls). Sie gehoeren einmal mit `hidraw` ausgemessen und dann in die
-  `HidBinding`-Tabelle geschrieben — nicht aus einem Forenbeitrag abgeschrieben.
-- **Companion sieht ein Gamepad nicht.** Es treibt Stream Decks und
-  Satellite-Flaechen, kein HID-Gamepad. Der Controller haengt also am Bridge-
-  Eingang, das Stream Deck an Companion. Zwei Wege, mit Absicht.
+Eines dabei im Blick behalten: **Companion sieht ein Gamepad nicht.** Es
+treibt Stream Decks und Satellite-Flaechen, kein HID-Gamepad. Der Controller
+haengt also am Bridge-Eingang, das Stream Deck an Companion. Zwei Wege, mit
+Absicht.
 
 ### 3.3 Achsen-Erfassung und Bedienelemente
 
@@ -230,30 +225,66 @@ nichts tut, ist im Aufbau das erste, was fehlt.
 - **Stream Deck → Pi per USB**, Companion greift direkt darauf zu.
 - **Display → DSI**, Chromium im Kiosk auf `http://localhost:3700`.
 
-## 6. Was in der Software noch fehlt
+## 6. Der Stand in der Software
 
-Ehrlich aufgeschrieben, damit niemand bestellt und dann feststellt, dass die
-Haelfte noch zu bauen ist. Gelesen in `HidControlSurface.ts`:
+### 6.1 Erledigt
 
-1. **Achsen sind heute vorzeichenlos.** `onReport` skaliert jeden Rohwert auf
-   0–255 und schickt einen einzelnen Parameter. Der `ptz`-Befehl des
-   `ViscaClient` will aber `pan` und `tilt` zusammen und mit Vorzeichen
-   (−100…100). Es braucht eine Bindungsart „bipolare Achse" und eine, die zwei
-   Achsen zu einem Befehl buendelt.
-2. **Kein Totband.** Ein Hall-Joystick in Ruhe wackelt in den letzten Bits;
-   `last` vergleicht exakt und wuerde bei jedem Bit einen Fahrbefehl senden.
-   Mittelwert-Fenster und Totband gehoeren in den Adapter, nicht in die
-   Firmware — sonst sind sie je Pult neu einzustellen.
-3. **`this.last` ist auf `offset` verschluesselt.** Zwei Bindungen auf
-   denselben Byte-Offset (ein Tasten-Bitfeld mit acht Tasten) loeschen sich
-   gegenseitig aus. Fuer Tasten braucht es eine Bit-Maske im `HidBinding`.
-4. **Fuer den DB3-Kopf gilt die Sperre aus Anhang A:** `setIris` und
-   `setMasterGain` sind 9-Byte-VISCA-Pakete, die der DigitalBird-Decoder als
-   Pan/Tilt-Richtung missversteht und den Kopf losfahren laesst. Ein
-   Iris-Fader am Pult darf diesen Kopf nicht erreichen.
+Die drei Luecken, die hier als offen standen, sind zu. Alle drei lagen in
+`HidControlSurface.ts`, und alle drei sind mit Tests belegt
+(`test/gamepadBindungen.test.ts`):
 
-Punkt 1–3 sind ueberschaubar und liegen alle in einer Datei. Punkt 4 ist eine
-Eigenschaft der Gegenstelle und gehoert in den Geraeteweg, nicht ins Pult.
+1. **Zweiseitige Achsen.** Eine Bindung mit `centre` gibt -`span` … +`span`
+   aus statt 0 … `span`. `group` buendelt zwei Achsen in EINEN Befehl — `ptz`
+   bekommt `pan` und `tilt` zusammen, statt als zwei Fahrten, von denen die
+   zweite die erste aufhebt.
+2. **Totband.** `deadband` gibt die Ruhelage zurueck, `step` haelt das
+   Zittern eines gehaltenen Sticks von der Leitung fern. Die Ruhelage selbst
+   geht immer durch, sobald die Achse sie ERREICHT: ein verschluckter Stopp
+   liesse den Kopf weiterfahren. Sie geht aber nicht bei jedem Report erneut
+   durch, sonst schickte ein Pult, das niemand anfasst, einen Stopp je
+   Report.
+3. **Tasten im Bitfeld.** `bit` waehlt die Taste im Byte, und der Merker
+   haengt jetzt an der Bindung statt am Byte-Offset. Vier Symboltasten in
+   einem Byte loeschen sich nicht mehr gegenseitig aus.
+
+Dazu kam eine vierte Sache, die erst der Test zeigte: **zwei Bindungen auf
+demselben Befehl kaempfen gegeneinander.** Die beiden Trigger fahren denselben
+Zoom in entgegengesetzte Richtungen; als eigene Befehle schickte der eine
+Fahrt und der andere im selben Report den Stopp, und wer gewann, entschied
+die Reihenfolge in der Tabelle. Mit `sum` addieren sie sich zu einem Wert —
+und beide gedrueckt heisst jetzt Stillstand statt Zufall.
+
+### 6.2 Die Belegung, die beim Einstecken greift
+
+`standardBindungen()` waehlt nach Vendor/Product-ID. Ein DualSense oder
+DualShock 4 bekommt die **Fahr**-Belegung, alles Uebrige die bisherige
+**Paint**-Belegung. Das ist keine Bequemlichkeit, sondern die Sperre aus
+Anhang A: die alte Vorgabe legte Achse 1 und 2 auf `setIris` und
+`setMasterGain`, und das sind bei VISCA 9-Byte-Pakete, deren Bytes 6/7 der
+DB3-Decoder als Pan/Tilt-Richtung liest. Ein Stick auf `setIris` haette den
+Kopf losfahren lassen — unkontrolliert, und ohne dass am Pult etwas danach
+ausgesehen haette.
+
+| Bedienelement | Befehl |
+|---|---|
+| Linker Stick | `ptz` (pan/tilt, zusammen, mit Vorzeichen) |
+| R2 / L2 | `setZoom` tele / weit, addiert |
+| Rechter Stick senkrecht | `setFocus` |
+| Quadrat / Kreuz / Kreis / Dreieck | `recallPreset` 1–4 |
+| L1 | `autoFocus` |
+
+### 6.3 Was weiterhin von Hand zu pruefen ist
+
+**Die Byte-Offsets sind nicht am Geraet nachgemessen.** Sie sind das
+dokumentierte USB-Format; ueber Bluetooth liegt derselbe Controller anders,
+und ob `node-hid` die Report-ID mitliefert, haengt an der Plattform. Deshalb
+gibt es `debug`: die Bruecke schickt dann jeden Report als Hex
+(`{ type: 'hidReport', hex }`), und die Offsets sind in einer Minute
+ausgezaehlt. Lieber eine Tabelle, die man pruefen kann, als eine, die man
+glauben muss.
+
+**`node-hid` ist eine optionale Abhaengigkeit** und ein natives Modul. Fehlt
+es, sagt die Bruecke es im Klartext, statt still nichts zu tun.
 
 ## 7. Vor dem Bestellen zu klaeren
 
