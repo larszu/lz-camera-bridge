@@ -37,14 +37,22 @@
 // web_page.h is included further down, after `server` exists.
 
 // ── W5500 wiring on the Waveshare ESP32-S3-ETH ─────────────────────────────
+//
+// Read off Waveshare's own wiki and cross-checked against the ESPHome
+// configuration for this board; two independent sources agreeing.
+//
+// An earlier revision of this file had all six wrong (CS 16, IRQ 12, RST 39,
+// SCK 15, MISO 14, MOSI 13) from a single secondary source. That would have
+// meant no Ethernet — and worse, GPIO 9 is the W5500's RESET and was being
+// driven as I²C SCL at the same time.
 #define B4_ETH_TYPE ETH_PHY_W5500
 #define B4_ETH_ADDR 1
-#define B4_ETH_CS 16
-#define B4_ETH_IRQ 12
-#define B4_ETH_RST 39
-#define B4_ETH_SCK 15
-#define B4_ETH_MISO 14
-#define B4_ETH_MOSI 13
+#define B4_ETH_MOSI 11
+#define B4_ETH_MISO 12
+#define B4_ETH_SCK 13
+#define B4_ETH_CS 14
+#define B4_ETH_RST 9
+#define B4_ETH_IRQ 10
 
 // ── I²C addresses ──────────────────────────────────────────────────────────
 #define ADDR_MCP4728 0x60

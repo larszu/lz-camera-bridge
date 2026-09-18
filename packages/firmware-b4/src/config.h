@@ -59,26 +59,44 @@
 // ───────────────────────────────────────────────────────────────────────────
 
 /*
- * Occupied by the W5500 and NOT available: GPIO 12 (INT), 13 (MOSI), 14 (MISO),
- * 15 (CLK), 16 (CS), 39 (RST).
+ * WHAT IS ALREADY SPOKEN FOR ON THIS BOARD
  *
- * Also unavailable on this chip: GPIO 19/20 (native USB), 26–32 (SPI flash),
- * and 33–37 — this is an ESP32-S3R8 with 8 MB OCTAL PSRAM, which claims them.
- * That last one bites people who read a generic S3 pinout.
+ * From Waveshare's wiki for the ESP32-S3-ETH, cross-checked against the
+ * ESPHome configuration for the same board.
  *
- * Free and safe: 1–11, 17, 18, 21, 38, 40–48.
+ *   W5500 Ethernet   9 (RST), 10 (INT), 11 (MOSI), 12 (MISO), 13 (SCLK), 14 (CS)
+ *   TF card slot     4 (CS), 5 (MISO), 6 (MOSI), 7 (SCLK)
+ *   RGB LED          21 (WS2812)
+ *   Camera header    1, 2, 3, 15, 18, 38, 39, 40, 41, 42, 45, 46, 47, 48
+ *   Native USB       19, 20
+ *   SPI flash        26–32
+ *   OCTAL PSRAM      33–37   ← an S3R8. A generic S3 pinout will not show this
+ *
+ * That leaves 8, 16, 17, and 43/44 (the UART0 pins, free here because the
+ * console runs over native USB-CDC).
+ *
+ * The camera pins are listed as taken even with no camera fitted: the header
+ * is on the board, and a pin that becomes a conflict the day someone plugs a
+ * sensor in is not a pin worth saving.
  */
 
 /*
  * I²C for the MCP4728 (DAC) and ADS1115 (ADC).
  *
- * VERIFY THESE AGAINST YOUR BOARD BEFORE WIRING. They are a reasonable default
- * for an ESP32-S3, not a reading off Waveshare's schematic. If the I²C scan at
- * boot reports nothing, suspect this before you suspect the modules — the scan
- * prints exactly that hint.
+ * 16 and 17: an adjacent free pair from the map above, and among the very few
+ * pins on this board that collide with nothing.
+ *
+ * These were 8 and 9 in an earlier revision, chosen as a generic ESP32-S3
+ * default rather than read off this board. **GPIO 9 is the W5500's RESET.**
+ * Driving it as a clock line would have held the Ethernet controller in reset
+ * — and the symptom would have been "no network", which nobody would have
+ * traced back to the I²C configuration.
+ *
+ * If the boot scan reports nothing on the bus, suspect the wiring and these
+ * two numbers before suspecting the modules; the scan prints that hint itself.
  */
-#define PIN_I2C_SDA 8
-#define PIN_I2C_SCL 9
+#define PIN_I2C_SDA 16
+#define PIN_I2C_SCL 17
 #define I2C_CLOCK_HZ 400000
 
 /*

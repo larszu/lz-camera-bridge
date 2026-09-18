@@ -80,10 +80,29 @@ the S3 has none. The external MCP4728 is therefore mandatory rather than
 convenient, and PWM plus a low-pass is not an acceptable substitute for an iris
 setpoint on a lens of this value.
 
-Also worth recording because a generic S3 pinout will mislead: this is an
-**S3R8 with octal PSRAM**, which claims **GPIO 33–37**. Together with the W5500
-(GPIO 12–16, 39) and the native USB pins (19/20), what remains free is
-1–11, 17, 18, 21, 38 and 40–48.
+## The pin map, because a generic S3 pinout will mislead
+
+Read off Waveshare's wiki for this board and cross-checked against the ESPHome
+configuration for it.
+
+| Function | GPIO |
+|---|---|
+| W5500 Ethernet | 9 RST, 10 INT, 11 MOSI, 12 MISO, 13 SCLK, 14 CS |
+| TF card | 4 CS, 5 MISO, 6 MOSI, 7 SCLK |
+| RGB LED (WS2812) | 21 |
+| Camera header | 1, 2, 3, 15, 18, 38, 39, 40, 41, 42, 45, 46, 47, 48 |
+| Native USB | 19, 20 |
+| SPI flash | 26–32 |
+| **Octal PSRAM** (S3R8) | **33–37** |
+
+**Free: 8, 16, 17, and 43/44** (the UART0 pins, available because the console
+runs over native USB-CDC). I²C uses 16 and 17.
+
+Two of these are worth stating as warnings rather than as a table row. The
+octal PSRAM claiming 33–37 appears on no generic S3 pinout. And **GPIO 9 is the
+W5500's reset** — an earlier revision of this firmware used it as I²C SCL,
+which would have held the Ethernet controller in reset while presenting as
+"no network", a symptom nobody traces back to an I²C setting.
 
 ## Sources
 
