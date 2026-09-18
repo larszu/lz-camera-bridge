@@ -160,6 +160,12 @@ number. Every match carries evidence — a measured model, a mere convention, or
 human — and where there is none, there is no match. See
 [`docs/camera-plan.md`](docs/camera-plan.md).
 
+A B4 lens reports its name, open f-number, focal lengths and MOD over the
+serial protocol. Those are **readings from one piece of glass**, not
+capabilities of this repo, so they stay out of the `caps:parity` contract — the
+reasoning, and where they live instead, is in
+[`docs/b4/lens-facts-vs-capabilities.md`](docs/b4/lens-facts-vs-capabilities.md).
+
 ## Packages
 
 | Path | What it is |
