@@ -659,6 +659,11 @@ export class BridgeServer {
       const dummyWs = { readyState: WebSocket.OPEN, send: () => {} } as unknown as WebSocket;
       void this.dispatchCommand(dummyWs, target, cmd, params);
     });
+    // Rohe Reports weiterreichen, wenn der Bedienende sie angefordert hat.
+    // Ohne das ist die Belegung eines fremden Pultes Raten: die Byte-Offsets
+    // eines Gamepads unterscheiden sich je Modell UND je Anschlussart, und
+    // eine abgeschriebene Tabelle legt die Achse still an die falsche Stelle.
+    hid.on('report', (hex: string) => this.broadcast({ type: 'hidReport', hex }));
     hid.on('started', (info) => this.broadcast({ type: 'controlSurface', active: true, info }));
     hid.on('stopped', () => this.broadcast({ type: 'controlSurface', active: false }));
     hid.on('error', (err: Error) => this.broadcast({ type: 'error', message: `Control surface: ${err.message}` }));
