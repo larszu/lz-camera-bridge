@@ -25,6 +25,10 @@ export type ConnectionMode =
   | 'zcam' | 'panasonic-ptz' | 'visca' | 'visca-serial' | 'jvc' | 'birddog'
   // Gimbals: bewegen den Kopf, tragen aber kein Bild.
   | 'dji-osmo' | 'dji-ronin'
+  // A B4 lens behind the ESP32-S3 interface in `packages/firmware-b4`.
+  // Iris only -- the Hirose 12-pin connector has no analog drive input for
+  // zoom or focus at all, so there is nothing else to offer.
+  | 'b4-lens'
   // A camera that is not there — the only mode that needs no address. Every
   // other one wants a host, a port or a USB device, so on a laptop the panel
   // came up empty and every control was inert. The state carries `isDemo`,

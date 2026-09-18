@@ -162,6 +162,32 @@ is found and configured from the host. A PoE ESP32 has the same problem.
 
 ---
 
+### `dmx-bicolor-controller` — the missed precedent
+
+**Not audited in the first pass, and it should have been.** It is the only
+finished firmware on the account that solves this project's *input* problem.
+
+1. **Transport.** Not applicable. DMX512 over a MAX485.
+2. **Device/host protocol.** Not applicable — it is a standalone fixture with no
+   host at all.
+3. **UI shell.** Not applicable. Two knobs.
+4. **Domain model.** **Adapt — this is the find.** Its README states the problem
+   in the same words this project needs: *"oversampling, an exponential moving
+   average, and a deadband, so the output does not shimmer from ADC noise."*
+   Reading iris position off pin 7 through a divider has the identical failure
+   mode and a worse consequence: there the noise made a lamp flicker, here it
+   feeds a closed loop and the iris servo hunts audibly. Adapted as
+   `packages/firmware-b4/src/analog_filter.h`, with that repository named as the
+   origin in the file header.
+5. **CI and release.** **Adapt.** Its repo shape was taken wholesale: a
+   `config.h` that is *the only file anyone should need to touch*, a `tools/`
+   script that **generates** a lookup table rather than shipping a hand-typed
+   one, and a wiring document beside the code. All three are in `firmware-b4`.
+
+The `config.h` convention matters more here than it did there. In that project a
+wrong constant gave the wrong colour temperature. Here Hirose pin 6 carries
++12 V into a chip whose GPIOs are 3.3 V and not 5 V tolerant.
+
 ### `photobooth` — private
 
 **Transport / device split — adapt.** The README documents an **ESP32 PoE
@@ -232,6 +258,8 @@ bridge may need a corresponding entry there. Check before, not after.
 | Domain model | **reuse** | normalized iris/focus/zoom across `cameras/`; `plan/cameraPlan.ts` |
 | CI and release | **reuse** | `.github/workflows/ci.yml` — 9 gates; branch `master` |
 | Firmware structure | **adapt** | `packages/firmware/src/` framing/network/config split |
+| Analog input conditioning | **adapt** | `larszu/dmx-bicolor-controller` → `packages/firmware-b4/src/analog_filter.h` |
+| Firmware repo shape | **reuse** | `larszu/dmx-bicolor-controller`: one `config.h`, generated tables, wiring doc |
 | OSC | **green field** | does not exist anywhere on the account |
 
 ## Recommendation on Phase 4 output

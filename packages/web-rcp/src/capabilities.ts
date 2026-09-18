@@ -80,6 +80,12 @@ const MODE_CAPS: Record<ConnectionMode, Partial<CameraCapabilities>> = {
   jvc: { iris: true, masterGain: true, colorTemp: true, awb: true, focus: true, record: true },
   // BirdDog: motion/optics via VISCA-over-IP (52381), setup via REST :8080.
   birddog: { iris: true, masterGain: true, colorTemp: true, awb: true, focus: true },
+  // A B4 LENS, not a camera. The Hirose 12-pin connector commands exactly
+  // one thing, so exactly one paint control is enabled. `autoIris` is
+  // true and that is unusual here: pin 8 physically switches the lens
+  // between its own auto-iris and remote, so unlike the CCU's NDA-only
+  // auto-setup codes, this one is a wire and can be honestly offered.
+  'b4-lens': { iris: true, autoIris: true },
 };
 
 /** Modes whose backend implements ptz/setZoom/setFocus/presets. */

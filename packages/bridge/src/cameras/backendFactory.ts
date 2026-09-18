@@ -20,6 +20,7 @@ import { ViscaClient } from './ViscaClient.js';
 import { JvcClient } from './JvcClient.js';
 import { BirddogClient } from './BirddogClient.js';
 import { DemoCameraClient } from './DemoCameraClient.js';
+import { B4LensClient } from './B4LensClient.js';
 import { DjiOsmoClient } from './DjiOsmoClient.js';
 import { DjiRoninClient } from './DjiRoninClient.js';
 
@@ -31,6 +32,12 @@ export type ConnectionMode =
   // (Kein Semikolon in diesem Block: valueOrigin.test.ts liest die Union
   // bis zum ersten, und ein Semikolon im Kommentar schnitte sie ab.)
   | 'dji-osmo' | 'dji-ronin'
+  // A B4 LENS, not a camera: the ESP32-S3 interface from
+  // `packages/firmware-b4`, sitting in the Hirose 12-pin cable. Iris is
+  // the only thing that connector can command -- and this is the only
+  // path here whose readback is an independent measurement (pin 7),
+  // not an echo of what we sent (pin 5).
+  | 'b4-lens'
   // A camera that is not there. Every other mode needs a real address, so
   // without hardware the panel came up empty and every control was inert —
   // you could not see the RCP work on a laptop. See `DemoCameraClient` for
@@ -116,7 +123,7 @@ class SonyUsbBackend extends EventEmitter implements CameraBackend {
   }
 }
 
-const GENERIC_PORT: Record<string, number> = { zcam: 80, 'panasonic-ptz': 80, visca: 1259, jvc: 80, birddog: 8080 };
+const GENERIC_PORT: Record<string, number> = { zcam: 80, 'panasonic-ptz': 80, visca: 1259, jvc: 80, birddog: 8080, 'b4-lens': 80 };
 
 /** Build a backend for a camera config. Throws for missing required fields. */
 export function makeBackend(cfg: CameraConfig): BuiltBackend {
@@ -166,6 +173,10 @@ export function makeBackend(cfg: CameraConfig): BuiltBackend {
         }),
         mapState: identity,
       };
+    }
+    case 'b4-lens': {
+      if (!cfg.camHost) throw new Error('Keine Adresse des B4-Objektiv-Interfaces konfiguriert');
+      return { backend: new B4LensClient(cfg.camHost, cfg.camPort ?? 80), mapState: identity };
     }
     case 'zcam': case 'panasonic-ptz': case 'visca': case 'jvc': case 'birddog': {
       const host = cfg.camHost;

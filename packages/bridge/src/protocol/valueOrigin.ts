@@ -155,6 +155,18 @@ export const MODE_READBACK: Readonly<Record<ConnectionMode, readonly PaintField[
   jvc: [],
   // `BirddogClient` reicht die Ereignisse seines ViscaClient durch.
   birddog: [],
+  // DIE AUSNAHME IN DIESER TABELLE. `B4LensClient.poll` liest
+  // `/api/status` und meldet `iris` NUR, wenn das Geraet einen Wert
+  // GEMESSEN hat; `handleRcpCommand('setIris')` sendet bewusst kein
+  // `stateChanged`. Der Wert stammt von Hirose Pin 7 -- einer ANDEREN
+  // ADER als der kommandierenden Pin 5 -- und ist damit der einzige Weg
+  // hier, dessen Rueckmeldung eine unabhaengige Messung ist statt der
+  // Meinung des Geraets ueber sich selbst.
+  //
+  // Zoom und Fokus liest das Interface ebenfalls, stehen aber absichtlich
+  // NICHT hier: `CameraState` hat keine Felder dafuer, und zwei erfundene
+  // Paint-Felder, die niemand kommandieren kann, waeren zwei tote Regler.
+  'b4-lens': ['iris'],
 };
 
 /** Liest dieser Weg dieses Feld ueberhaupt vom Geraet? */
@@ -309,6 +321,12 @@ export const MODE_CADENCE: Readonly<Record<ConnectionMode, ConfirmCadence>> = {
   'dji-ronin': { kind: 'none' },
   jvc: { kind: 'none' },
   birddog: { kind: 'none' },
+  // `B4LensClient`: `setInterval(() => void this.poll(), this.pollMs)`,
+  // Vorgabe 250 ms. Bewusst schneller als jeder Kameraweg hier, und das ist
+  // kein Uebermut: am anderen Ende sitzt ein Blendenservo, den ein Mensch
+  // waehrend der Aufnahme anschaut. Ein Zwei-Sekunden-Takt zeigte eine
+  // Blende, die vor zwei Sekunden dort stand.
+  'b4-lens': { kind: 'poll', everyMs: 250 },
 }
 
 /**

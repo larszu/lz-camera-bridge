@@ -18,6 +18,9 @@ connector, and for reading zoom/focus demands as input devices.
 | [`spc7000-pinout.md`](spc7000-pinout.md) | Transcription of the 3ality SPC-7000 connector sheet, with an analysis of what it corroborates and what it adds. |
 | [`spc7000-pinout.pdf`](spc7000-pinout.pdf) | The original sheet (2010). Source for the transcription above. |
 | [`claude-code-brief.md`](claude-code-brief.md) | The execution brief this work started from. **Partly outdated** — see below. |
+| [`runtime.md`](runtime.md) | Why the firmware is Arduino-ESP32 and not ESP-IDF, and what would reopen it. Settles the first point ADR-008 left open. |
+| [`wiring.md`](wiring.md) | Dividers, the op-amp stage dimensioned, and the commissioning order. Step 4 — measure the amplifier with the lens *disconnected* — is the one people skip and the only one that catches a wrong resistor in time. |
+| [`measurements/`](measurements/) | Real readings, including the ones that failed. Empty until 2026-09-23. |
 | [`../reuse-audit.md`](../reuse-audit.md) | What already exists in this repository and the other repositories, with a reuse verdict per criterion. |
 
 ## Where this work lives
@@ -38,10 +41,21 @@ bridge, they are already the normalized commands *of* it, across eight camera
 clients. A separate repository would have produced a second iris that behaves
 differently from the first.
 
-**Not settled by ADR-008:** the runtime (ESP-IDF vs Arduino core) and whether
-`firmware-b4` is built in CI. The runtime has a concrete criterion rather than a
-matter of taste — the serial line runs inverted, and the inversion belongs in the
-UART's hardware setting, not in software.
+**Both points ADR-008 left open are now settled.**
+
+The **runtime is Arduino-ESP32 core 3.x** — see [`runtime.md`](runtime.md). The
+criterion recorded here did not survive checking: Arduino-ESP32's
+`HardwareSerial::begin()` takes an `invert` flag that calls ESP-IDF's
+`uart_set_line_inverse()`, so the hardware inversion is reached from both and
+does not distinguish them. What decided it instead was the hardware that
+actually exists — mature Arduino libraries for the MCP4728 and ADS1115, one
+board, and a logic analyzer that takes the ESP32 out of the serial question
+entirely.
+
+`firmware-b4` **is built in CI**, both the safe and the armed variant. The armed
+build is the one that matters: it is the only place the drive path compiles at
+all, so a break in it would otherwise surface for the first time on a bench next
+to a lens.
 
 ## Corrections to the brief
 

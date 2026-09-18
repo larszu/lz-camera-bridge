@@ -109,3 +109,71 @@ jobs:
 
       - name: Faehigkeits-Tabelle des multicam-planners stimmt noch
         run: npm run caps:parity -- --planner upstream/multicam-planner
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Die B4-Firmware. ADR-008 legt sie in dieses Repo, `docs/b4/runtime.md`
+  # entscheidet die Laufzeit — und damit ist auch der zweite dort offene
+  # Punkt beantwortet: sie wird in CI gebaut, beide Varianten.
+  #
+  # Der SCHARFE Bau ist der wichtige. Er ist die einzige Stelle, an der der
+  # treibende Pfad ueberhaupt uebersetzt wird (`B4_ENABLE_IRIS_DRIVE`), und
+  # ein Bruch darin faellt sonst zum ersten Mal an einer Werkbank auf, neben
+  # einer Optik im vierstelligen Bereich.
+  #
+  # Eigener Job statt eines Schritts in `verify`: ein zweiter Werkzeugkasten
+  # (PlatformIO, Python) gehoert nicht in den Node-Lauf, und wer nur die
+  # Bruecke aendert, soll nicht auf einen Xtensa-Compiler warten.
+  # ─────────────────────────────────────────────────────────────────────────
+  firmware-b4:
+    name: B4-Firmware
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      - name: PlatformIO installieren
+        run: pip install --upgrade platformio
+
+      - name: PlatformIO zwischenspeichern
+        uses: actions/cache@v6
+        with:
+          path: ~/.platformio
+          key: pio-${{ hashFiles('packages/firmware-b4/platformio.ini') }}
+
+      - name: Bau (sicher, Vorgabe — treibt nichts)
+        working-directory: packages/firmware-b4
+        run: pio run -e waveshare-esp32-s3-eth
+
+      - name: Bau (scharf — der treibende Pfad)
+        working-directory: packages/firmware-b4
+        run: pio run -e waveshare-esp32-s3-eth-armed
+
+      # Der Simulator ist keine Zierde: er ist das, was den
+      # Kalibrier-Rekorder ueberhaupt pruefbar macht, solange keine Hardware
+      # da ist. Laufen die beiden auseinander, ist der Rekorder ungeprueft
+      # bis zu dem Tag, an dem er an einer Optik haengt.
+      - name: Simulator und Rekorder, ganze Kette
+        working-directory: packages/firmware-b4
+        run: |
+          python3 tools/simulator.py --port 8099 &
+          sleep 2
+          python3 tools/record_calibration.py --host 127.0.0.1:8099 --points 9 --settle 0.15
+          curl -fsS http://127.0.0.1:8099/api/calibration.csv | tee /tmp/cal.csv
+          test "$(wc -l < /tmp/cal.csv)" -eq 10   # Kopfzeile + 9 Punkte
+          python3 tools/plot_calibration.py /tmp/cal.csv
+
+      # Die Zusicherung aus dem Brief, §3: der Vorgabebau KANN nicht treiben.
+      # Geprueft wird sie am Verhalten, nicht am Kommentar.
+      - name: Der Bau ohne Antrieb verweigert das Treiben
+        working-directory: packages/firmware-b4
+        run: |
+          python3 tools/simulator.py --port 8098 --no-drive &
+          sleep 2
+          code=$(curl -s -o /dev/null -w '%{http_code}' -X POST \
+            -H 'Content-Type: application/json' -d '{"value":128}' \
+            http://127.0.0.1:8098/api/iris)
+          test "$code" = "409" || { echo "erwartet 409, bekommen $code"; exit 1; }
