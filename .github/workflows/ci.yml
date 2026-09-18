@@ -152,6 +152,26 @@ jobs:
         working-directory: packages/firmware-b4
         run: pio run -e waveshare-esp32-s3-eth-armed
 
+      # Der scharfe Bau MUSS groesser sein als der sichere.
+      #
+      # Das steht hier, weil es schon einmal nicht so war: `config.h` hatte ein
+      # nacktes `#define B4_ENABLE_IRIS_DRIVE 0`, das die Kommandozeile
+      # `-DB4_ENABLE_IRIS_DRIVE=1` stumm ueberschrieb. Beide Bauten kamen
+      # byte-gleich heraus — der "scharfe" war nie scharf, und der Schritt
+      # darueber pruefte nichts. Aufgefallen ist es nur am Vergleich der
+      # Flash-Zahlen. Eine Pruefung, die nicht pruefen kann, ist schlimmer als
+      # keine, also wird der Unterschied jetzt behauptet und nicht gehofft.
+      - name: Die beiden Bauten unterscheiden sich wirklich
+        working-directory: packages/firmware-b4
+        run: |
+          safe=$(stat -c%s .pio/build/waveshare-esp32-s3-eth/firmware.bin)
+          armed=$(stat -c%s .pio/build/waveshare-esp32-s3-eth-armed/firmware.bin)
+          echo "sicher: $safe B / scharf: $armed B"
+          test "$armed" -gt "$safe" || {
+            echo "Der scharfe Bau ist nicht groesser als der sichere."
+            echo "B4_ENABLE_IRIS_DRIVE greift nicht — der treibende Pfad fehlt."
+            exit 1; }
+
       # Der Simulator ist keine Zierde: er ist das, was den
       # Kalibrier-Rekorder ueberhaupt pruefbar macht, solange keine Hardware
       # da ist. Laufen die beiden auseinander, ist der Rekorder ungeprueft

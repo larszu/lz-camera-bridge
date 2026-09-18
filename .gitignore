@@ -11,3 +11,6 @@ build.log
 # Die gebaute Projektseite (scripts/build-site.py). Sie entsteht in CI neu;
 # eine eingecheckte Kopie waere ein zweiter Stand derselben Doku.
 _site/
+
+# PlatformIO-Bauverzeichnis (packages/firmware-b4)
+.pio/

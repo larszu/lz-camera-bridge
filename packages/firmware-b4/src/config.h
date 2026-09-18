@@ -31,7 +31,16 @@
  * deliberate act. Flashing a build with this at 1 must not be enough to move
  * an iris the moment the cable is plugged in.
  */
+/*
+ * #ifndef, not a bare #define: platformio.ini's armed environment passes
+ * -DB4_ENABLE_IRIS_DRIVE=1 on the command line, and a bare #define here would
+ * silently override it. It did -- both builds came out byte-identical, so the
+ * "armed" build was never armed and the CI job that built it was checking
+ * nothing. Caught by comparing the flash figures of the two builds.
+ */
+#ifndef B4_ENABLE_IRIS_DRIVE
 #define B4_ENABLE_IRIS_DRIVE 0
+#endif
 
 /*
  * Never transmit on the lens serial line (Hirose pin 12).
@@ -41,7 +50,9 @@
  * all and pin 11 is an ANALOG focus-position output — driving it would be
  * driving against the lens's own buffer. Leave this at 0.
  */
+#ifndef B4_ENABLE_SERIAL_TX
 #define B4_ENABLE_SERIAL_TX 0
+#endif
 
 // ───────────────────────────────────────────────────────────────────────────
 // 2. BOARD — Waveshare ESP32-S3-ETH

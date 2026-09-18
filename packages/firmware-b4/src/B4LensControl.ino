@@ -34,16 +34,17 @@
 #include "config.h"
 #include "analog_filter.h"
 #include "calibration.h"
+// web_page.h is included further down, after `server` exists.
 
 // ── W5500 wiring on the Waveshare ESP32-S3-ETH ─────────────────────────────
-#define ETH_PHY_TYPE ETH_PHY_W5500
-#define ETH_PHY_ADDR 1
-#define ETH_PHY_CS 16
-#define ETH_PHY_IRQ 12
-#define ETH_PHY_RST 39
-#define ETH_SPI_SCK 15
-#define ETH_SPI_MISO 14
-#define ETH_SPI_MOSI 13
+#define B4_ETH_TYPE ETH_PHY_W5500
+#define B4_ETH_ADDR 1
+#define B4_ETH_CS 16
+#define B4_ETH_IRQ 12
+#define B4_ETH_RST 39
+#define B4_ETH_SCK 15
+#define B4_ETH_MISO 14
+#define B4_ETH_MOSI 13
 
 // ── I²C addresses ──────────────────────────────────────────────────────────
 #define ADDR_MCP4728 0x60
@@ -92,12 +93,11 @@ static bool readChannel(uint8_t ch, float &out) {
   if (!health.adcPresent) return false;
   int32_t acc = 0;
   for (uint8_t i = 0; i < ADC_OVERSAMPLE; ++i) {
-    const int16_t v = ads.readADC_SingleEnded(ch);
-    if (v == 0 && i == 0 && ads.getLastConversionResults() == 0) {
-      // A single zero is legitimate; a dead bus reads zero forever. The
-      // distinction is made by the I²C probe below, not by guessing here.
-    }
-    acc += v;
+    // A single zero reading is legitimate — a grounded input reads zero.
+    // Whether the ADC is THERE is decided by the I²C probe, not by looking
+    // for suspicious values here; guessing from the data would mean a
+    // genuinely closed iris could be mistaken for a missing chip.
+    acc += ads.readADC_SingleEnded(ch);
   }
   out = static_cast<float>(acc) / ADC_OVERSAMPLE;
   return true;
@@ -143,7 +143,6 @@ static void stopMotion(const char *why) {
   drive.dacCode = 0;
 }
 
-#if B4_ENABLE_IRIS_DRIVE
 /**
  * One iteration of the outer loop.
  *
@@ -152,6 +151,14 @@ static void stopMotion(const char *why) {
  * proportional term stacked on a servo is how you get oscillation.
  */
 static void serviceLoop(float irisCounts, bool haveFeedback) {
+#if !B4_ENABLE_IRIS_DRIVE
+  // Nothing is compiled in that could move anything. The function
+  // still EXISTS because the .ino prototype generator emits a
+  // declaration for it either way, and a declared-but-undefined
+  // static is a warning now and a link error later.
+  (void)irisCounts;
+  (void)haveFeedback;
+#else
   if (!drive.armed) return;
 
   if (!haveFeedback) {
@@ -194,14 +201,13 @@ static void serviceLoop(float irisCounts, bool haveFeedback) {
 
   drive.holding = pct <= LOOP_TOLERANCE_PCT;
   drive.fault = nullptr;
-}
 #endif
+}
 
 // ───────────────────────────────────────────────────────────────────────────
 // HTTP
 // ───────────────────────────────────────────────────────────────────────────
 
-static float gIrisCounts = 0, gZoomCounts = 0, gFocusCounts = 0;
 static bool gIrisOk = false, gZoomOk = false, gFocusOk = false;
 
 static String lensVolts(float counts) {
@@ -364,86 +370,7 @@ static void handleLiveCsv() {
   server.send(200, "text/csv", csv);
 }
 
-static void handleRoot();
-
-/**
- * The built-in page.
- *
- * It exists because of where this device is used: you are standing at a lens
- * turning a focus ring, and the numbers you need are on a laptop on the other
- * side of the room. A page the lens serves itself is readable from a phone
- * over the same Ethernet that carries the control.
- *
- * Deliberately one file, no framework, no CDN. A control device that cannot
- * show its own state without fetching a megabyte from the internet is a
- * control device that stops working in an OB truck.
- */
-static void handleRoot() {
-  static const char PAGE[] PROGMEM = R"HTML(<!doctype html>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>B4 Lens Control</title>
-<style>
- :root{color-scheme:light dark;--fg:#111;--bg:#fafafa;--mut:#666;--ok:#1a7f37;--bad:#b42318;--line:#ddd}
- @media(prefers-color-scheme:dark){:root{--fg:#eee;--bg:#161616;--mut:#999;--line:#333}}
- body{margin:0;padding:16px;font:14px/1.5 system-ui,sans-serif;background:var(--bg);color:var(--fg)}
- h1{font-size:18px;margin:0 0 4px}
- .sub{color:var(--mut);margin-bottom:16px}
- .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
- .card{border:1px solid var(--line);border-radius:8px;padding:12px}
- .k{color:var(--mut);font-size:12px;text-transform:uppercase;letter-spacing:.04em}
- .v{font-size:24px;font-variant-numeric:tabular-nums;margin-top:2px}
- .u{color:var(--mut);font-size:13px}
- .na{color:var(--mut);font-size:16px;font-style:italic}
- .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
- .pill{padding:2px 8px;border-radius:99px;font-size:12px;border:1px solid var(--line)}
- .on{color:var(--ok);border-color:var(--ok)} .off{color:var(--bad);border-color:var(--bad)}
- table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
- td,th{border-bottom:1px solid var(--line);padding:4px 6px;text-align:right}
- th:first-child,td:first-child{text-align:left}
- button{font:inherit;padding:6px 12px;border:1px solid var(--line);border-radius:6px;background:transparent;color:inherit;cursor:pointer}
- input[type=range]{width:100%}
- .warn{border-left:3px solid var(--bad);padding-left:10px;color:var(--mut);margin:12px 0}
-</style>
-<h1>B4 Lens Control</h1>
-<div class="sub">Canon/Fujinon 2/3&quot; B4 &mdash; Hirose 12-pin</div>
-<div class="row" id="pills"></div>
-<div class="grid" id="vals"></div>
-<div id="drive"></div>
-<div class="warn">Every electrical figure this device reports rests on a divider
-ratio you entered in <code>config.h</code>. It is measuring, not certifying.</div>
-<h2 style="font-size:15px">Calibration</h2>
-<div id="cal"></div>
-<script>
-const $=s=>document.querySelector(s);
-function cell(k,v,u){return `<div class="card"><div class="k">${k}</div>`+
- (v===undefined?`<div class="na">not read</div>`:`<div class="v">${v}<span class="u">${u||''}</span></div>`)+`</div>`}
-async function tick(){
- let s; try{ s=await (await fetch('/api/status')).json() }catch(e){ return }
- $('#pills').innerHTML=
-  `<span class="pill ${s.i2c.adc?'on':'off'}">ADC ${s.i2c.adc?'ok':'missing'}</span>`+
-  `<span class="pill ${s.i2c.dac?'on':'off'}">DAC ${s.i2c.dac?'ok':'missing'}</span>`+
-  `<span class="pill ${s.calibrated?'on':'off'}">${s.calibrated?'calibrated ('+s.calPoints+' pts)':'not calibrated'}</span>`+
-  `<span class="pill ${s.armed?'on':'off'}">${s.armed?'ARMED':'disarmed'}</span>`+
-  (s.driveCompiledIn?'':'<span class="pill off">drive not compiled in</span>');
- const L=s.lens||{};
- $('#vals').innerHTML=
-  cell('Iris',L.iris,' / 255')+
-  cell('Iris volts',L.irisVolts,' V')+
-  cell('Zoom volts',L.zoomVolts,' V')+
-  cell('Focus volts',L.focusVolts,' V');
- const d=s.drive;
- $('#drive').innerHTML=`<div class="card"><div class="k">Setpoint ${d.setpoint} &mdash; DAC ${d.dacCode}`+
-  (d.fault?` &mdash; <span style="color:var(--bad)">${d.fault}</span>`:(d.holding?' &mdash; holding':''))+`</div>`+
-  `<input type=range min=0 max=255 value="${d.setpoint}" id="sp" ${s.armed&&s.calibrated?'':'disabled'}></div>`;
- $('#sp').oninput=e=>fetch('/api/iris',{method:'POST',body:JSON.stringify({value:+e.target.value})});
- $('#cal').innerHTML=s.calPoints? '<a href="/api/calibration.csv">download calibration.csv</a>'
-  : 'No table recorded. Run <code>packages/firmware-b4/tools/record_calibration.py</code>; the device refuses to drive until then.';
-}
-tick(); setInterval(tick,500);
-</script>
-)HTML";
-  server.send_P(200, "text/html", PAGE);
-}
+#include "web_page.h"
 
 static void setupRoutes() {
   server.on("/", HTTP_GET, handleRoot);
@@ -501,8 +428,8 @@ void setup() {
   Serial.println(cal.load() ? F("Calibration table loaded from NVS.")
                             : F("No calibration table. Drive will refuse until one is recorded."));
 
-  SPI.begin(ETH_SPI_SCK, ETH_SPI_MISO, ETH_SPI_MOSI);
-  ETH.begin(ETH_PHY_TYPE, ETH_PHY_ADDR, ETH_PHY_CS, ETH_PHY_IRQ, ETH_PHY_RST, SPI);
+  SPI.begin(B4_ETH_SCK, B4_ETH_MISO, B4_ETH_MOSI);
+  ETH.begin(B4_ETH_TYPE, B4_ETH_ADDR, B4_ETH_CS, B4_ETH_IRQ, B4_ETH_RST, SPI);
   ETH.setHostname(HOSTNAME);
 
   setupRoutes();
@@ -528,13 +455,11 @@ void loop() {
 
   float c;
   gIrisOk = readChannel(ADS_CH_IRIS_POSITION, c);
-  if (gIrisOk) { gIrisCounts = c; fIris.push(c); }
+  if (gIrisOk) fIris.push(c);
   gZoomOk = readChannel(ADS_CH_ZOOM_POSITION, c);
-  if (gZoomOk) { gZoomCounts = c; fZoom.push(c); }
+  if (gZoomOk) fZoom.push(c);
   gFocusOk = readChannel(ADS_CH_FOCUS_POSITION, c);
-  if (gFocusOk) { gFocusCounts = c; fFocus.push(c); }
+  if (gFocusOk) fFocus.push(c);
 
-#if B4_ENABLE_IRIS_DRIVE
   serviceLoop(fIris.stable(), gIrisOk && fIris.primed());
-#endif
 }
