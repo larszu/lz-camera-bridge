@@ -1,0 +1,242 @@
+<!doctype html><html lang="de"><head><meta charset="utf-8"><title>B4 Objektivsteuerung — Iris</title><style>:root{
+  --navy:#1D324F; --deep:#132040; --off:#F6F5F0; --eis:#E1ECEF;
+  --stahl:#8C9CB3; --schiefer:#5C6B85; --tally:#D6402E;
+}
+@page{ size:A4; margin:20mm 20mm 25mm 20mm; }
+*{ box-sizing:border-box; border-radius:0 !important; }
+html,body{ margin:0; padding:0; background:#fff; color:var(--navy);
+  font-family:"Public Sans","Segoe UI",Arial,sans-serif;
+  font-size:10pt; line-height:1.5; -webkit-font-smoothing:antialiased; }
+
+/* ── Kopflinie: Kicker + durchgehende Linie, einer pro Flaeche ──────────── */
+.kopf{ margin-bottom:6mm; }
+.kicker{ font-weight:700; text-transform:uppercase; font-size:7.5pt;
+  letter-spacing:.18em; color:var(--schiefer); margin-bottom:2mm; }
+.kopf hr{ border:0; border-top:.6pt solid var(--stahl); margin:0; }
+
+h1{ font-weight:900; font-style:italic; text-transform:uppercase;
+  font-size:30pt; line-height:1.03; letter-spacing:-.015em;
+  margin:0 0 4mm; max-width:150mm; }
+h1 .pt{ color:var(--tally); }
+.sub{ font-weight:500; font-size:13pt; color:var(--schiefer);
+  margin:0 0 8mm; max-width:140mm; }
+
+h2{ font-weight:800; font-size:13pt; margin:9mm 0 2.5mm;
+  padding-top:2.5mm; border-top:.6pt solid var(--stahl); }
+h2:first-of-type{ margin-top:0; }
+h3{ font-weight:800; font-size:10.5pt; margin:5mm 0 1.5mm; }
+p{ margin:0 0 3mm; max-width:165mm; }
+.lead{ font-size:11pt; color:var(--schiefer); }
+strong{ font-weight:800; }
+code{ font-family:"SF Mono",Menlo,Consolas,monospace; font-size:9pt;
+  background:var(--eis); padding:.3mm 1mm; }
+
+ul{ margin:0 0 3mm; padding:0; list-style:none; }
+li{ margin:0 0 1.5mm; padding-left:5mm; position:relative; }
+li::before{ content:"–"; position:absolute; left:0; color:var(--stahl); }
+
+table{ width:100%; border-collapse:collapse; margin:0 0 4mm; font-size:9pt; }
+th{ background:var(--eis); text-align:left; font-weight:800; font-size:7.5pt;
+  text-transform:uppercase; letter-spacing:.12em; padding:1.8mm 2mm; }
+td{ padding:1.8mm 2mm; border-bottom:.4pt solid var(--eis);
+  vertical-align:top; }
+td.n{ font-variant-numeric:tabular-nums; white-space:nowrap; }
+tr.warn td{ background:#FBF0EE; }
+
+.box{ background:var(--eis); padding:4mm 5mm; margin:0 0 5mm; }
+.box p:last-child{ margin-bottom:0; }
+.box .lbl{ font-weight:800; font-size:7.5pt; text-transform:uppercase;
+  letter-spacing:.14em; color:var(--schiefer); margin-bottom:1.5mm; }
+
+.stop{ background:var(--navy); color:var(--off); padding:5mm 6mm; margin:0 0 5mm; }
+.stop .lbl{ font-weight:800; font-size:7.5pt; text-transform:uppercase;
+  letter-spacing:.14em; color:var(--stahl); margin-bottom:2mm; }
+.stop p{ margin-bottom:2mm; } .stop p:last-child{ margin-bottom:0; }
+.stop code{ background:rgba(255,255,255,.12); color:var(--off); }
+
+pre{ background:var(--eis); padding:3.5mm 4mm; margin:0 0 4mm;
+  font-family:"SF Mono",Menlo,Consolas,monospace; font-size:8.5pt;
+  line-height:1.45; white-space:pre; overflow:hidden; }
+
+.two{ display:grid; grid-template-columns:1fr 1fr; gap:0 8mm; }
+.logo{ height:11mm; margin-bottom:8mm; }
+.foot{ position:running(foot); }
+h2,h3{ break-after:avoid; }
+.box,.stop,pre,.two{ break-inside:avoid; }
+thead{ display:table-header-group; }
+tr{ break-inside:avoid; }
+.keep{ break-inside:avoid; }
+.meta{ font-size:8pt; color:var(--schiefer); margin-top:6mm;
+  padding-top:2.5mm; border-top:.6pt solid var(--stahl); }
+</style></head><body>
+<img class="logo" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjQ3OC4xMjkgNDU1LjU3MCA5OTcuMzM2IDIxMC40MjIiPjxwYXRoIGZpbGwtcnVsZT0ibm9uemVybyIgZD0iTSA0NzguMTI4OTA2IDU5NS40NDUzMTIgTCA1MDUuMjg1MTU2IDQ1NS41NzAzMTIgTCA1NDAuMjA3MDMxIDQ1NS41NzAzMTIgTCA1MTMuMDQ2ODc1IDU5NS40NDUzMTIgWiBNIDQ3OC4xMjg5MDYgNTk1LjQ0NTMxMiAgTSA1NzAuMDgyMDMxIDU2NS4xNzk2ODggQyA1NjguOTE3OTY5IDU3MS4xMzI4MTIgNTcxLjc2MTcxOSA1NzQuMTA1NDY5IDU3OC42MTcxODggNTc0LjEwNTQ2OSBDIDU4Mi4zNjcxODggNTc0LjEwNTQ2OSA1ODUuNjk5MjE5IDU3Mi42MjEwOTQgNTg4LjYwOTM3NSA1NjkuNjQ0NTMxIEMgNTkxLjUxOTUzMSA1NjYuNjY3OTY5IDU5My40MjU3ODEgNTYyLjg1MTU2MiA1OTQuMzMyMDMxIDU1OC4xOTUzMTIgTCA1OTUuMzA0Njg4IDU1My43MzQzNzUgQyA1OTIuODQzNzUgNTU0LjI1MzkwNiA1ODguODk4NDM4IDU1NC43MDMxMjUgNTgzLjQ2ODc1IDU1NS4wOTM3NSBDIDU3OS4zMjgxMjUgNTU1LjYxMzI4MSA1NzYuMjIyNjU2IDU1Ni42MTMyODEgNTc0LjE1NjI1IDU1OC4xMDE1NjIgQyA1NzIuMDg1OTM4IDU1OS41ODk4NDQgNTcwLjcyNjU2MiA1NjEuOTQ5MjE5IDU3MC4wODIwMzEgNTY1LjE3OTY4OCBNIDU2MC4zODI4MTIgNTk3LjM4MjgxMiBDIDU0OS41MTk1MzEgNTk3LjM4MjgxMiA1NDEuOTE3OTY5IDU5NC44NjMyODEgNTM3LjU4NTkzOCA1ODkuODIwMzEyIEMgNTMzLjI1MzkwNiA1ODQuNzczNDM4IDUzMi4xMjEwOTQgNTc3LjAxNTYyNSA1MzQuMTkxNDA2IDU2Ni41MzkwNjIgQyA1MzcuNDI1NzgxIDU0OS44NTU0NjkgNTUwLjk0MTQwNiA1NDAuMDg5ODQ0IDU3NC43MzgyODEgNTM3LjI0NjA5NCBDIDU4MC41NTg1OTQgNTM2LjQ2ODc1IDU4OC42NDA2MjUgNTM1LjY5MTQwNiA1OTguOTg4MjgxIDUzNC45MTc5NjkgTCA1OTguOTg4MjgxIDUzNC41MjczNDQgQyA1OTkuODkwNjI1IDUzMC4xMzI4MTIgNTk5LjIxNDg0NCA1MjcuMDU4NTk0IDU5Ni45NDkyMTkgNTI1LjMxMjUgQyA1OTQuNjg3NSA1MjMuNTY2NDA2IDU5MC42NDQ1MzEgNTIyLjY5NTMxMiA1ODQuODI0MjE5IDUyMi42OTUzMTIgQyA1ODAuODE2NDA2IDUyMi42OTUzMTIgNTc2LjE2MDE1NiA1MjMuMzA4NTk0IDU3MC44NTkzNzUgNTI0LjUzOTA2MiBDIDU2NS41NTQ2ODggNTI1Ljc2OTUzMSA1NjEuMjg1MTU2IDUyNy4wMzEyNSA1NTguMDU0Njg4IDUyOC4zMjAzMTIgTCA1NTMuMjAzMTI1IDUzMC4yNjE3MTkgTCA1NTMuNzg1MTU2IDUwMS45Mzc1IEMgNTY5LjQzMzU5NCA0OTUuNjAxNTYyIDU4NC42OTUzMTIgNDkyLjQyOTY4OCA1OTkuNTcwMzEyIDQ5Mi40Mjk2ODggQyA2MTMuMDE5NTMxIDQ5Mi40Mjk2ODggNjIyLjg4MjgxMiA0OTUuNTAzOTA2IDYyOS4xNTYyNSA1MDEuNjQ0NTMxIEMgNjM1LjQyNTc4MSA1MDcuNzg5MDYyIDYzNy40NjQ4NDQgNTE2LjQyMTg3NSA2MzUuMjY1NjI1IDUyNy41NDI5NjkgTCA2MjIuMDc0MjE5IDU5NS40NDUzMTIgTCA1OTMuOTQ1MzEyIDU5NS40NDUzMTIgTCA1OTAuMjU3ODEyIDU4Ny42ODM1OTQgQyA1ODIuMjM4MjgxIDU5NC4xNTIzNDQgNTcyLjI4MTI1IDU5Ny4zODI4MTIgNTYwLjM4MjgxMiA1OTcuMzgyODEyICBNIDY3NC40NTMxMjUgNTk1LjQ0NTMxMiBMIDYzOS41MzEyNSA1OTUuNDQ1MzEyIEwgNjU5LjEyNSA0OTQuNTY2NDA2IEwgNjkxLjMzMjAzMSA0OTQuNTY2NDA2IEwgNjkwLjk0MTQwNiA1MDYuMjAzMTI1IEMgNjk5LjYwNTQ2OSA0OTcuNTQyOTY5IDcwOS4xNzk2ODggNDkzLjIwNzAzMSA3MTkuNjUyMzQ0IDQ5My4yMDcwMzEgQyA3MjMuMjczNDM4IDQ5My4yMDcwMzEgNzI2LjgzMjAzMSA0OTMuNjYwMTU2IDczMC4zMjQyMTkgNDk0LjU2NjQwNiBMIDcxOS4wNzAzMTIgNTI4LjUxNTYyNSBDIDcxNS4xOTE0MDYgNTI3LjQ4MDQ2OSA3MTEuODI4MTI1IDUyNi45NjA5MzggNzA4Ljk4NDM3NSA1MjYuOTYwOTM4IEMgNzAzLjAzMTI1IDUyNi45NjA5MzggNjk3Ljk4ODI4MSA1MjguOTY4NzUgNjkzLjg1MTU2MiA1MzIuOTc2NTYyIEMgNjg5LjcxMDkzOCA1MzYuOTg4MjgxIDY4Ni4wOTM3NSA1NDMuMjU3ODEyIDY4Mi45ODgyODEgNTUxLjc5Mjk2OSBaIE0gNjc0LjQ1MzEyNSA1OTUuNDQ1MzEyICBNIDcxOS42NTIzNDQgNTg5LjQyOTY4OCBMIDcyOS4xNTYyNSA1NjEuODgyODEyIEMgNzQwLjc5Njg3NSA1NjcuNDQ1MzEyIDc1MS41OTM3NSA1NzAuMjI2NTYyIDc2MS41NTQ2ODggNTcwLjIyNjU2MiBDIDc2OC43OTY4NzUgNTcwLjIyNjU2MiA3NzIuODA4NTk0IDU2OC40MTQwNjIgNzczLjU4MjAzMSA1NjQuNzkyOTY5IEMgNzczLjgzOTg0NCA1NjMuMjQyMTg4IDc3Mi44NzEwOTQgNTYxLjkxNDA2MiA3NzAuNjcxODc1IDU2MC44MTY0MDYgQyA3NjguNDcyNjU2IDU1OS43MTg3NSA3NjUuNjYwMTU2IDU1OC44NDM3NSA3NjIuMjM0Mzc1IDU1OC4xOTUzMTIgQyA3NTguODA0Njg4IDU1Ny41NTA3ODEgNzU1LjE1MjM0NCA1NTYuNDg0Mzc1IDc1MS4yNzM0MzggNTU0Ljk5NjA5NCBDIDc0Ny4zOTQ1MzEgNTUzLjUxMTcxOSA3NDMuODY3MTg4IDU1MS42OTkyMTkgNzQwLjY5OTIxOSA1NDkuNTYyNSBDIDczNy41MzEyNSA1NDcuNDI5Njg4IDczNS4xNzE4NzUgNTQ0LjE2NDA2MiA3MzMuNjIxMDk0IDUzOS43NjU2MjUgQyA3MzIuMDY2NDA2IDUzNS4zNzEwOTQgNzMxLjg3NSA1MzAuMTMyODEyIDczMy4wMzkwNjIgNTI0LjA1MDc4MSBDIDczNy4wNDY4NzUgNTAyLjk3MjY1NiA3NTMuNDA2MjUgNDkyLjQyOTY4OCA3ODIuMTIxMDk0IDQ5Mi40Mjk2ODggQyA3ODguMzI4MTI1IDQ5Mi40Mjk2ODggNzk0LjM3MTA5NCA0OTMuMDQ2ODc1IDgwMC4yNTc4MTIgNDk0LjI3MzQzOCBDIDgwNi4xNDA2MjUgNDk1LjUwMzkwNiA4MTAuNDQ1MzEyIDQ5Ni42OTkyMTkgODEzLjE2MDE1NiA0OTcuODYzMjgxIEwgODE3LjQyNTc4MSA0OTkuNjA5Mzc1IEwgODA4LjExNzE4OCA1MjYuOTYwOTM4IEMgODAwLjM1NTQ2OSA1MjIuMDUwNzgxIDc5MC45MTQwNjIgNTE5LjU4OTg0NCA3NzkuNzkyOTY5IDUxOS41ODk4NDQgQyA3NzMuMDYyNSA1MTkuNTg5ODQ0IDc2OS40NDE0MDYgNTIwLjk0OTIxOSA3NjguOTI1NzgxIDUyMy42NjQwNjIgQyA3NjguNjY3OTY5IDUyNS4zNDc2NTYgNzY5LjYwNTQ2OSA1MjYuNzM4MjgxIDc3MS43NDIxODggNTI3LjgzNTkzOCBDIDc3My44NzUgNTI4LjkzNzUgNzc2LjY4NzUgNTI5Ljc3NzM0NCA3ODAuMTc5Njg4IDUzMC4zNTkzNzUgQyA3ODMuNjcxODc1IDUzMC45NDE0MDYgNzg3LjM1NTQ2OSA1MzEuOTc2NTYyIDc5MS4yMzgyODEgNTMzLjQ2MDkzOCBDIDc5NS4xMTcxODggNTM0Ljk0OTIxOSA3OTguNjQwNjI1IDUzNi43OTI5NjkgODAxLjgwODU5NCA1MzguOTkyMTg4IEMgODA0Ljk3NjU2MiA1NDEuMTkxNDA2IDgwNy4zMzk4NDQgNTQ0LjU4NTkzOCA4MDguODkwNjI1IDU0OS4xNzU3ODEgQyA4MTAuNDQ1MzEyIDU1My43Njk1MzEgODEwLjU3MDMxMiA1NTkuMjM0Mzc1IDgwOS4yODEyNSA1NjUuNTcwMzEyIEMgODA3LjA3ODEyNSA1NzYuNTYyNSA4MDEuOTY4NzUgNTg0LjYxMzI4MSA3OTMuOTUzMTI1IDU4OS43MjI2NTYgQyA3ODUuOTMzNTk0IDU5NC44MzIwMzEgNzc0Ljg3NSA1OTcuMzgyODEyIDc2MC43ODEyNSA1OTcuMzgyODEyIEMgNzUzLjE0NDUzMSA1OTcuMzgyODEyIDc0NS45MDYyNSA1OTYuNzM4MjgxIDczOS4wNTA3ODEgNTk1LjQ0NTMxMiBDIDczMi4xOTUzMTIgNTk0LjE1MjM0NCA3MjcuMjgxMjUgNTkyLjg1OTM3NSA3MjQuMzA4NTk0IDU5MS41NjY0MDYgWiBNIDcxOS42NTIzNDQgNTg5LjQyOTY4OCAgTSA5NDkuOTI1NzgxIDU5NS40NDUzMTIgTCA4NjcuNDc2NTYyIDU5NS40NDUzMTIgTCA4NzIuNzEwOTM4IDU2OC4yODUxNTYgTCA5MjIuNTcwMzEyIDUyMS43MjY1NjIgTCA4ODEuODMyMDMxIDUyMS43MjY1NjIgTCA4ODcuMDcwMzEyIDQ5NC41NjY0MDYgTCA5NjkuNTE5NTMxIDQ5NC41NjY0MDYgTCA5NjQuMjgxMjUgNTIxLjcyNjU2MiBMIDkxNC40MjE4NzUgNTY4LjI4NTE1NiBMIDk1NS4xNjQwNjIgNTY4LjI4NTE1NiBaIE0gOTQ5LjkyNTc4MSA1OTUuNDQ1MzEyICBNIDEwMDMuMjczNDM4IDU5Ny41NzgxMjUgQyA5OTAuNTk3NjU2IDU5Ny41NzgxMjUgOTgxLjk2NDg0NCA1OTQuNjA1NDY5IDk3Ny4zNzUgNTg4LjY1NjI1IEMgOTcyLjc4MTI1IDU4Mi43MDcwMzEgOTcxLjc3NzM0NCA1NzMuMTMyODEyIDk3NC4zNjcxODggNTU5Ljk0MTQwNiBMIDk4Ni45NzY1NjIgNDk0LjU2NjQwNiBMIDEwMjEuODk4NDM4IDQ5NC41NjY0MDYgTCAxMDExLjAzNTE1NiA1NTAuMjQyMTg4IEMgMTAwOC45NjA5MzggNTYxLjEwNTQ2OSAxMDExLjc0MjE4OCA1NjYuNTM5MDYyIDEwMTkuMzc1IDU2Ni41MzkwNjIgQyAxMDIzLjY0NDUzMSA1NjYuNTM5MDYyIDEwMjcuMjYxNzE5IDU2NC44OTA2MjUgMTAzMC4yMzgyODEgNTYxLjU4OTg0NCBDIDEwMzMuMjEwOTM4IDU1OC4yOTI5NjkgMTAzNS43OTY4NzUgNTUzLjAyNzM0NCAxMDM4IDU0NS43ODEyNSBMIDEwNDcuODk0NTMxIDQ5NC41NjY0MDYgTCAxMDgyLjgxMjUgNDk0LjU2NjQwNiBMIDEwNjMuMjE4NzUgNTk1LjQ0NTMxMiBMIDEwMzEuNDAyMzQ0IDU5NS40NDUzMTIgTCAxMDMxLjAxNTYyNSA1ODQuMzg2NzE5IEMgMTAyMy42NDQ1MzEgNTkzLjE4MzU5NCAxMDE0LjM5NDUzMSA1OTcuNTc4MTI1IDEwMDMuMjczNDM4IDU5Ny41NzgxMjUgIE0gMTExNy41MzkwNjIgNTk1LjQ0NTMxMiBMIDEwODIuNjE3MTg4IDU5NS40NDUzMTIgTCAxMTAyLjIxMDkzOCA0OTQuNTY2NDA2IEwgMTEzNC4wMjczNDQgNDk0LjU2NjQwNiBMIDExMzQuNDE3OTY5IDUwNC44NDc2NTYgQyAxMTQxLjM5ODQzOCA0OTYuNTcwMzEyIDExNTAgNDkyLjQyOTY4OCAxMTYwLjIxODc1IDQ5Mi40Mjk2ODggQyAxMTc2LjUxNTYyNSA0OTIuNDI5Njg4IDExODUuNzYxNzE5IDQ5OC4wNTg1OTQgMTE4Ny45NjA5MzggNTA5LjMwODU5NCBDIDExOTUuODQ3NjU2IDQ5OC4wNTg1OTQgMTIwNS42MTMyODEgNDkyLjQyOTY4OCAxMjE3LjI1MzkwNiA0OTIuNDI5Njg4IEMgMTIyOS4xNTIzNDQgNDkyLjQyOTY4OCAxMjM3LjI2NTYyNSA0OTUuNDA2MjUgMTI0MS42MDE1NjIgNTAxLjM1NTQ2OSBDIDEyNDUuOTMzNTk0IDUwNy4zMDQ2ODggMTI0Ni44NjcxODggNTE2Ljg3NSAxMjQ0LjQxNDA2MiA1MzAuMDY2NDA2IEwgMTIzMS42MDkzNzUgNTk1LjQ0NTMxMiBMIDExOTYuNjkxNDA2IDU5NS40NDUzMTIgTCAxMjA3LjU1NDY4OCA1MzkuNzY1NjI1IEMgMTIwOS42MjEwOTQgNTI4LjkwMjM0NCAxMjA3LjQyNTc4MSA1MjMuNDcyNjU2IDEyMDAuOTU3MDMxIDUyMy40NzI2NTYgQyAxMTkzLjk3NjU2MiA1MjMuNDcyNjU2IDExODguNTQyOTY5IDUzMC4xMzI4MTIgMTE4NC42NjAxNTYgNTQzLjQ1MzEyNSBMIDExNzQuNTc0MjE5IDU5NS40NDUzMTIgTCAxMTM5LjY1MjM0NCA1OTUuNDQ1MzEyIEwgMTE1MC41MTk1MzEgNTM5Ljc2NTYyNSBDIDExNTIuNTg1OTM4IDUyOC45MDIzNDQgMTE1MC4zODY3MTkgNTIzLjQ3MjY1NiAxMTQzLjkyMTg3NSA1MjMuNDcyNjU2IEMgMTEzNi45Mzc1IDUyMy40NzI2NTYgMTEzMS41MDc4MTIgNTMwLjEzMjgxMiAxMTI3LjYyNSA1NDMuNDUzMTI1IFogTSAxMTE3LjUzOTA2MiA1OTUuNDQ1MzEyICBNIDEyOTcuNzY1NjI1IDUzNC41MjczNDQgTCAxMjkzLjEwOTM3NSA1NTguMzkwNjI1IEMgMTI5NC4wMTE3MTkgNTY0Ljk4ODI4MSAxMjk4LjkyNTc4MSA1NjguMjg1MTU2IDEzMDcuODUxNTYyIDU2OC4yODUxNTYgQyAxMzEzLjY3MTg3NSA1NjguMjg1MTU2IDEzMTguMjMwNDY5IDU2Ni40NDE0MDYgMTMyMS41MjczNDQgNTYyLjc1MzkwNiBDIDEzMjQuODI0MjE5IDU1OS4wNzAzMTIgMTMyNy4zMTY0MDYgNTUzLjE1MjM0NCAxMzI4Ljk5NjA5NCA1NDUuMDAzOTA2IEMgMTMzMC41NTA3ODEgNTM2Ljg1NTQ2OSAxMzMwLjM4NjcxOSA1MzAuOTEwMTU2IDEzMjguNTExNzE5IDUyNy4xNTYyNSBDIDEzMjYuNjM2NzE5IDUyMy40MDYyNSAxMzIyLjc4OTA2MiA1MjEuNTMxMjUgMTMxNi45Njg3NSA1MjEuNTMxMjUgQyAxMzA4LjE3MTg3NSA1MjEuNTMxMjUgMTMwMS43Njk1MzEgNTI1Ljg2NzE4OCAxMjk3Ljc2NTYyNSA1MzQuNTI3MzQ0IE0gMTIzNi4wNTQ2ODggNjY1Ljk5MjE4OCBMIDEyNzAuNjA1NDY5IDQ5NC41NjY0MDYgTCAxMzAyLjgwODU5NCA0OTQuNTY2NDA2IEwgMTMwMyA1MDQuNDU3MDMxIEMgMTMxMS42NjQwNjIgNDk2LjQ0MTQwNiAxMzIxLjgyMDMxMiA0OTIuNDI5Njg4IDEzMzMuNDU3MDMxIDQ5Mi40Mjk2ODggQyAxMzQ3LjgxNjQwNiA0OTIuNDI5Njg4IDEzNTcuNTE1NjI1IDQ5Ni42MDE1NjIgMTM2Mi41NTg1OTQgNTA0Ljk0NTMxMiBDIDEzNjcuNjA1NDY5IDUxMy4yODUxNTYgMTM2OC4zNzg5MDYgNTI2LjY0MDYyNSAxMzY0Ljg4NjcxOSA1NDUuMDAzOTA2IEMgMTM2MS4yNjU2MjUgNTYzLjI0MjE4OCAxMzU1LjMxNjQwNiA1NzYuNTMxMjUgMTM0Ny4wMzkwNjIgNTg0Ljg3MTA5NCBDIDEzMzguNzYxNzE5IDU5My4yMTQ4NDQgMTMyNy40NDUzMTIgNTk3LjM4NjcxOSAxMzEzLjA4OTg0NCA1OTcuMzg2NzE5IEMgMTMwMS45NjQ4NDQgNTk3LjM4NjcxOSAxMjkzLjQyOTY4OCA1OTQuMDg1OTM4IDEyODcuNDgwNDY5IDU4Ny40OTIxODggTCAxMjcwLjk3NjU2MiA2NjUuOTkyMTg4IFogTSAxMjM2LjA1NDY4OCA2NjUuOTkyMTg4ICBNIDE0MjkuMDk3NjU2IDUyMS41MzEyNSBDIDE0MjQuODMyMDMxIDUyMS41MzEyNSAxNDIxLjQzNzUgNTIyLjY2NDA2MiAxNDE4LjkxNDA2MiA1MjQuOTI1NzgxIEMgMTQxNi4zOTQ1MzEgNTI3LjE5MTQwNiAxNDE0LjI4OTA2MiA1MzAuODQzNzUgMTQxMi42MDkzNzUgNTM1Ljg4NjcxOSBMIDE0MzguOTk2MDk0IDUzNS44ODY3MTkgQyAxNDQwLjY3MTg3NSA1MjYuMzE2NDA2IDE0MzcuMzc1IDUyMS41MzEyNSAxNDI5LjA5NzY1NiA1MjEuNTMxMjUgTSAxNDIxLjE0ODQzOCA1OTcuMzg2NzE5IEMgMTM4My4xMjEwOTQgNTk3LjM4NjcxOSAxMzY3LjYwMTU2MiA1NzkuOTI1NzgxIDEzNzQuNTg1OTM4IDU0NS4wMDM5MDYgQyAxMzc4LjIwMzEyNSA1MjYuNjQwNjI1IDEzODQuOTI5Njg4IDUxMy4yODUxNTYgMTM5NC43NjE3MTkgNTA0Ljk0NTMxMiBDIDE0MDQuNTg5ODQ0IDQ5Ni42MDE1NjIgMTQxOC4zNjMyODEgNDkyLjQyOTY4OCAxNDM2LjA4MjAzMSA0OTIuNDI5Njg4IEMgMTQ1MC44MjgxMjUgNDkyLjQyOTY4OCAxNDYxLjMzMjAzMSA0OTYuNjM2NzE5IDE0NjcuNjA5Mzc1IDUwNS4wMzkwNjIgQyAxNDczLjg3ODkwNiA1MTMuNDQ5MjE5IDE0NzUuNDY0ODQ0IDUyNS40NzY1NjIgMTQ3Mi4zNjMyODEgNTQxLjEyNSBMIDE0NjkuODM5ODQ0IDU1NC4xMjEwOTQgTCAxNDA5LjY5OTIxOSA1NTQuMTIxMDk0IEMgMTQxMC42MDU0NjkgNTYzLjU2NjQwNiAxNDE2LjE2NDA2MiA1NjguMjg1MTU2IDE0MjYuMzgyODEyIDU2OC4yODUxNTYgQyAxNDM2LjU5NzY1NiA1NjguMjg1MTU2IDE0NDYuNzUzOTA2IDU2NS42OTkyMTkgMTQ1Ni44Mzk4NDQgNTYwLjUyMzQzOCBMIDE0NTQuNzA3MDMxIDU4OS42MjUgQyAxNDQ0LjYyMTA5NCA1OTQuODAwNzgxIDE0MzMuNDI5Njg4IDU5Ny4zODY3MTkgMTQyMS4xNDg0MzggNTk3LjM4NjcxOSAgTTY0OS41MTEgNjY1Ljk4NiA2MzguMjA5IDYzNi4yMDEgSDYzOC4wMjUgUTYzOC4xMTcgNjM3LjE0NSA2MzguMTg2IDYzOC41MDMgUTYzOC4yNTYgNjM5Ljg2MSA2MzguMzAyIDY0MS40NjAgUTYzOC4zNDggNjQzLjA2MCA2MzguMzQ4IDY0NC43MTggVjY2NS45ODYgSDYzNC43MTEgVjYzMi4zMzQgSDY0MC41MTEgTDY1MS4xNjkgNjYwLjMyNCBINjUxLjMzMCBMNjYyLjE0OCA2MzIuMzM0IEg2NjcuOTAzIFY2NjUuOTg2IEg2NjQuMDM2IFY2NDQuNDQxIFE2NjQuMDM2IDY0Mi45NDUgNjY0LjA4MiA2NDEuNDM3IFE2NjQuMTI4IDYzOS45MzAgNjY0LjE5NyA2MzguNTgzIFE2NjQuMjY2IDYzNy4yMzcgNjY0LjMzNSA2MzYuMjQ3IEg2NjQuMTUxIEw2NTIuNzExIDY2NS45ODYgWiBNNzAxLjc0NSA2NjUuOTg2IEg2ODMuMDA4IFY2MzIuMzM0IEg3MDEuNzQ1IFY2MzUuNzg3IEg2ODYuOTIxIFY2NDYuNjc0IEg3MDAuODkzIFY2NTAuMDgxIEg2ODYuOTIxIFY2NjIuNTM0IEg3MDEuNzQ1IFogTTc0MS44MjUgNjQ4LjgzOCBRNzQxLjgyNSA2NTQuNTIzIDczOS43NTMgNjU4LjMzMyBRNzM3LjY4MSA2NjIuMTQyIDczMy43NTcgNjY0LjA2NCBRNzI5LjgzMiA2NjUuOTg2IDcyNC4yMzkgNjY1Ljk4NiBINzE1LjEwMSBWNjMyLjMzNCBINzI1LjI1MiBRNzMwLjM4NSA2MzIuMzM0IDczNC4wOTAgNjM0LjIxMCBRNzM3Ljc5NiA2MzYuMDg2IDczOS44MTAgNjM5Ljc1NyBRNzQxLjgyNSA2NDMuNDI5IDc0MS44MjUgNjQ4LjgzOCBaIE03MzcuNzA0IDY0OC45NzYgUTczNy43MDQgNjQ0LjQ0MSA3MzYuMTk3IDY0MS40OTUgUTczNC42ODkgNjM4LjU0OSA3MzEuNzc3IDYzNy4xMTAgUTcyOC44NjUgNjM1LjY3MSA3MjQuNjUzIDYzNS42NzEgSDcxOS4wMTQgVjY2Mi42MjYgSDcyMy43NzggUTczMC43MzAgNjYyLjYyNiA3MzQuMjE3IDY1OS4xOTYgUTczNy43MDQgNjU1Ljc2NiA3MzcuNzA0IDY0OC45NzYgWiBNNzU1LjIwMyA2NjUuOTg2IFY2MzIuMzM0IEg3NTkuMTE3IFY2NjUuOTg2IFogTTc5My4wMDQgNjY1Ljk4NiBINzc0LjI2OCBWNjMyLjMzNCBINzkzLjAwNCBWNjM1Ljc4NyBINzc4LjE4MSBWNjQ2LjY3NCBINzkyLjE1MyBWNjUwLjA4MSBINzc4LjE4MSBWNjYyLjUzNCBINzkzLjAwNCBaIE04MzIuNjcwIDY2NS45ODYgSDgyOC4xNTggTDgwOS44MTMgNjM3LjcyMCBIODA5LjYyOSBRODA5LjY5OCA2MzguODQ4IDgwOS43OTAgNjQwLjI4NyBRODA5Ljg4MiA2NDEuNzI1IDgwOS45NDAgNjQzLjM0OCBRODA5Ljk5NyA2NDQuOTcxIDgwOS45OTcgNjQ2LjY1MSBWNjY1Ljk4NiBIODA2LjM2MCBWNjMyLjMzNCBIODEwLjg0OSBMODI5LjEyNSA2NjAuNTA4IEg4MjkuMjg2IFE4MjkuMjQwIDY1OS43MDIgODI5LjE3MSA2NTguMjE4IFE4MjkuMTAyIDY1Ni43MzMgODI5LjA0NSA2NTUuMDE4IFE4MjguOTg3IDY1My4zMDMgODI4Ljk4NyA2NTEuODMwIFY2MzIuMzM0IEg4MzIuNjcwIFogTTg1Ni41NDUgNjMyLjMzNCBRODYzLjA1OSA2MzIuMzM0IDg2Ni4wNjMgNjM0Ljg3NyBRODY5LjA2NyA2MzcuNDIxIDg2OS4wNjcgNjQyLjE2MyBRODY5LjA2NyA2NDQuMzAzIDg2OC4zNjUgNjQ2LjIyNSBRODY3LjY2MyA2NDguMTQ3IDg2Ni4wOTggNjQ5LjYwOSBRODY0LjUzMiA2NTEuMDcxIDg2MS45ODkgNjUxLjkxMSBRODU5LjQ0NSA2NTIuNzUxIDg1NS43NjIgNjUyLjc1MSBIODUxLjY2NSBWNjY1Ljk4NiBIODQ3Ljc1MiBWNjMyLjMzNCBaIE04NTYuMTc3IDYzNS42NzEgSDg1MS42NjUgVjY0OS4zOTAgSDg1NS4zMjUgUTg1OC41NDggNjQ5LjM5MCA4NjAuNzAwIDY0OC43MDAgUTg2Mi44NTIgNjQ4LjAwOSA4NjMuOTM0IDY0Ni40NTUgUTg2NS4wMTYgNjQ0LjkwMiA4NjUuMDE2IDY0Mi4zMjQgUTg2NS4wMTYgNjM4Ljk2MyA4NjIuODc1IDYzNy4zMTcgUTg2MC43MzQgNjM1LjY3MSA4NTYuMTc3IDYzNS42NzEgWiBNODkxLjEwMSA2MzIuMzM0IFE4OTUuMjQ0IDYzMi4zMzQgODk3Ljk0OCA2MzMuMzU4IFE5MDAuNjUzIDYzNC4zODIgOTAxLjk4OCA2MzYuNDc3IFE5MDMuMzIzIDYzOC41NzIgOTAzLjMyMyA2NDEuODE3IFE5MDMuMzIzIDY0NC40ODcgOTAyLjM1NiA2NDYuMjcxIFE5MDEuMzkwIDY0OC4wNTUgODk5LjgyNCA2NDkuMTYwIFE4OTguMjU5IDY1MC4yNjUgODk2LjQ4NyA2NTAuODYzIEw5MDUuNzE3IDY2NS45ODYgSDkwMS4xNTkgTDg5Mi45MTkgNjUxLjk0NSBIODg1LjkyMiBWNjY1Ljk4NiBIODgyLjAwOCBWNjMyLjMzNCBaIE04OTAuODcwIDYzNS43MTcgSDg4NS45MjIgVjY0OC42MzEgSDg5MS4yNjIgUTg5NS4zODIgNjQ4LjYzMSA4OTcuMzI3IDY0Ni45NTAgUTg5OS4yNzIgNjQ1LjI3MCA4OTkuMjcyIDY0Mi4wMDEgUTg5OS4yNzIgNjM4LjU3MiA4OTcuMjEyIDYzNy4xNDUgUTg5NS4xNTIgNjM1LjcxNyA4OTAuODcwIDYzNS43MTcgWiBNOTQ2LjE4OCA2NDkuMTE0IFE5NDYuMTg4IDY1My4wMDQgOTQ1LjE5OCA2NTYuMTkyIFE5NDQuMjA5IDY1OS4zODAgOTQyLjI2NCA2NjEuNjcwIFE5NDAuMzE5IDY2My45NjEgOTM3LjQ0MSA2NjUuMjA0IFE5MzQuNTY0IDY2Ni40NDcgOTMwLjc2NiA2NjYuNDQ3IFE5MjYuODUzIDY2Ni40NDcgOTIzLjk0MSA2NjUuMjA0IFE5MjEuMDI5IDY2My45NjEgOTE5LjEwNyA2NjEuNjU5IFE5MTcuMTg1IDY1OS4zNTcgOTE2LjIzMCA2NTYuMTU4IFE5MTUuMjc1IDY1Mi45NTggOTE1LjI3NSA2NDkuMDY4IFE5MTUuMjc1IDY0My45MTIgOTE2Ljk3OCA2NDAuMDIyIFE5MTguNjgyIDYzNi4xMzIgOTIyLjE0NiA2MzMuOTY4IFE5MjUuNjEwIDYzMS44MDQgOTMwLjgzNSA2MzEuODA0IFE5MzUuODMwIDYzMS44MDQgOTM5LjI0OCA2MzMuOTQ1IFE5NDIuNjY2IDYzNi4wODYgOTQ0LjQyNyA2MzkuOTY0IFE5NDYuMTg4IDY0My44NDMgOTQ2LjE4OCA2NDkuMTE0IFogTTkxOS4zOTUgNjQ5LjExNCBROTE5LjM5NSA2NTMuMzk1IDkyMC42MTUgNjU2LjUyNiBROTIxLjgzNSA2NTkuNjU2IDkyNC4zNTYgNjYxLjM2MCBROTI2Ljg3NiA2NjMuMDYzIDkzMC43NjYgNjYzLjA2MyBROTM0LjY3OSA2NjMuMDYzIDkzNy4xNzcgNjYxLjM2MCBROTM5LjY3NCA2NTkuNjU2IDk0MC44NzEgNjU2LjUyNiBROTQyLjA2OCA2NTMuMzk1IDk0Mi4wNjggNjQ5LjExNCBROTQyLjA2OCA2NDIuNjAwIDkzOS4zNDAgNjM4LjkyOCBROTM2LjYxMyA2MzUuMjU3IDkzMC44MzUgNjM1LjI1NyBROTI2LjkyMiA2MzUuMjU3IDkyNC4zOTAgNjM2LjkzNyBROTIxLjg1OCA2MzguNjE4IDkyMC42MjcgNjQxLjcxNCBROTE5LjM5NSA2NDQuODEwIDkxOS4zOTUgNjQ5LjExNCBaIE05ODYuMjkxIDY0OC44MzggUTk4Ni4yOTEgNjU0LjUyMyA5ODQuMjE5IDY1OC4zMzMgUTk4Mi4xNDggNjYyLjE0MiA5NzguMjIzIDY2NC4wNjQgUTk3NC4yOTkgNjY1Ljk4NiA5NjguNzA1IDY2NS45ODYgSDk1OS41NjcgVjYzMi4zMzQgSDk2OS43MTggUTk3NC44NTEgNjMyLjMzNCA5NzguNTU3IDYzNC4yMTAgUTk4Mi4yNjMgNjM2LjA4NiA5ODQuMjc3IDYzOS43NTcgUTk4Ni4yOTEgNjQzLjQyOSA5ODYuMjkxIDY0OC44MzggWiBNOTgyLjE3MSA2NDguOTc2IFE5ODIuMTcxIDY0NC40NDEgOTgwLjY2MyA2NDEuNDk1IFE5NzkuMTU1IDYzOC41NDkgOTc2LjI0NCA2MzcuMTEwIFE5NzMuMzMyIDYzNS42NzEgOTY5LjEyMCA2MzUuNjcxIEg5NjMuNDgwIFY2NjIuNjI2IEg5NjguMjQ1IFE5NzUuMTk2IDY2Mi42MjYgOTc4LjY4NCA2NTkuMTk2IFE5ODIuMTcxIDY1NS43NjYgOTgyLjE3MSA2NDguOTc2IFogTTEwMjUuMTI4IDYzMi4zMzQgVjY1NC4xMDkgUTEwMjUuMTI4IDY1Ny42NzcgMTAyMy42ODkgNjYwLjQ2MiBRMTAyMi4yNTEgNjYzLjI0NyAxMDE5LjM1MCA2NjQuODQ3IFExMDE2LjQ1MCA2NjYuNDQ3IDEwMTIuMDc3IDY2Ni40NDcgUTEwMDUuODM5IDY2Ni40NDcgMTAwMi41ODIgNjYzLjA2MyBROTk5LjMyNSA2NTkuNjc5IDk5OS4zMjUgNjU0LjAxNyBWNjMyLjMzNCBIMTAwMy4yNjEgVjY1NC4xMzIgUTEwMDMuMjYxIDY1OC40MTMgMTAwNS41MjggNjYwLjczOCBRMTAwNy43OTUgNjYzLjA2MyAxMDEyLjMwNyA2NjMuMDYzIFExMDE1LjM5MSA2NjMuMDYzIDEwMTcuMzU5IDY2MS45NDcgUTEwMTkuMzI3IDY2MC44MzAgMTAyMC4yODMgNjU4LjgxNiBRMTAyMS4yMzggNjU2LjgwMiAxMDIxLjIzOCA2NTQuMTU1IFY2MzIuMzM0IFogTTEwNjQuMTk1IDY2NS45ODYgSDEwNTkuNTY4IEwxMDQ3LjQzOCA2NDkuNjIwIEwxMDQzLjg0NyA2NTIuODQzIFY2NjUuOTg2IEgxMDM5LjkzNCBWNjMyLjMzNCBIMTA0My44NDcgVjY0OS4xMTQgUTEwNDUuMTU5IDY0Ny42MTggMTA0Ni41NDAgNjQ2LjEzMyBRMTA0Ny45MjEgNjQ0LjY0OCAxMDQ5LjI3OSA2NDMuMTI5IEwxMDU5LjEwOCA2MzIuMzM0IEgxMDYzLjY4OSBMMTA1MC4yOTIgNjQ2LjkyNyBaIE0xMDg1LjAzMiA2NjUuOTg2IEgxMDgxLjA5NiBWNjM1Ljc4NyBIMTA3MC41MDcgVjYzMi4zMzQgSDEwOTUuNTc0IFY2MzUuNzg3IEgxMDg1LjAzMiBaIE0xMTA2LjU1OSA2NjUuOTg2IFY2MzIuMzM0IEgxMTEwLjQ3MiBWNjY1Ljk4NiBaIE0xMTU0LjgxMCA2NDkuMTE0IFExMTU0LjgxMCA2NTMuMDA0IDExNTMuODIwIDY1Ni4xOTIgUTExNTIuODMxIDY1OS4zODAgMTE1MC44ODYgNjYxLjY3MCBRMTE0OC45NDEgNjYzLjk2MSAxMTQ2LjA2MyA2NjUuMjA0IFExMTQzLjE4NiA2NjYuNDQ3IDExMzkuMzg4IDY2Ni40NDcgUTExMzUuNDc1IDY2Ni40NDcgMTEzMi41NjMgNjY1LjIwNCBRMTEyOS42NTEgNjYzLjk2MSAxMTI3LjcyOSA2NjEuNjU5IFExMTI1LjgwNyA2NTkuMzU3IDExMjQuODUyIDY1Ni4xNTggUTExMjMuODk3IDY1Mi45NTggMTEyMy44OTcgNjQ5LjA2OCBRMTEyMy44OTcgNjQzLjkxMiAxMTI1LjYwMCA2NDAuMDIyIFExMTI3LjMwNCA2MzYuMTMyIDExMzAuNzY4IDYzMy45NjggUTExMzQuMjMyIDYzMS44MDQgMTEzOS40NTcgNjMxLjgwNCBRMTE0NC40NTIgNjMxLjgwNCAxMTQ3Ljg3MCA2MzMuOTQ1IFExMTUxLjI4OCA2MzYuMDg2IDExNTMuMDQ5IDYzOS45NjQgUTExNTQuODEwIDY0My44NDMgMTE1NC44MTAgNjQ5LjExNCBaIE0xMTI4LjAxNyA2NDkuMTE0IFExMTI4LjAxNyA2NTMuMzk1IDExMjkuMjM3IDY1Ni41MjYgUTExMzAuNDU3IDY1OS42NTYgMTEzMi45NzggNjYxLjM2MCBRMTEzNS40OTggNjYzLjA2MyAxMTM5LjM4OCA2NjMuMDYzIFExMTQzLjMwMSA2NjMuMDYzIDExNDUuNzk5IDY2MS4zNjAgUTExNDguMjk2IDY1OS42NTYgMTE0OS40OTMgNjU2LjUyNiBRMTE1MC42OTAgNjUzLjM5NSAxMTUwLjY5MCA2NDkuMTE0IFExMTUwLjY5MCA2NDIuNjAwIDExNDcuOTYyIDYzOC45MjggUTExNDUuMjM1IDYzNS4yNTcgMTEzOS40NTcgNjM1LjI1NyBRMTEzNS41NDQgNjM1LjI1NyAxMTMzLjAxMiA2MzYuOTM3IFExMTMwLjQ4MCA2MzguNjE4IDExMjkuMjQ5IDY0MS43MTQgUTExMjguMDE3IDY0NC44MTAgMTEyOC4wMTcgNjQ5LjExNCBaIE0xMTk0LjQ5OSA2NjUuOTg2IEgxMTg5Ljk4NyBMMTE3MS42NDIgNjM3LjcyMCBIMTE3MS40NTggUTExNzEuNTI3IDYzOC44NDggMTE3MS42MTkgNjQwLjI4NyBRMTE3MS43MTEgNjQxLjcyNSAxMTcxLjc2OCA2NDMuMzQ4IFExMTcxLjgyNiA2NDQuOTcxIDExNzEuODI2IDY0Ni42NTEgVjY2NS45ODYgSDExNjguMTg5IFY2MzIuMzM0IEgxMTcyLjY3OCBMMTE5MC45NTQgNjYwLjUwOCBIMTE5MS4xMTUgUTExOTEuMDY5IDY1OS43MDIgMTE5MS4wMDAgNjU4LjIxOCBRMTE5MC45MzEgNjU2LjczMyAxMTkwLjg3MyA2NTUuMDE4IFExMTkwLjgxNiA2NTMuMzAzIDExOTAuODE2IDY1MS44MzAgVjYzMi4zMzQgSDExOTQuNDk5IFoiIGZpbGw9IiMxRDMyNEYiLz48L3N2Zz4=" alt="Lars Zumpe Medienproduktion">
+
+<div class="kopf">
+  <div class="kicker">B4 Objektivsteuerung &middot; Werkstattanleitung</div>
+  <hr>
+</div>
+
+<h1>Die Blende<br>fernsteuern<span class="pt">.</span></h1>
+<p class="sub">Ein ESP32-S3 im 12-poligen Hirose-Kabel zwischen Kamera und
+2/3"-Objektiv. Er liest, wo die Lamellen stehen, und stellt sie.</p>
+
+<div class="stop">
+  <div class="lbl">Bevor irgendetwas angeschlossen wird</div>
+  <p>Die Spannungswerte auf diesen Seiten stammen aus fremder Rekonstruktion an
+  einer Fujinon-Optik. Die Pinbelegung ist durch ein zweites Dokument bestätigt,
+  die Spannungen sind es nicht. <strong>An der eigenen Optik nachmessen.</strong></p>
+  <p>Auf Pin 6 liegen 12 V. Die GPIOs des ESP32-S3 vertragen 3,3 V und sind nicht
+  5-V-tolerant. Ein verrutschter Draht kostet den Chip, ein falsch belegter
+  Steuerpin die Servoelektronik der Optik.</p>
+</div>
+
+<h2>Was gebraucht wird</h2>
+<table><thead><tr><th>Teil</th><th>Wofür</th></tr></thead><tbody><tr><td>Waveshare ESP32-S3-ETH</td><td>Rechner und Netzanschluss. 16 MB Flash, 8 MB PSRAM, W5500</td></tr><tr><td>MCP4728, I²C, 12 Bit</td><td>Sollwert. Zwingend — der ESP32-S3 hat keinen eigenen DAC</td></tr><tr><td>ADS1115, I²C, 16 Bit</td><td>Rücklesung von Blende, Zoom und Fokus</td></tr><tr><td>LM358 oder TL072, DIP-8</td><td>Hebt 0–3,3 V auf 2,5–6,6 V, aus der 12-V-Schiene</td></tr><tr><td>Widerstände 10 k, 16 k, 6,8 k, 1 k</td><td>Teiler und Verstärkerstufe</td></tr><tr><td>Hirose-Verlängerung 12-polig</td><td>Zum Auftrennen. Alle zwölf Adern müssen belegt sein</td></tr><tr><td>Netzteil 12 V</td><td>Versorgt die Optik, wenn keine Kamera dranhängt</td></tr></tbody></table>
+
+<h2>Der Steckverbinder</h2>
+<p>Pin 1 bis 10 sind in beiden Betriebsarten gleich; 11 und 12 unterscheiden sich
+je nach Optikgruppe.</p>
+<table><thead><tr><th>Pin</th><th>Analog (Gruppe C)</th><th>Mit seriell (Gruppe B)</th><th>Richtung</th></tr></thead><tbody><tr><td class="n">1</td><td>RET SW, Rückkanalwahl</td><td>gleich</td><td>Optik → Kamera</td></tr><tr><td class="n">2</td><td>VTR SW, Start/Stop</td><td>gleich</td><td>Optik → Kamera</td></tr><tr><td class="n">3</td><td>GND</td><td>gleich</td><td>—</td></tr><tr><td class="n">4</td><td>Iris-Servo</td><td>Iris-Auto freigeben</td><td>Kamera → Optik</td></tr><tr><td class="n">5</td><td><strong>Iris-Steuersignal</strong></td><td>gleich</td><td>Kamera → Optik</td></tr><tr class="warn"><td class="n">6</td><td><strong>+12 V</strong></td><td>gleich</td><td>Kamera → Optik</td></tr><tr><td class="n">7</td><td><strong>Iris-Position</strong></td><td>gleich</td><td>Optik → Kamera</td></tr><tr><td class="n">8</td><td>Iris-Mode (Auto 0 V / Remote 5 V)</td><td>gleich</td><td>Kamera → Optik</td></tr><tr><td class="n">9</td><td>Extender</td><td>gleich</td><td>Optik → Kamera</td></tr><tr><td class="n">10</td><td>Zoom-Position</td><td>gleich</td><td>Optik → Kamera</td></tr><tr><td class="n">11</td><td>Fokus-Position</td><td>TXD</td><td>Optik → Kamera</td></tr><tr><td class="n">12</td><td>—</td><td>RXD</td><td>Kamera → Optik</td></tr></tbody></table>
+
+<div class="box">
+  <div class="lbl">Wichtig für die Planung</div>
+  <p>Am 12-Pin gibt es <strong>keinen analogen Antriebseingang für Zoom oder
+  Fokus</strong>. Nur die Blende ist analog steuerbar. Zoom und Fokus laufen über
+  die separaten Demand-Buchsen der Optik.</p>
+</div>
+
+<h3>Signalpegel</h3>
+<table><thead><tr><th>Signal</th><th>Unteres Ende</th><th>Oberes Ende</th></tr></thead><tbody><tr><td>Iris-Steuerung (Pin 5) und Iris-Position (Pin 7)</td><td class="n">geschlossen 2,5 V</td><td class="n">F16 3,4 V · F2.8 6,2 V</td></tr><tr><td>Zoom-Position (Pin 10)</td><td class="n">Weitwinkel 2 V</td><td class="n">Tele 7 V</td></tr><tr><td>Fokus-Position (Pin 11, Gruppe C)</td><td class="n">nah 2 V</td><td class="n">unendlich 7 V</td></tr></tbody></table>
+
+
+<h2>Welche Gruppe hat die Optik?</h2>
+<p>Das entscheidet den größten Teil des Vorhabens, kostet nichts und braucht nur
+ein Multimeter.</p>
+<ul>
+<li>Optik an 12 V auf Pin 6 gegen Pin 3. Sonst nichts angeschlossen. Der Servo ist hörbar.</li>
+<li>Pin 11 gegen Masse messen und dabei den <strong>Fokusring</strong> durchdrehen.</li>
+</ul>
+<table><thead><tr><th>Beobachtung</th><th>Bedeutung</th></tr></thead><tbody><tr><td>Die Spannung wandert stetig, etwa 2 V bis 7 V</td><td><strong>Gruppe C.</strong> Pin 11 ist analoge Fokusposition, es gibt kein serielles Protokoll</td></tr><tr><td>Fester Pegel, der den Ring ignoriert</td><td><strong>Gruppe B.</strong> Pin 11 ist TXD, auf der Leitung liegt ein Protokoll</td></tr></tbody></table>
+<p>Bei einer Canon J15ax8B4 IRS SX12 — SD-ENG — ist Gruppe C zu erwarten. Erwarten,
+dann messen. Das Ergebnis gehört notiert, auch wenn es nicht funktioniert hat.</p>
+
+<h2>Aufbau 1 · Nur lesen</h2>
+<p>Drei Teiler, sechs Widerstände. Hier gibt es nichts zu verlieren, und hier
+sollte der erste Abend hingehen.</p>
+<pre>Objektiv-Pin --[ 10k ]--+-- ADS1115 Ax
+                        |
+                     [ 6k8 ]
+                        |
+                       GND  -- gemeinsam mit ESP32 und 12-V-Netzteil</pre>
+<table><thead><tr><th>Objektiv-Pin</th><th>Signal</th><th>ADS1115</th></tr></thead><tbody><tr><td class="n">7</td><td>Iris-Position</td><td class="n">A0</td></tr><tr><td class="n">10</td><td>Zoom-Position</td><td class="n">A1</td></tr><tr><td class="n">11</td><td>Fokus-Position (nur Gruppe C)</td><td class="n">A2</td></tr></tbody></table>
+<p>7,00 V am Pin werden so zu 2,83 V am ADC. Die <strong>gemessenen</strong>
+Widerstandswerte gehören in <code>config.h</code> — ein 5-%-Widerstand ist eine
+5-%-Lüge über die Blende, und sie steckt in jeder Spannung, die das Gerät meldet.</p>
+
+<h2>Aufbau 2 · Treiben</h2>
+<p>Erst wenn Aufbau 1 funktioniert.</p>
+<pre>ESP32 --I2C--&gt; MCP4728 --&gt; Verstaerkerstufe --&gt; 1k --&gt; Pin 5
+               (0-3,3 V)    (2,5-6,6 V)
+
+Pin 8  --&gt; 5 V     Remote statt Eigenautomatik
+Pin 6  --&gt; +12 V   Pin 3 --&gt; GND, gemeinsam mit dem ESP32</pre>
+
+<div class="box">
+  <div class="lbl">MCP4728 und ADS1115 an 3,3 V betreiben</div>
+  <p>Der I²C-Bus des ESP32-S3 ist 3,3 V, damit passen die Pegel ohne Wandler. Und
+  die Rechnung unten setzt 0–3,3 V am DAC voraus: bei 5 V bräuchte die Stufe eine
+  Verstärkung von 0,82, die ein nichtinvertierender Verstärker nicht erzeugen
+  kann — er geht nie unter 1.</p>
+</div>
+
+<h3>Die Verstärkerstufe</h3>
+<p>Nichtinvertierender Verstärker mit Summierung am Plus-Eingang. Vier
+Widerstände, ein Operationsverstärker aus der 12-V-Schiene.</p>
+<div class="two">
+<div>
+<pre>Ra = 10k  von 3,3 V      zum +Eingang
+Rb = 16k  vom DAC        zum +Eingang
+R1 = 10k  vom -Eingang   nach Masse
+R2 = 10k  vom Ausgang    zum -Eingang</pre>
+</div>
+<div>
+<pre>Vp   = (Vdac*Rb + 3,3*Ra) / (Ra+Rb)
+Vout = Vp * (1 + R2/R1)
+     = 1,231 * Vdac + 2,54
+
+0,00 V  ->  2,54 V   Blende zu
+3,30 V  ->  6,60 V   Blende offen</pre>
+</div>
+</div>
+<p>Der Bereich muss nur ungefähr stimmen; die genaue Zuordnung entsteht später in
+der Kennlinie. LM358 und TL072 haben dieselbe Pinbelegung und passen in dieselben
+Löcher — der Ausgang muss nur 6,6 V erreichen, Rail-to-Rail ist nicht nötig.</p>
+
+<h3>Zwei Dinge an der Optik selbst</h3>
+<ul>
+<li>Der <strong>Iris-Schalter am Tubus steht auf A</strong>. Auf M folgt die Blende dem Ring und ignoriert Pin 5 vollständig.</li>
+<li><strong>Pin 8 liegt auf 5 V</strong>, sonst nimmt die Optik gar keine Fernsteuerung an.</li>
+</ul>
+
+
+<h2>Belegte Pins am Board</h2>
+<p>Am Waveshare ESP32-S3-ETH ist mehr vergeben, als ein allgemeiner S3-Pinout zeigt.</p>
+<table><thead><tr><th>Funktion</th><th>GPIO</th></tr></thead><tbody><tr><td>W5500 Ethernet</td><td class="n">9 RST · 10 INT · 11 MOSI · 12 MISO · 13 SCLK · 14 CS</td></tr><tr><td>TF-Karte</td><td class="n">4 CS · 5 MISO · 6 MOSI · 7 SCLK</td></tr><tr><td>RGB-LED</td><td class="n">21</td></tr><tr><td>Kameraheader</td><td class="n">1 · 2 · 3 · 15 · 18 · 38 · 39 · 40 · 41 · 42 · 45 · 46 · 47 · 48</td></tr><tr><td>Native USB</td><td class="n">19 · 20</td></tr><tr><td>SPI-Flash</td><td class="n">26–32</td></tr><tr><td>Octal-PSRAM (S3R8)</td><td class="n">33–37</td></tr><tr class="warn"><td><strong>Frei</strong></td><td class="n"><strong>8 · 16 · 17 · 43 · 44</strong></td></tr></tbody></table>
+<p><strong>I²C liegt auf GPIO 16 (SDA) und 17 (SCL).</strong> GPIO 9 ist der Reset
+des W5500 — was dort als Taktleitung läge, hielte den Ethernet-Controller im
+Reset, und das Symptom wäre „kein Netz".</p>
+
+<h2>Inbetriebnahme</h2>
+<p>Der Reihe nach. Jeder Schritt sagt, ob der nächste gefahrlos ist.</p>
+<table><thead><tr><th>#</th><th>Handlung</th><th>Erwartung</th></tr></thead><tbody><tr><td class="n">1</td><td>Optik nur an 12 V (Pin 6 / 3), sonst nichts</td><td>Optik läuft an, Servo hörbar</td></tr><tr><td class="n">2</td><td>Pin 7 messen, Blende von Hand durchfahren</td><td>Spannung ändert sich stetig, 2,5–6,2 V</td></tr><tr><td class="n">3</td><td>Pin 8 auf 5 V legen</td><td>Optik nimmt Fernsteuerung an</td></tr><tr class="warn"><td class="n">4</td><td>Verstärkerausgang messen — <strong>ohne Optik</strong> — und den DAC durchfahren</td><td>2,5–6,6 V, linear</td></tr><tr><td class="n">5</td><td>Erst jetzt Ausgang über 1 kΩ auf Pin 5</td><td>Blende folgt dem Sollwert</td></tr><tr><td class="n">6</td><td>Kennlinie aufnehmen</td><td>Tabelle im Gerät gespeichert</td></tr></tbody></table>
+<p>Schritt 4 ist der, den man überspringt. Er ist auch der einzige, der einen
+falschen Widerstand findet, bevor die falsche Spannung an der Optik liegt.</p>
+
+<h2>Firmware</h2>
+<pre>cd ~/sony-camera-bridge/packages/firmware-b4
+
+./tools/flash.sh              sicherer Bau: liest, treibt nichts
+./tools/flash.sh --monitor    dazu die Konsole
+./tools/flash.sh --armed      Antrieb einkompiliert, fragt vorher nach</pre>
+<p>Der Vorgabebau kann keine Blende bewegen. Das sind zwei Sperren — ein
+Compile-Flag und eine Scharfschaltung zur Laufzeit —, damit ein frisch
+geflashtes Board nicht in dem Moment etwas verstellt, in dem das Kabel einrastet.</p>
+<p>Beim Start läuft ein I²C-Scan über die Konsole. Meldet er nichts, sind die
+Modulpins oder die Verdrahtung dran, nicht die Module.</p>
+
+<h2>Bedienen</h2>
+<p>Sobald das Netzwerkkabel steckt, meldet die Konsole die Adresse. Die Seite
+kommt vom Gerät selbst — sie braucht kein Internet und läuft auf dem Telefon,
+während man an der Optik steht.</p>
+<table><thead><tr><th>Zugriff</th><th>Wofür</th></tr></thead><tbody><tr><td><code>http://&lt;adresse&gt;/</code></td><td>Statusseite mit Blendenregler</td></tr><tr><td><code>GET /api/status</code></td><td>Vollständiger Zustand. Was nicht gemessen wurde, fehlt — es ist nie 0</td></tr><tr><td><code>POST /api/iris</code></td><td><code>{"value": 0..255}</code></td></tr><tr><td><code>GET /api/calibration.csv</code></td><td>Die aufgenommene Kennlinie</td></tr></tbody></table>
+
+<h2>Kennlinie aufnehmen</h2>
+<pre>python3 tools/record_calibration.py --host &lt;adresse&gt;
+python3 tools/plot_calibration.py   --host &lt;adresse&gt;</pre>
+<p>Das Skript fährt den DAC in Stufen, wartet, bis die Lamellen stehen, und
+schreibt mit, was Pin 7 meldet. Es schaltet vorher scharf und danach wieder ab.</p>
+<p>Ohne Kennlinie meldet das Gerät <code>calibrated: false</code> und
+<strong>verweigert den Antrieb</strong>. Es nimmt keine Gerade zwischen zwei
+Spannungen an, die niemand gemessen hat. Die Tabelle liegt im Flash und übersteht
+das Neuflashen.</p>
+<p>Der Plotter meldet die drei Fehler, die in einer Zahlenkolonne nicht auffallen:
+ein flaches Stück, ein Rückwärtssprung, und eine perfekt gerade Kurve — letztere
+heißt meist, dass der DAC-Monitor statt Pin 7 gemessen wurde.</p>
+
+<h2>Wenn etwas nicht geht</h2>
+<table><thead><tr><th>Beobachtung</th><th>Zuerst prüfen</th></tr></thead><tbody><tr><td>I²C-Scan meldet nichts</td><td>GPIO 16/17, Masse gemeinsam, Module an 3,3 V</td></tr><tr><td>Kein Netz</td><td>Kabel, Link-LED an der Buchse, dann die W5500-Pins</td></tr><tr><td>Blende rührt sich nicht</td><td>Schalter am Tubus auf A, Pin 8 auf 5 V, scharfgeschaltet, Kennlinie vorhanden</td></tr><tr><td>Blende pendelt</td><td>Masseverbindung zwischen Netzteil und ESP32</td></tr><tr><td>Kennlinie springt zurück</td><td>Wartezeit je Punkt erhöhen (<code>--settle</code>)</td></tr><tr><td>Messwert steht fest auf 0</td><td>Teiler falsch herum, oder der Kanal liegt auf Masse</td></tr></tbody></table>
+
+<h2>Ohne Hardware testen</h2>
+<p>Der Simulator liefert dieselbe Schnittstelle, dahinter ein Modell eines
+Blendenservos mit nichtlinearer Kennlinie, Verzögerung und Rauschen.</p>
+<pre>python3 tools/simulator.py --port 8080
+python3 tools/record_calibration.py --host 127.0.0.1:8080 --points 9 --settle 0.2</pre>
+<p>Er beweist etwas über die Software und nichts über eine Optik.</p>
+
+<div class="meta">
+  Lars Zumpe Medienproduktion &middot; B4 Objektivsteuerung &middot; Stand 19.09.2026<br>
+  Quellen und Firmware: <code>sony-camera-bridge</code>, <code>docs/b4/</code> und
+  <code>packages/firmware-b4/</code>. Die elektrischen Angaben sind unverifiziert —
+  Messungen gehören nach <code>docs/b4/measurements/</code>.
+</div>
+</body></html>

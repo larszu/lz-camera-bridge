@@ -20,6 +20,7 @@ connector, and for reading zoom/focus demands as input devices.
 | [`claude-code-brief.md`](claude-code-brief.md) | The execution brief this work started from. **Partly outdated** — see below. |
 | [`bridge-interface.md`](bridge-interface.md) | How the lens became the `b4-lens` connection mode, which two alternatives were rejected, and why this is the only path in the bridge whose iris readback is an independent measurement. |
 | [`runtime.md`](runtime.md) | Why the firmware is Arduino-ESP32 and not ESP-IDF, and what would reopen it. Settles the first point ADR-008 left open. |
+| [`iris-anleitung.pdf`](iris-anleitung.pdf) | **Werkstattanleitung Iris-Steuerung**, sechs Seiten A4 zum Ausdrucken und Mitnehmen an die Werkbank: Teile, Pinbelegung, beide Aufbauten dimensioniert, Inbetriebnahme in sechs Schritten, Fehlersuche. Quelle: `iris-anleitung.html`. German, deliberately — it is read with a soldering iron in the other hand. |
 | [`wiring.md`](wiring.md) | Dividers, the op-amp stage dimensioned, and the commissioning order. Step 4 — measure the amplifier with the lens *disconnected* — is the one people skip and the only one that catches a wrong resistor in time. |
 | [`measurements/`](measurements/) | Real readings, including the ones that failed. Empty until 2026-09-23. |
 | [`../reuse-audit.md`](../reuse-audit.md) | What already exists in this repository and the other repositories, with a reuse verdict per criterion. |
