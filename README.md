@@ -153,6 +153,18 @@ Live-video feasibility per camera family — which cameras can show a live
 picture in the panel, at what cost — is documented in
 [`docs/live-video.md`](docs/live-video.md).
 
+A USB control surface drives the bridge instead of the other way round: a
+gamepad, or a panel you build yourself. A PlayStation controller is recognised
+by vendor/product id and gets a *drive* mapping (left stick pan/tilt, analog
+triggers zoom, face buttons presets); anything unknown keeps the *paint*
+mapping it always had. That split is a safety boundary and not a convenience —
+`setIris` is a 9-byte VISCA packet whose bytes 6/7 the DigitalBird DB3 decoder
+reads as a pan/tilt direction, so a stick on iris makes that head drive off.
+The parts list for a panel of your own, and the compatibility check against the
+DB3 head, are in [`docs/ptz-pult-hardware.md`](docs/ptz-pult-hardware.md); the
+two things that still need a real device are in
+[`docs/ptz-pult-messprotokoll.md`](docs/ptz-pult-messprotokoll.md).
+
 The bridge reads the `camera-list` the AV Planner Suite's MultiCam Planner
 exports and holds it against the cameras on the bus, so the control wall can
 label a slot the way the show calls it ("CAM 3 — Bühne links") instead of by
