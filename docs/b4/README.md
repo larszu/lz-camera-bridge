@@ -23,6 +23,9 @@ connector, and for reading zoom/focus demands as input devices.
 | [`iris-anleitung.pdf`](iris-anleitung.pdf) | **Werkstattanleitung Iris-Steuerung**, sechs Seiten A4 zum Ausdrucken und Mitnehmen an die Werkbank: Teile, Pinbelegung, beide Aufbauten dimensioniert, Inbetriebnahme in sechs Schritten, Fehlersuche. Quelle: `iris-anleitung.html`. German, deliberately — it is read with a soldering iron in the other hand. |
 | [`wiring.md`](wiring.md) | Dividers, the op-amp stage dimensioned, and the commissioning order. Step 4 — measure the amplifier with the lens *disconnected* — is the one people skip and the only one that catches a wrong resistor in time. |
 | [`measurements/`](measurements/) | Real readings, including the ones that failed. Empty until 2026-09-23. |
+| [`freed-output.md`](freed-output.md) | FreeD D1 output: the split between encoder and sender, what the byte table is verified against, and why address, port and rate have no defaults. |
+| [`axis.md`](axis.md) | The axis state machine: setpoint, feedback, limits, homing, status — and the order in which a stop engages the brake and cuts torque. |
+| [`device-profiles.md`](device-profiles.md) | Profile format for retro-fitted foreign heads: what a profile holds, what is rejected outright, and why an unstated figure costs capability instead of getting a default. |
 | [`../reuse-audit.md`](../reuse-audit.md) | What already exists in this repository and the other repositories, with a reuse verdict per criterion. |
 
 ## Where this work lives

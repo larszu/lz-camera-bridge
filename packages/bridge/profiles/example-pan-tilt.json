@@ -1,0 +1,42 @@
+{
+  "formatVersion": 1,
+  "id": "example-pan-tilt",
+  "manufacturer": "Example",
+  "model": "Retro-fitted pan/tilt head",
+  "source": "EXAMPLE PROFILE — invented figures, not a measurement of any head. It exists to show a complete profile; copy the shape, not the numbers.",
+  "axes": [
+    {
+      "id": "pan",
+      "kind": "rotary",
+      "unit": "degree",
+      "travel": { "min": -180, "max": 180 },
+      "directionSense": "normal",
+      "drive": { "ratio": 120, "toothModuleMm": 0.8, "poles": 8 },
+      "feedback": { "kind": "incremental-encoder", "countsPerUnit": 400, "zeroOffset": 0 },
+      "homing": { "method": "index-pulse", "direction": "toward-min", "against": "index mark on the slip ring" },
+      "brake": { "present": false },
+      "cutouts": { "currentA": 4.5, "followingError": 2, "commandTimeoutS": 1 }
+    },
+    {
+      "id": "tilt",
+      "kind": "rotary",
+      "unit": "degree",
+      "travel": { "min": -45, "max": 75 },
+      "directionSense": "inverted",
+      "drive": { "ratio": 180, "toothModuleMm": 0.8, "poles": 8 },
+      "feedback": { "kind": "incremental-encoder", "countsPerUnit": 600, "zeroOffset": -1.25 },
+      "homing": { "method": "limit-switch", "direction": "toward-min", "against": "lower limit switch" },
+      "brake": { "present": true, "releaseBeforeMoveMs": 120, "engageAfterStopMs": 200 },
+      "cutouts": { "currentA": 6, "followingError": 1.5, "commandTimeoutS": 1 }
+    },
+    {
+      "id": "lift",
+      "kind": "linear",
+      "unit": "mm",
+      "directionSense": "normal",
+      "drive": { "ratio": 2.5 },
+      "brake": { "present": true, "releaseBeforeMoveMs": 250 },
+      "cutouts": { "currentA": 8 }
+    }
+  ]
+}
