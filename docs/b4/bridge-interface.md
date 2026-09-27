@@ -67,6 +67,13 @@ event rather than claimed in a comment:
 - A field the device did not measure is **absent** from `/api/status`, and the
   client reports nothing rather than zero.
 
+And once more one level up, where a panel sees it: `b4LensBus.test.ts` drives a
+`BridgeServer` with a real `B4LensClient` against a fake device and reads the
+`type: 'state'` broadcast. `setIris` over `{ type: 'command' }` arrives as
+`origins.iris = 'commanded'` with **no** entry in `confirmations`; only the next
+pin-7 measurement turns it into `'confirmed'` with a timestamp. Same port, same
+message schema as every other backend.
+
 Zoom and focus position are read too but deliberately **do not** appear in
 `MODE_READBACK`: `CameraState` has no fields for them, and inventing `zoom` /
 `focus` paint fields to hold a number nothing can command would put two dead
