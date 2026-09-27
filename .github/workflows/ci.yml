@@ -135,6 +135,15 @@ jobs:
         with:
           python-version: '3.12'
 
+      # Die reinen Kopfdateien der Firmware -- Kalibriertabelle und Irisregler --
+      # auf dem Host, gegen dasselbe Servomodell wie tools/simulator.py. Laeuft
+      # vor PlatformIO, weil es in Sekunden sagt, was sonst erst nach dem
+      # Xtensa-Bau auffiele. Beweist etwas ueber den Code, nichts ueber eine
+      # Optik (#40 bleibt offen bis zur Messung).
+      - name: Host-Tests der Firmware (Kalibrierung, Regler)
+        working-directory: packages/firmware-b4
+        run: test/native/run.sh
+
       - name: PlatformIO installieren
         run: pip install --upgrade platformio
 

@@ -19,6 +19,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer, type Server } from 'node:http';
+import { once } from 'node:events';
 import { AddressInfo } from 'node:net';
 
 import { B4LensClient, driveRefusal, type B4Status } from '../src/cameras/B4LensClient.js';
@@ -78,6 +79,11 @@ const READY: B4Status = {
 test('setIris meldet NICHT zurueck — die Bestaetigung kommt von Pin 7', async () => {
   await withDevice({ ...READY }, async (c, posted, state) => {
     await c.connect();
+    // Erst die erste Messung abwarten. Ohne das lief der Test gegen die Uhr:
+    // kam die erste Abfrage erst NACH dem Anmelden des Zuhoerers an, stand
+    // die gemessene 100 in `events` — richtig gemeldet, aber als Fehlschlag
+    // gezaehlt (lokal etwa jeder dritte Lauf).
+    await once(c, 'stateChanged');
 
     const events: unknown[] = [];
     c.on('stateChanged', (s) => events.push(s));
@@ -91,7 +97,11 @@ test('setIris meldet NICHT zurueck — die Bestaetigung kommt von Pin 7', async 
 
     // Erst wenn das Geraet einen anderen Wert GEMESSEN hat, kommt er an.
     state.status = { ...READY, lens: { iris: 198, irisVolts: 5.4 } };
-    await new Promise((r) => setTimeout(r, 120));
+    // Bis zur Messung warten, nicht eine feste Zeit: unter Last (volle
+    // Testsuite) reichten 120 ms gelegentlich nicht.
+    for (let t0 = Date.now(); events.length === 0 && Date.now() - t0 < 2000; ) {
+      await new Promise((r) => setTimeout(r, 10));
+    }
     assert.deepEqual(events, [{ iris: 198 }]);
   });
 });

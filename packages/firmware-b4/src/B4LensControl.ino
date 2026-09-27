@@ -34,6 +34,7 @@
 #include "config.h"
 #include "analog_filter.h"
 #include "calibration.h"
+#include "iris_loop.h"
 // web_page.h is included further down, after `server` exists.
 
 // ── W5500 wiring on the Waveshare ESP32-S3-ETH ─────────────────────────────
@@ -196,18 +197,12 @@ static void serviceLoop(float irisCounts, bool haveFeedback) {
     return;
   }
 
-  const int error = static_cast<int>(drive.setpoint) - static_cast<int>(measured);
-  const float pct = fabsf(error) * 100.0f / 255.0f;
-
-  int step = static_cast<int>(error * LOOP_I_GAIN * 16.0f);
-  step = constrain(step, -LOOP_MAX_STEP_COUNTS, LOOP_MAX_STEP_COUNTS);
-
-  int next = static_cast<int>(drive.dacCode == 0 ? target : drive.dacCode) + step;
-  next = constrain(next, 0, 4095);
-  drive.dacCode = static_cast<uint16_t>(next);
+  const IrisLoopResult r = irisLoopStep(drive.setpoint, measured, target, drive.dacCode,
+                                       LOOP_I_GAIN, LOOP_MAX_STEP_COUNTS, LOOP_TOLERANCE_PCT);
+  drive.dacCode = r.dacCode;
   dac.setChannelValue(static_cast<MCP4728_channel_t>(DAC_CH_IRIS), drive.dacCode);
 
-  drive.holding = pct <= LOOP_TOLERANCE_PCT;
+  drive.holding = r.holding;
   drive.fault = nullptr;
 #endif
 }
