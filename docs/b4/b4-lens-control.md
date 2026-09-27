@@ -205,6 +205,9 @@ With no communication running, the lens reportedly emits `FB 03`.
   which is a far better documented and cheaper world to work in. Unknown whether
   the BDC-10 is passive rewiring or contains electronics — if passive, measuring
   it yields the 18-pin pinout for free.
+  *Update 2026-09-27:* Canon's 2023 catalogue names **BDC-11** ("20p - 18p
+  cable. Required for FDJ-D02 / ZDJ-D02"); BDC-10 appears in no Canon document
+  found. Details and sources in [`research-canon.md`](research-canon.md).
 - **Command codes 0x42–0x44 / 0x52–0x54** ("switch 2/3/4") are undocumented as to
   what they actually switch.
 

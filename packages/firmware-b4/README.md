@@ -21,8 +21,11 @@ These are the load-bearing parts, and they are refusals rather than features:
 - **It cannot drive unless `B4_ENABLE_IRIS_DRIVE` is compiled in *and* the
   device is armed over the API.** Two gates, per the brief §3. A flashed board
   must not move a lens the moment a cable is plugged in.
-- **It never transmits on the lens serial line.** On a group C lens pin 11 is an
-  analog focus output; driving it would be driving against the lens's own buffer.
+- **It does not transmit on the lens serial line** — not in any default build.
+  The transmit path exists only in the `-serial` build (`B4_ENABLE_SERIAL_TX`),
+  refuses the disputed control codes until #47 has resolved them, and still
+  needs a physical jumper. On a group C lens pin 11 is an analog focus output;
+  driving it would be driving against the lens's own buffer.
 - **It does not guess a calibration curve.** With no table it reports
   `calibrated:false` and refuses. It does not fall back to a straight line
   between two voltages nobody measured — the same refusal `paintNudge` makes
@@ -39,6 +42,15 @@ table recorded per lens and stored in NVS.
 ```bash
 pio run -e waveshare-esp32-s3-eth -t upload    # default: reads, drives nothing
 ./tools/flash.sh --armed                       # drive compiled in; prompts first
+```
+
+For a group B lens (serial on pins 11/12) there is a third build that listens
+to both directions and has the transmit path compiled in — behind the
+`B4_COMMAND_CODES_RESOLVED` gate and a physical jumper. Procedure first:
+[`docs/b4/serial.md`](../../docs/b4/serial.md).
+
+```bash
+pio run -e waveshare-esp32-s3-eth-serial
 ```
 
 ## Test it without hardware
@@ -99,4 +111,6 @@ A host sending volts would be asserting a curve it cannot know.
 | `src/analog_filter.h` | Oversample → EMA → deadband, adapted from `larszu/dmx-bicolor-controller` |
 | `src/B4LensControl.ino` | Setup, I²C scan, reading, the closed loop, HTTP |
 | `tools/` | Simulator, calibration recorder, curve inspector, flash script |
+| `src/b4_frame.h` | Serial frame, CRC, decoder, lens-name assembly, transmit gate — pure |
+| `src/lens_serial.h`, `lens_serial_http.h` | Capture and send, compiled only with the serial flags |
 | `test/native/` | Host tests for the pure headers — no board, no lens |
