@@ -97,7 +97,11 @@ test('setIris meldet NICHT zurueck — die Bestaetigung kommt von Pin 7', async 
 
     // Erst wenn das Geraet einen anderen Wert GEMESSEN hat, kommt er an.
     state.status = { ...READY, lens: { iris: 198, irisVolts: 5.4 } };
-    await new Promise((r) => setTimeout(r, 120));
+    // Bis zur Messung warten, nicht eine feste Zeit: unter Last (volle
+    // Testsuite) reichten 120 ms gelegentlich nicht.
+    for (let t0 = Date.now(); events.length === 0 && Date.now() - t0 < 2000; ) {
+      await new Promise((r) => setTimeout(r, 10));
+    }
     assert.deepEqual(events, [{ iris: 198 }]);
   });
 });
