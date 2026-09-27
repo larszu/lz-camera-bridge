@@ -101,12 +101,12 @@ A non-inverting amplifier with summing at the + input. Four resistors, one
 op-amp, fed from the 12 V rail.
 
 ```
-Ra = 10k   from 3.3 V        to +input
-Rb = 16k   from DAC output   to +input
+Ra = 16k   from 3.3 V        to +input
+Rb = 10k   from DAC output   to +input
 R1 = 10k   from −input       to GND
 R2 = 10k   from output       to −input
 
-Vp   = (Vdac·Rb + 3.3·Ra) / (Ra + Rb)
+Vp   = (Vdac·Ra + 3.3·Rb) / (Ra + Rb)
 Vout = Vp · (1 + R2/R1)   =   1.231 · Vdac + 2.54
 ```
 
@@ -114,6 +114,14 @@ Vout = Vp · (1 + R2/R1)   =   1.231 · Vdac + 2.54
 |---|---|
 | 0.00 V | 2.54 V — iris closed |
 | 3.30 V | 6.60 V — iris open |
+
+**Which resistor goes where matters.** At a summing node each source is
+weighted by the *other* resistor (superposition: Vdac reaches the node through
+Rb, divided against Ra). An earlier revision of this page had 10k from 3.3 V
+and 16k from the DAC under the same formula — built that way the stage gives
+0.769 · Vdac + 4.06, i.e. **4.06–6.60 V**, and the iris could never close. Step
+4 below would have caught it on the bench; the check at 0 V DAC is 2.54 V, not
+4 V.
 
 The range only has to be approximately right. The exact voltage-to-aperture
 relationship is calibrated in software, which is why no voltage appears

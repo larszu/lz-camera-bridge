@@ -154,13 +154,13 @@ Pin 6  --&gt; +12 V   Pin 3 --&gt; GND, gemeinsam mit dem ESP32</pre>
 Widerstände, ein Operationsverstärker aus der 12-V-Schiene.</p>
 <div class="two">
 <div>
-<pre>Ra = 10k  von 3,3 V      zum +Eingang
-Rb = 16k  vom DAC        zum +Eingang
+<pre>Ra = 16k  von 3,3 V      zum +Eingang
+Rb = 10k  vom DAC        zum +Eingang
 R1 = 10k  vom -Eingang   nach Masse
 R2 = 10k  vom Ausgang    zum -Eingang</pre>
 </div>
 <div>
-<pre>Vp   = (Vdac*Rb + 3,3*Ra) / (Ra+Rb)
+<pre>Vp   = (Vdac*Ra + 3,3*Rb) / (Ra+Rb)
 Vout = Vp * (1 + R2/R1)
      = 1,231 * Vdac + 2,54
 
@@ -168,9 +168,9 @@ Vout = Vp * (1 + R2/R1)
 3,30 V  ->  6,60 V   Blende offen</pre>
 </div>
 </div>
-<p>Der Bereich muss nur ungefähr stimmen; die genaue Zuordnung entsteht später in
-der Kennlinie. LM358 und TL072 haben dieselbe Pinbelegung und passen in dieselben
-Löcher — der Ausgang muss nur 6,6 V erreichen, Rail-to-Rail ist nicht nötig.</p>
+<p><strong>Nicht vertauschen:</strong> 16k an 3,3 V, 10k an den DAC — sonst 4,06–6,60 V,
+die Blende schließt nie. Alles Weitere regelt die Kennlinie. LM358 und TL072 passen in
+dieselben Löcher; Rail-to-Rail ist nicht nötig.</p>
 
 <h3>Zwei Dinge an der Optik selbst</h3>
 <ul>
@@ -234,7 +234,7 @@ python3 tools/record_calibration.py --host 127.0.0.1:8080 --points 9 --settle 0.
 <p>Er beweist etwas über die Software und nichts über eine Optik.</p>
 
 <div class="meta">
-  Lars Zumpe Medienproduktion &middot; B4 Objektivsteuerung &middot; Stand 19.09.2026<br>
+  Lars Zumpe Medienproduktion &middot; B4 Objektivsteuerung &middot; Stand 27.09.2026<br>
   Quellen und Firmware: <code>sony-camera-bridge</code>, <code>docs/b4/</code> und
   <code>packages/firmware-b4/</code>. Die elektrischen Angaben sind unverifiziert —
   Messungen gehören nach <code>docs/b4/measurements/</code>.
