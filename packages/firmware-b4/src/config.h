@@ -58,7 +58,7 @@
  * Listening on the lens serial line (group B, phase 2). Passive: a UART RX
  * behind a divider draws nothing a lens would notice. Off by default because
  * on a group C lens — the one this project has — pin 11 is analog focus and
- * there is nothing to hear. See §6 for pins and docs/b4/serial.md.
+ * there is nothing to hear. See §5 for pins and docs/b4/serial.md.
  */
 #ifndef B4_ENABLE_SERIAL_RX
 #define B4_ENABLE_SERIAL_RX 0
@@ -173,6 +173,17 @@
 #define ADS_GAIN_SETTING GAIN_ONE
 
 /*
+ * ADS1115 data rate. The Adafruit driver defaults to 128 SPS and its
+ * readADC_SingleEnded() BLOCKS until the conversion is done, so one reading is
+ * about 8 ms. Eight oversamples on three channels at 128 SPS is ~190 ms — the
+ * 50 ms loop below would really have run at about 5 Hz. At 860 SPS (the
+ * fastest rate in TI's datasheet) the same 24 conversions take ~28 ms. Faster
+ * conversions are noisier per sample; the oversampling and the EMA below are
+ * what pays for that. `loopMs` in /api/status shows what the loop really takes.
+ */
+#define ADS_DATA_RATE RATE_ADS1115_860SPS
+
+/*
  * Input conditioning, adapted from larszu/dmx-bicolor-controller.
  *
  * That project needed it so a DMX fixture would not shimmer from ADC noise.
@@ -235,8 +246,62 @@
 /* The board's WS2812 (GPIO 21, §2) shows red while a TX-capable build runs. */
 #define PIN_TX_INDICATOR 21
 
+// 6. DEMANDS  (phase 4 — reading only, nothing here drives anything)
 // ───────────────────────────────────────────────────────────────────────────
-// 6. NETWORK
+
+/*
+ * A second ADS1115 for zoom and focus demands. Its ADDR pin goes to VDD, which
+ * gives 0x49 (TI ADS1115 datasheet, table 7-2: GND 0x48, VDD 0x49, SDA 0x4A,
+ * SCL 0x4B). Missing chip = no demand fields in /api/status, not zeros.
+ *
+ * Pin roles come from the 3ality SPC-7000 sheet (docs/b4/spc7000-pinout.md,
+ * Fujinon B/C demands): pin 7 is the wiper, pin 6 is "Detect". What Detect
+ * actually is — pull-up, strap, identifying resistor — is NOT known (#49). The
+ * firmware therefore reports its voltage raw and interprets nothing. The
+ * demand also needs its 2.5 / 5.0 / 7.5 V references supplied by the host;
+ * that circuit is not designed yet (docs/b4/demand.md).
+ *
+ * Both lines go through the same 10k/6k8 divider as the lens readback: the
+ * ADS1115 must never see more than VDD + 0.3 V (datasheet, absolute maximum).
+ */
+#ifndef B4_ENABLE_DEMAND
+#define B4_ENABLE_DEMAND 1
+#endif
+#define ADDR_ADS1115_DEMAND 0x49
+#define ADS_DEMAND_CH_ZOOM 0         // zoom demand pin 7, via divider
+#define ADS_DEMAND_CH_FOCUS 1        // focus demand pin 7, via divider
+#define ADS_DEMAND_CH_ZOOM_DETECT 2  // zoom demand pin 6, via divider — raw only
+#define ADS_DEMAND_CH_FOCUS_DETECT 3 // focus demand pin 6, via divider — raw only
+#define DEMAND_OVERSAMPLE 4          // fewer than the iris: it is a hand, not a loop
+
+/*
+ * VTR and RET buttons of a B/C zoom demand (pins 9/10 and 11/12 on the
+ * SPC-7000 sheet: button and its common). Read as INPUT_PULLUP, active low,
+ * with the common on ground — which is only safe if the contacts really are
+ * dry contacts. Unmeasured, so -1 (not wired) until #49 has looked. Pins 8, 43
+ * and 44 were free on this board (§2) but are now the lens serial line of §5
+ * (group B builds). Before wiring VTR/RET, pick pins that are free in the build
+ * that will actually run — a group B build needs all three for the lens.
+ */
+#define PIN_DEMAND_VTR -1
+#define PIN_DEMAND_RET -1
+
+/*
+ * The demand as a USB HID gamepad (#52), so it works on a computer with no
+ * bridge running. Needs the TinyUSB stack (ARDUINO_USB_MODE=0), which is why it
+ * is its own build environment in platformio.ini and off by default.
+ *
+ * Axes are the stock Arduino USBHIDGamepad: 8 bit signed. X = zoom demand,
+ * Y = focus demand, raw ADC counts scaled linearly from 0..32767 onto
+ * -127..127 — the ADC's scale, not a claim about the demand's voltages. A
+ * missing reading reports the centre. Buttons 0/1 = VTR/RET when wired.
+ */
+#ifndef B4_DEMAND_HID
+#define B4_DEMAND_HID 0
+#endif
+
+// ───────────────────────────────────────────────────────────────────────────
+// 7. NETWORK
 // ───────────────────────────────────────────────────────────────────────────
 
 #define HTTP_PORT 80

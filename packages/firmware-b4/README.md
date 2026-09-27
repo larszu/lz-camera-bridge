@@ -84,6 +84,19 @@ directions, refusal without a table, the NVS round trip, and the closed loop
 holding under 2 % — including against a table that has drifted since it was
 recorded, which the open loop cannot correct. CI runs it before the firmware
 build. The <2 % figure on a real lens is still a bench measurement (#40).
+## Demands (phase 4)
+
+A second ADS1115 at 0x49 reads a zoom and a focus demand; `/api/status` then
+carries a `demand` block (absent fields = not read). `--demand` on the simulator
+models it, and `POST /api/sim/demand {"axis":"zoom","position":null}` unplugs
+one. As a USB gamepad instead:
+
+```bash
+pio run -e waveshare-esp32-s3-eth-demand-hid -t upload
+```
+
+Wiring, the two output ways and what is still unmeasured:
+[`docs/b4/demand.md`](../../docs/b4/demand.md).
 
 ## HTTP API
 

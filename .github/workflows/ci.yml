@@ -178,6 +178,13 @@ jobs:
               echo "$e enthaelt den Sendepfad"; exit 1; fi
           done
 
+      # Der Demand als USB-HID-Gamepad (#52): eigener Bau, weil HID den
+      # TinyUSB-Stapel braucht (ARDUINO_USB_MODE=0). Ohne diesen Schritt
+      # faellt ein Bruch darin erst am Rechner auf, an dem der Demand steckt.
+      - name: Bau (Demand als USB-HID)
+        working-directory: packages/firmware-b4
+        run: pio run -e waveshare-esp32-s3-eth-demand-hid
+
       # Der scharfe Bau MUSS groesser sein als der sichere.
       #
       # Das steht hier, weil es schon einmal nicht so war: `config.h` hatte ein
@@ -223,3 +230,15 @@ jobs:
             -H 'Content-Type: application/json' -d '{"value":128}' \
             http://127.0.0.1:8098/api/iris)
           test "$code" = "409" || { echo "erwartet 409, bekommen $code"; exit 1; }
+
+      # Phase 4 im Simulator: der Demand erscheint im Status, und ein
+      # abgezogener Demand VERSCHWINDET daraus, statt als letzter Wert
+      # stehenzubleiben. Darauf baut die Freigabe in DemandSource auf.
+      - name: Simulator mit Demand, Abziehen laesst das Feld verschwinden
+        working-directory: packages/firmware-b4
+        run: |
+          python3 tools/simulator.py --port 8097 --demand &
+          sleep 2
+          curl -fsS http://127.0.0.1:8097/api/status | grep -q '"zoomCounts"'
+          curl -fsS -X POST -d '{"axis":"zoom","position":null}' http://127.0.0.1:8097/api/sim/demand
+          curl -fsS http://127.0.0.1:8097/api/status | python3 -c 'import json,sys; d=json.load(sys.stdin)["demand"]; sys.exit(1 if "zoomCounts" in d else 0)'

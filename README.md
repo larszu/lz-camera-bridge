@@ -178,6 +178,12 @@ capabilities of this repo, so they stay out of the `caps:parity` contract — th
 reasoning, and where they live instead, is in
 [`docs/b4/lens-facts-vs-capabilities.md`](docs/b4/lens-facts-vs-capabilities.md).
 
+A zoom or focus demand wired to the B4 interface becomes an input on the same
+bus: its wiper drives `setZoom`/`setFocus` on a chosen camera, through a table
+measured on that demand, and an unplugged demand stops the axis instead of
+holding its last value. Without the bridge the same firmware can appear as a
+USB gamepad. See [`docs/b4/demand.md`](docs/b4/demand.md).
+
 ## Packages
 
 | Path | What it is |

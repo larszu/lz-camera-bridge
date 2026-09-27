@@ -35,6 +35,12 @@
 #include "analog_filter.h"
 #include "calibration.h"
 #include "iris_loop.h"
+#include "demand.h"
+#if B4_DEMAND_HID
+#include <USB.h>
+#include <USBHIDGamepad.h>
+USBHIDGamepad gamepad;
+#endif
 // web_page.h is included further down, after `server` exists.
 
 // ── W5500 wiring on the Waveshare ESP32-S3-ETH ─────────────────────────────
@@ -61,16 +67,20 @@
 
 WebServer server(HTTP_PORT);
 Adafruit_ADS1115 ads;
+Adafruit_ADS1115 adsDemand; // second chip, 0x49 — demands (phase 4)
 Adafruit_MCP4728 dac;
 Calibration cal;
 
 AnalogFilter fIris(ADC_EMA_ALPHA, ADC_DEADBAND_COUNTS);
 AnalogFilter fZoom(ADC_EMA_ALPHA, ADC_DEADBAND_COUNTS);
 AnalogFilter fFocus(ADC_EMA_ALPHA, ADC_DEADBAND_COUNTS);
+AnalogFilter fDemZoom(ADC_EMA_ALPHA, ADC_DEADBAND_COUNTS);
+AnalogFilter fDemFocus(ADC_EMA_ALPHA, ADC_DEADBAND_COUNTS);
 
 struct Health {
   bool dacPresent = false;
   bool adcPresent = false;
+  bool demandAdcPresent = false;
   bool ethUp = false;
 } health;
 
@@ -89,6 +99,7 @@ struct Drive {
 
 uint32_t lastFeedbackMs = 0;
 uint32_t lastLoopMs = 0;
+uint32_t loopDurationMs = 0; // what one pass of reading + loop really took
 float voltsPerCount = 0.000125f; // GAIN_ONE: 4.096 V / 32768
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -113,6 +124,15 @@ static bool readChannel(uint8_t ch, float &out) {
     acc += ads.readADC_SingleEnded(ch);
   }
   out = static_cast<float>(acc) / ADC_OVERSAMPLE;
+  return true;
+}
+
+/** Same as readChannel(), on the demand ADC. Absent chip = no reading, never zero. */
+static bool readDemandChannel(uint8_t ch, uint8_t oversample, float &out) {
+  if (!health.demandAdcPresent) return false;
+  int32_t acc = 0;
+  for (uint8_t i = 0; i < oversample; ++i) acc += adsDemand.readADC_SingleEnded(ch);
+  out = static_cast<float>(acc) / oversample;
   return true;
 }
 
@@ -216,6 +236,9 @@ static void serviceLoop(float irisCounts, bool haveFeedback) {
 // ───────────────────────────────────────────────────────────────────────────
 
 static bool gIrisOk = false, gZoomOk = false, gFocusOk = false;
+static bool gDemZoomOk = false, gDemFocusOk = false;
+static float gDemZoomDetect = 0, gDemFocusDetect = 0;
+static bool gDemZoomDetectOk = false, gDemFocusDetectOk = false;
 
 static String lensVolts(float counts) {
   return String(adcCountsToLensVolts(counts, voltsPerCount,
@@ -233,6 +256,7 @@ static void handleStatus() {
   String j = "{";
   j += "\"firmware\":\"b4-lens-control/1\",";
   j += "\"uptimeMs\":" + String(millis()) + ",";
+  j += "\"loopMs\":" + String(loopDurationMs) + ",";
   j += "\"driveCompiledIn\":" + String(B4_ENABLE_IRIS_DRIVE ? "true" : "false") + ",";
   j += "\"armed\":" + String(drive.armed ? "true" : "false") + ",";
   j += "\"calibrated\":" + String(cal.isValid() ? "true" : "false") + ",";
@@ -261,6 +285,27 @@ static void handleStatus() {
     j += ",\"focusVolts\":" + lensVolts(fFocus.smoothed());
   }
   j += "},";
+
+  // Demands: present only when the second ADC answered, each field only when
+  // it was read. Detect is reported as a voltage and deliberately NOT turned
+  // into "plugged in / not" — what that pin means is still to be measured (#49).
+  if (health.demandAdcPresent) {
+    j += "\"demand\":{";
+    bool df = true;
+    auto field = [&](const char *name, float counts) {
+      if (!df) j += ",";
+      j += String("\"") + name + "Counts\":" + String(counts, 1) + ",\"" + name +
+           "Volts\":" + lensVolts(counts);
+      df = false;
+    };
+    if (gDemZoomOk) field("zoom", fDemZoom.smoothed());
+    if (gDemFocusOk) field("focus", fDemFocus.smoothed());
+    if (gDemZoomDetectOk) field("zoomDetect", gDemZoomDetect);
+    if (gDemFocusDetectOk) field("focusDetect", gDemFocusDetect);
+    if (PIN_DEMAND_VTR >= 0) { j += String(df ? "" : ",") + "\"vtr\":" + (digitalRead(PIN_DEMAND_VTR) == LOW ? "true" : "false"); df = false; }
+    if (PIN_DEMAND_RET >= 0) { j += String(df ? "" : ",") + "\"ret\":" + (digitalRead(PIN_DEMAND_RET) == LOW ? "true" : "false"); df = false; }
+    j += "},";
+  }
 
   j += "\"drive\":{\"setpoint\":" + String(drive.setpoint) +
        ",\"dacCode\":" + String(drive.dacCode) +
@@ -443,10 +488,29 @@ void setup() {
   health.adcPresent = i2cPresent(ADDR_ADS1115) && ads.begin(ADDR_ADS1115);
   if (health.adcPresent) {
     ads.setGain(ADS_GAIN_SETTING);
+    ads.setDataRate(ADS_DATA_RATE);
     Serial.println(F("ADS1115 ready."));
   } else {
     Serial.println(F("ADS1115 NOT found — no position readback. Reading only what exists."));
   }
+
+#if B4_ENABLE_DEMAND
+  health.demandAdcPresent = i2cPresent(ADDR_ADS1115_DEMAND) && adsDemand.begin(ADDR_ADS1115_DEMAND);
+  if (health.demandAdcPresent) {
+    adsDemand.setGain(ADS_GAIN_SETTING);
+    adsDemand.setDataRate(ADS_DATA_RATE);
+    Serial.println(F("Demand ADS1115 (0x49) ready."));
+  } else {
+    Serial.println(F("No demand ADS1115 at 0x49 — demands not read."));
+  }
+  if (PIN_DEMAND_VTR >= 0) pinMode(PIN_DEMAND_VTR, INPUT_PULLUP);
+  if (PIN_DEMAND_RET >= 0) pinMode(PIN_DEMAND_RET, INPUT_PULLUP);
+#endif
+#if B4_DEMAND_HID
+  gamepad.begin();
+  USB.begin();
+  Serial.println(F("Demand also appears as a USB HID gamepad (X zoom, Y focus)."));
+#endif
 
   health.dacPresent = i2cPresent(ADDR_MCP4728) && dac.begin(ADDR_MCP4728);
   if (health.dacPresent) {
@@ -505,4 +569,30 @@ void loop() {
   if (gFocusOk) fFocus.push(c);
 
   serviceLoop(fIris.stable(), gIrisOk && fIris.primed());
+
+#if B4_ENABLE_DEMAND
+  gDemZoomOk = readDemandChannel(ADS_DEMAND_CH_ZOOM, DEMAND_OVERSAMPLE, c);
+  if (gDemZoomOk) fDemZoom.push(c);
+  gDemFocusOk = readDemandChannel(ADS_DEMAND_CH_FOCUS, DEMAND_OVERSAMPLE, c);
+  if (gDemFocusOk) fDemFocus.push(c);
+  gDemZoomDetectOk = readDemandChannel(ADS_DEMAND_CH_ZOOM_DETECT, 1, gDemZoomDetect);
+  gDemFocusDetectOk = readDemandChannel(ADS_DEMAND_CH_FOCUS_DETECT, 1, gDemFocusDetect);
+#endif
+#if B4_DEMAND_HID
+  {
+    uint32_t buttons = 0;
+    if (PIN_DEMAND_VTR >= 0 && digitalRead(PIN_DEMAND_VTR) == LOW) buttons |= 1u << 0;
+    if (PIN_DEMAND_RET >= 0 && digitalRead(PIN_DEMAND_RET) == LOW) buttons |= 1u << 1;
+    const int8_t x = gDemZoomOk ? demandHidAxis(fDemZoom.stable()) : 0;
+    const int8_t y = gDemFocusOk ? demandHidAxis(fDemFocus.stable()) : 0;
+    static int8_t lx = 0, ly = 0;
+    static uint32_t lb = 0;
+    if (x != lx || y != ly || buttons != lb) {
+      gamepad.send(x, y, 0, 0, 0, 0, HAT_CENTER, buttons);
+      lx = x; ly = y; lb = buttons;
+    }
+  }
+#endif
+
+  loopDurationMs = millis() - now;
 }

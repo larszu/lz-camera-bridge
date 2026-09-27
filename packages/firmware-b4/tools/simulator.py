@@ -33,6 +33,12 @@ Usage
     python3 packages/firmware-b4/tools/simulator.py --no-drive      # behave like the safe build
     python3 packages/firmware-b4/tools/simulator.py --no-adc        # ADS1115 missing
     python3 packages/firmware-b4/tools/simulator.py --group-c       # no focus line (the real lens)
+    python3 packages/firmware-b4/tools/simulator.py --demand        # a zoom and a focus demand plugged in
+
+Demands (phase 4) are moved from outside, because there is no hand:
+
+    curl -X POST localhost:8080/api/sim/demand -d '{"axis":"zoom","position":0.8}'
+    curl -X POST localhost:8080/api/sim/demand -d '{"axis":"zoom","position":null}'   # unplug
 
 This is a TEST DOUBLE. It is not a lens and it proves nothing about one.
 """
@@ -112,6 +118,8 @@ class Device:
         self.t0 = time.time()
         self.zoom = 0.35   # static unless someone turns the ring
         self.focus = 0.70
+        # Demand wiper positions 0..1, or None = unplugged. Only with --demand.
+        self.demand: dict = {"zoom": 0.5, "focus": 0.5} if args.demand else {}
         threading.Thread(target=self._run, daemon=True).start()
 
     def _run(self) -> None:
@@ -186,6 +194,17 @@ class Device:
             lens["focusCounts"] = round(c["focusCounts"], 1)
             lens["focusVolts"] = round(2.0 + self.focus * 5.0, 3)
 
+        demand: dict = {}
+        if self.args.demand:
+            for axis, pos in self.demand.items():
+                if pos is None:
+                    continue  # unplugged: the wiper floats; the field is absent
+                # MODEL ONLY: the wiper between the 2.5 V and 7.5 V references
+                # the SPC-7000 sheet lists. What a real demand does is #49.
+                v = 2.5 + pos * 5.0
+                demand[f"{axis}Counts"] = round(self._noisy(v), 1)
+                demand[f"{axis}Volts"] = round(v, 3)
+
         drive = {
             "setpoint": self.setpoint,
             "dacCode": self.dac_code,
@@ -194,9 +213,10 @@ class Device:
         }
         if self.fault:
             drive["fault"] = self.fault
-        return {
+        out = {
             "firmware": "b4-lens-control/1 (SIMULATOR)",
             "uptimeMs": int((time.time() - self.t0) * 1000),
+            "loopMs": 30,
             "driveCompiledIn": self.args.drive,
             "armed": self.armed,
             "calibrated": self.calibrated,
@@ -205,6 +225,9 @@ class Device:
             "lens": lens,
             "drive": drive,
         }
+        if self.args.demand:
+            out["demand"] = demand
+        return out
 
 
 # ── HTTP ───────────────────────────────────────────────────────────────────
@@ -310,6 +333,17 @@ class Handler(BaseHTTPRequestHandler):
             d.calibrated = True
             return self._send(200, {"ok": True, "points": len(d.cal)})
 
+        if self.path == "/api/sim/demand":
+            if not d.args.demand:
+                return self._refuse(404, "simulator started without --demand")
+            axis, pos = body.get("axis"), body.get("position", "missing")
+            if axis not in ("zoom", "focus"):
+                return self._refuse(400, "axis must be zoom or focus")
+            if pos is not None and not (isinstance(pos, (int, float)) and 0 <= pos <= 1):
+                return self._refuse(400, "position must be 0..1 or null (unplugged)")
+            d.demand[axis] = pos
+            return self._send(200, {"ok": True})
+
         if self.path == "/api/calibrate/clear":
             d.cal, d.calibrated, d.dac_code = [], False, 0
             d.fault = "calibration cleared"
@@ -330,6 +364,8 @@ def main() -> None:
                     help="MCP4728 missing from the bus")
     ap.add_argument("--group-c", dest="group_c_no_focus", action="store_true",
                     help="no focus readback (pin 11 unread)")
+    ap.add_argument("--demand", action="store_true",
+                    help="a zoom and a focus demand on the second ADC (phase 4)")
     args = ap.parse_args()
 
     Handler.dev = Device(args)
