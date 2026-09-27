@@ -25,6 +25,7 @@ connector, and for reading zoom/focus demands as input devices.
 | [`serial.md`](serial.md) | Phases 2–3 for a group B lens: breakout, capture of both directions, lens name, resolving the command codes, and the transmit path behind a compile flag *and* a jumper. Probably not needed for our Canon (group C expected). |
 | [`lens-inventory.md`](lens-inventory.md) | Every lens on hand with its group (A/B/C), the method and the date — #38. Currently one row, *expected C, unmeasured*. |
 | [`research-canon.md`](research-canon.md) | Desk research with sources: what Canon's own documents say about our J15ax8B4 IRS, the 8-pin zoom remote, digital demands and the BDC-11 cable (the BDC-10 of §7 does not appear at Canon). |
+| [`demand.md`](demand.md) | Phase 4: zoom/focus demands read by the firmware, as `setZoom`/`setFocus` on the bus (#51) or as a USB HID gamepad (#52), which of the two runs when, and what #49 still has to measure. |
 | [`measurements/`](measurements/) | Real readings, including the ones that failed. Empty until 2026-09-23. |
 | [`freed-output.md`](freed-output.md) | FreeD D1 output: the split between encoder and sender, what the byte table is verified against, and why address, port and rate have no defaults. |
 | [`axis.md`](axis.md) | The axis state machine: setpoint, feedback, limits, homing, status — and the order in which a stop engages the brake and cuts torque. |

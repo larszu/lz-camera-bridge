@@ -20,6 +20,9 @@
  *          | 'discoverSonyUsb' | 'discoverSonyMnc'
  *          | 'listHidDevices' | 'enableControlSurface' | 'disableControlSurface'
  *          | 'setTally' | 'getTally' }
+ *   { type: 'enableDemand', demand } | { type: 'disableDemand' }
+ *       Zoom-/Fokus-Demand an einem firmware-b4-Geraet als Quelle von
+ *       setZoom/setFocus; siehe input/DemandSource.ts und docs/b4/demand.md.
  *
  * Server → Client messages:
  *   { type: 'cameras', cameras: [{ cameraNumber, config, connected,
@@ -32,6 +35,9 @@
  *                        (ms seit Epoche). Nur bestaetigte Felder stehen
  *                        darin; ein Kommando loescht den Eintrag.
  *   { type: 'error', message, cameraNumber? }
+ *   { type: 'demand', axis, cameraNumber, command, raw, value, present,
+ *                     origin: 'commanded' }   nur wenn etwas gesendet wurde
+ *   { type: 'demandSource', active, bindings? }
  *   { type: 'tally' | 'ports' | 'wiznetDevices' | 'sonyUsbDevices'
  *          | 'sonyMncDevices' | 'hidDevices' | 'controlSurface' | 'wiznetConfigResult' }
  */
@@ -45,6 +51,7 @@ import { makeBackend, CameraBackend, CameraConfig } from './cameras/backendFacto
 import { WiznetDiscovery, WiznetDeviceConfig } from './discovery/WiznetDiscovery.js';
 import { CompanionServer, TallyState } from './companion/CompanionServer.js';
 import { HidControlSurface, HidSurfaceConfig } from './input/HidControlSurface.js';
+import { DemandSource, conflictingCommands, type DemandConfig } from './input/DemandSource.js';
 import {
   matchCameraPlan, parseCameraPlan,
   type CameraPlan, type PlanCamera, type SlotFacts,
@@ -87,7 +94,7 @@ interface ClientMessage {
     | 'listCameras' | 'setCameraConfig' | 'connectCamera' | 'disconnectCamera' | 'removeCamera'
     | 'command' | 'listPorts' | 'discoverWiznet' | 'configureWiznet' | 'discoverSonyUsb'
     | 'discoverSonyMnc' | 'listHidDevices' | 'enableControlSurface' | 'disableControlSurface'
-    | 'setTally' | 'getTally'
+    | 'setTally' | 'getTally' | 'enableDemand' | 'disableDemand'
     | 'matchCameraPlan' | 'applyCameraPlan' | 'assignPlanCamera';
   cameraNumber?: number;
   config?: CameraConfig;
@@ -96,6 +103,7 @@ interface ClientMessage {
   deviceIp?: string;
   deviceConfig?: WiznetDeviceConfig;
   surface?: HidSurfaceConfig;
+  demand?: DemandConfig;
   tally?: Partial<TallyState>;
   /** Kamera-Plan als Text ODER als Objekt — beides, siehe `handleClientMessage`. */
   plan?: string | Record<string, unknown>;
@@ -126,6 +134,8 @@ export class BridgeServer {
   private wiznetDiscovery = new WiznetDiscovery();
   private companion: CompanionServer;
   private hidSurface: HidControlSurface | null = null;
+  private hidSurfaceConfig: HidSurfaceConfig | null = null;
+  private demandSource: DemandSource | null = null;
   private tally: TallyState = { program: false, preview: false, isoRec: false };
 
   /**
@@ -181,6 +191,7 @@ export class BridgeServer {
 
   stop(): void {
     this.disableControlSurface();
+    this.disableDemand();
     for (const slot of this.cameras.values()) void slot.backend?.disconnect();
     this.companion.stop();
     this.wss.close();
@@ -300,6 +311,15 @@ export class BridgeServer {
 
       case 'disableControlSurface':
         this.disableControlSurface();
+        break;
+
+      case 'enableDemand':
+        if (!msg.demand) { this.sendError(ws, 'Missing demand config'); break; }
+        this.enableDemand(msg.demand);
+        break;
+
+      case 'disableDemand':
+        this.disableDemand();
         break;
 
       case 'setTally':
@@ -650,6 +670,14 @@ export class BridgeServer {
 
   private async enableControlSurface(surface: HidSurfaceConfig): Promise<void> {
     this.disableControlSurface();
+    const clash = this.demandSource ? conflictingCommands(this.demandSource.bindings, surface.bindings) : [];
+    if (clash.length > 0) {
+      throw new Error(
+        `Control surface refused: ${clash.join(', ')} is already driven by a demand. ` +
+          'Two sources on one axis cancel each other out — disable the demand first.',
+      );
+    }
+    this.hidSurfaceConfig = surface;
     const hid = new HidControlSurface(surface);
     this.hidSurface = hid;
     hid.on('command', ({ cmd, params }: { cmd: string; params: Record<string, unknown> }) => {
@@ -675,6 +703,47 @@ export class BridgeServer {
       this.hidSurface.stop();
       this.hidSurface = null;
     }
+    this.hidSurfaceConfig = null;
+  }
+
+  // ─── Demand source (phase 4) ────────────────────────────────────────────
+
+  /**
+   * A zoom/focus demand as a source on this bus. Its commands take the same
+   * path as a tap on the panel, so they are 'commanded' and never 'confirmed'.
+   * Refused while a HID surface drives the same command — see
+   * `conflictingCommands` for why.
+   */
+  private enableDemand(cfg: DemandConfig): void {
+    this.disableDemand();
+    const clash = this.hidSurfaceConfig ? conflictingCommands(cfg.bindings, this.hidSurfaceConfig.bindings) : [];
+    if (clash.length > 0) {
+      throw new Error(
+        `Demand refused: ${clash.join(', ')} is already driven by the control surface. ` +
+          'Two sources on one axis cancel each other out — disable the surface first.',
+      );
+    }
+    const src = new DemandSource(cfg);
+    this.demandSource = src;
+    src.on('command', ({ cameraNumber, cmd, params }: { cameraNumber: number; cmd: string; params: Record<string, unknown> }) => {
+      const slot = this.cameras.get(cameraNumber);
+      if (!slot?.connected) return; // nothing to drive; the broadcast still shows the demand
+      const quietWs = { readyState: WebSocket.OPEN, send: () => {} } as unknown as WebSocket;
+      void this.dispatchCommand(quietWs, cameraNumber, cmd, params);
+    });
+    src.on('demand', (ev) => this.broadcast({ type: 'demand', ...ev }));
+    src.on('error', (err: Error) => this.broadcast({ type: 'error', message: `Demand: ${err.message}` }));
+    src.start();
+    this.broadcast({ type: 'demandSource', active: true, bindings: cfg.bindings.map((b) => ({ axis: b.axis, cameraNumber: b.cameraNumber, command: b.command })) });
+  }
+
+  private disableDemand(): void {
+    if (!this.demandSource) return;
+    // stop() releases every driven axis — the stop goes out before the source is gone.
+    this.demandSource.stop();
+    this.demandSource.removeAllListeners();
+    this.demandSource = null;
+    this.broadcast({ type: 'demandSource', active: false });
   }
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
