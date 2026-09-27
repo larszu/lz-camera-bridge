@@ -59,6 +59,20 @@ which usually means the DAC monitor was measured instead of pin 7.
 
 It is a test double. It proves things about this code and nothing about a lens.
 
+The pure headers are also tested on the host, without PlatformIO:
+
+```bash
+test/native/run.sh
+```
+
+That compiles `calibration.h` and `iris_loop.h` with the desktop C++ compiler
+(stubs for `Arduino.h` and `Preferences.h` in `test/native/stubs/`) and runs
+them against the same servo model the simulator serves: interpolation in both
+directions, refusal without a table, the NVS round trip, and the closed loop
+holding under 2 % — including against a table that has drifted since it was
+recorded, which the open loop cannot correct. CI runs it before the firmware
+build. The <2 % figure on a real lens is still a bench measurement (#40).
+
 ## HTTP API
 
 | | |
@@ -81,6 +95,8 @@ A host sending volts would be asserting a curve it cannot know.
 |---|---|
 | `src/config.h` | **The only file you should need to touch.** Pins, divider values, loop gains, safety flags |
 | `src/calibration.h` | The NVS-backed table and its interpolation, both directions |
+| `src/iris_loop.h` | One step of the outer iris loop as a pure function, so the host tests reach it |
 | `src/analog_filter.h` | Oversample → EMA → deadband, adapted from `larszu/dmx-bicolor-controller` |
 | `src/B4LensControl.ino` | Setup, I²C scan, reading, the closed loop, HTTP |
 | `tools/` | Simulator, calibration recorder, curve inspector, flash script |
+| `test/native/` | Host tests for the pure headers — no board, no lens |
