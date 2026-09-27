@@ -161,6 +161,23 @@ jobs:
         working-directory: packages/firmware-b4
         run: pio run -e waveshare-esp32-s3-eth-armed
 
+      # Die serielle Leitung (Gruppe B): Mitlesen UND Sendepfad einkompiliert.
+      # Gebaut, damit der Sendepfad nicht verrottet -- und damit der naechste
+      # Schritt pruefen kann, dass er im Vorgabebau FEHLT (#48).
+      - name: Bau (serielle Leitung, mit Sendepfad)
+        working-directory: packages/firmware-b4
+        run: pio run -e waveshare-esp32-s3-eth-serial
+
+      - name: Ohne Flag ist der Sendepfad nicht im Binary
+        working-directory: packages/firmware-b4
+        run: |
+          test "$(grep -a -c 'B4 TX:' .pio/build/waveshare-esp32-s3-eth-serial/firmware.bin)" -ge 1 || {
+            echo "Merkmal fehlt im Sendebau -- die Pruefung unten wuerde nichts beweisen"; exit 1; }
+          for e in waveshare-esp32-s3-eth waveshare-esp32-s3-eth-armed; do
+            if grep -a -q 'B4 TX:' .pio/build/$e/firmware.bin; then
+              echo "$e enthaelt den Sendepfad"; exit 1; fi
+          done
+
       # Der scharfe Bau MUSS groesser sein als der sichere.
       #
       # Das steht hier, weil es schon einmal nicht so war: `config.h` hatte ein

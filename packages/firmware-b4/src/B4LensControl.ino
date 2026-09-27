@@ -83,6 +83,10 @@ struct Drive {
   const char *fault = nullptr; // non-null means motion is stopped and why
 } drive;
 
+#if B4_ENABLE_SERIAL_RX
+#include "lens_serial.h"
+#endif
+
 uint32_t lastFeedbackMs = 0;
 uint32_t lastLoopMs = 0;
 float voltsPerCount = 0.000125f; // GAIN_ONE: 4.096 V / 32768
@@ -263,6 +267,14 @@ static void handleStatus() {
        ",\"closedLoop\":" + String(drive.closedLoop ? "true" : "false") +
        ",\"holding\":" + String(drive.holding ? "true" : "false");
   if (drive.fault) j += ",\"fault\":\"" + String(drive.fault) + "\"";
+  j += "}";
+
+  j += ",\"serial\":{\"rxCompiledIn\":" + String(B4_ENABLE_SERIAL_RX ? "true" : "false") +
+       ",\"txCompiledIn\":" + String(B4_ENABLE_SERIAL_TX ? "true" : "false");
+#if B4_ENABLE_SERIAL_RX
+  j += ",\"fromLens\":" + captureJson(capLens) + ",\"fromCamera\":" + captureJson(capCam);
+  if (lensName.known()) j += ",\"lensName\":\"" + String(lensName.name()) + "\"";
+#endif
   j += "}}";
 
   server.send(200, "application/json", j);
@@ -373,6 +385,10 @@ static void handleLiveCsv() {
   server.send(200, "text/csv", csv);
 }
 
+#if B4_ENABLE_SERIAL_RX
+#include "lens_serial_http.h"
+#endif
+
 #include "web_page.h"
 
 static void setupRoutes() {
@@ -385,6 +401,13 @@ static void setupRoutes() {
   server.on("/api/calibrate/clear", HTTP_POST, handleCalClear);
   server.on("/api/calibration.csv", HTTP_GET, handleCalCsv);
   server.on("/api/live.csv", HTTP_GET, handleLiveCsv);
+#if B4_ENABLE_SERIAL_RX
+  server.on("/api/capture.bin", HTTP_GET, handleCaptureBin);
+  server.on("/api/capture/clear", HTTP_POST, handleCaptureClear);
+#if B4_ENABLE_SERIAL_TX
+  server.on("/api/lens/send", HTTP_POST, handleLensSend);
+#endif
+#endif
   server.onNotFound([]() { refuse(404, "no such endpoint"); });
 }
 
@@ -399,6 +422,20 @@ void setup() {
   Serial.println(F("B4LensControl — ESP32-S3 B4 lens interface"));
   Serial.printf("  iris drive compiled in: %s\n", B4_ENABLE_IRIS_DRIVE ? "YES" : "no");
   Serial.printf("  serial TX to lens:      %s\n", B4_ENABLE_SERIAL_TX ? "YES" : "no (correct)");
+
+#if B4_ENABLE_SERIAL_RX
+  // Inversion in the UART, not in software — config.h §5.
+#if B4_ENABLE_SERIAL_TX
+  Serial1.begin(LENS_BAUD, SERIAL_8N1, PIN_LENS_RX_FROM_LENS, PIN_LENS_TX, true);
+  rgbLedWrite(PIN_TX_INDICATOR, 64, 0, 0); // red: this build can transmit
+  Serial.println(F("  LENS TX COMPILED IN. The jumper decides whether it reaches pin 12."));
+#else
+  Serial1.begin(LENS_BAUD, SERIAL_8N1, PIN_LENS_RX_FROM_LENS, -1, true);
+#endif
+  Serial2.begin(LENS_BAUD, SERIAL_8N1, PIN_LENS_RX_FROM_CAM, -1, true);
+  Serial.printf("  listening on the lens line: %d baud, inverted, RX GPIO %d / %d\n",
+                LENS_BAUD, PIN_LENS_RX_FROM_LENS, PIN_LENS_RX_FROM_CAM);
+#endif
 
   Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL, I2C_CLOCK_HZ);
   scanI2C();
@@ -442,6 +479,9 @@ void setup() {
 
 void loop() {
   server.handleClient();
+#if B4_ENABLE_SERIAL_RX
+  serviceSerial(); // every pass, not every LOOP_INTERVAL: the UART FIFO is 128 bytes
+#endif
 
   if (!health.ethUp && ETH.linkUp()) {
     health.ethUp = true;

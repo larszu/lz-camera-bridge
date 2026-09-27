@@ -54,6 +54,30 @@
 #define B4_ENABLE_SERIAL_TX 0
 #endif
 
+/*
+ * Listening on the lens serial line (group B, phase 2). Passive: a UART RX
+ * behind a divider draws nothing a lens would notice. Off by default because
+ * on a group C lens — the one this project has — pin 11 is analog focus and
+ * there is nothing to hear. See §6 for pins and docs/b4/serial.md.
+ */
+#ifndef B4_ENABLE_SERIAL_RX
+#define B4_ENABLE_SERIAL_RX 0
+#endif
+
+/*
+ * The source gives two assignments for iris/zoom/focus control codes (0x20
+ * iris / 0x21 zoom / 0x22 focus vs 0x21 / 0x23 / 0x22). Until capture has shown
+ * which one a camera really sends (#47), the transmit path refuses 0x20–0x23.
+ * Set to 1 only together with a note in b4-lens-control.md that resolves it.
+ */
+#ifndef B4_COMMAND_CODES_RESOLVED
+#define B4_COMMAND_CODES_RESOLVED 0
+#endif
+
+#if B4_ENABLE_SERIAL_TX && !B4_ENABLE_SERIAL_RX
+#error "B4_ENABLE_SERIAL_TX needs B4_ENABLE_SERIAL_RX: a sender that cannot hear the acknowledgement is guessing"
+#endif
+
 // ───────────────────────────────────────────────────────────────────────────
 // 2. BOARD — Waveshare ESP32-S3-ETH
 // ───────────────────────────────────────────────────────────────────────────
@@ -188,7 +212,31 @@
 #define FEEDBACK_TIMEOUT_MS 500
 
 // ───────────────────────────────────────────────────────────────────────────
-// 5. NETWORK
+// 5. LENS SERIAL LINE  (group B only — see B4_ENABLE_SERIAL_RX / _TX in §1)
+// ───────────────────────────────────────────────────────────────────────────
+
+/*
+ * 78400 8N1, TTL, INVERTED (b4-lens-control.md §3). The inversion is set in the
+ * UART itself (HardwareSerial::begin(…, invert=true) → uart_set_line_inverse),
+ * not by flipping bits afterwards: software inversion keeps the wrong framing
+ * and break detection, and the error then shows up at the CRC.
+ *
+ * Pins are the free ones from the board map in §2. Both lens-side lines come
+ * in through a divider (10k over 15k: 5 V → 3.0 V, docs/b4/wiring.md), never
+ * directly. TX needs a real level shifter, 1 kΩ in series AND the physical
+ * jumper; the compile flag alone is not enough (issue #48).
+ */
+#define LENS_BAUD 78400
+#define PIN_LENS_RX_FROM_LENS 44 // Hirose pin 11 (lens TXD) via divider → UART1 RX
+#define PIN_LENS_RX_FROM_CAM 8   // Hirose pin 12 (camera → lens) via divider → UART2 RX
+#define PIN_LENS_TX 43           // → level shifter → jumper → 1 kΩ → pin 12. TX builds only.
+#define CAPTURE_BYTES 16384      // per direction; what does not fit is counted, not wrapped
+
+/* The board's WS2812 (GPIO 21, §2) shows red while a TX-capable build runs. */
+#define PIN_TX_INDICATOR 21
+
+// ───────────────────────────────────────────────────────────────────────────
+// 6. NETWORK
 // ───────────────────────────────────────────────────────────────────────────
 
 #define HTTP_PORT 80
