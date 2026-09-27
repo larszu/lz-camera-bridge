@@ -196,6 +196,20 @@ For a Preston DMF.
 
 ---
 
+## Deviations between the two sources (#37)
+
+Checked row by row on 2026-09-27. The pin *functions* agree on all twelve
+pins; these are the points where the wording differs and a careless copy
+could go wrong:
+
+| Pin | SPC-7000 | `b4-lens-control.md` | Deviation |
+|---|---|---|---|
+| 4 | "Auto servo" | "Iris servo (off 0 V, on 5 V)" / "Iris auto enable" | Same wire, different emphasis; which level the Canon wants is a measurement (#40). |
+| 6 | "Unreg (unused)" | "Power, +12 V" | SPC says *unregulated*, i.e. not a clean 12 V. Size the input protection for that. |
+| 12 | "Lens Tx" | "RXD (lens receive)" | Named from opposite ends. **Direction words are not transferable**, see the note at the top. |
+| 1, 2, 9 | "from SPC" | "lens → cam" | Direction convention only. |
+| — | no voltages at all | voltage table §2 | The SPC sheet corroborates the **pinout**, not a single voltage. |
+
 ## Follow-ups this document creates
 
 - Measure pin 6 (`Detect`) on a real B/C demand before designing a reader.
