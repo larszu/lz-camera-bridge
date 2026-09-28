@@ -3,7 +3,8 @@
 //
 // ─── WAS ER PRUEFT UND WAS AUSDRUECKLICH NICHT ─────────────────────────────
 //
-// Geprueft wird das DASHBOARD (`packages/web-rcp/src/index.css`). NICHT
+// Geprueft wird das DASHBOARD (`packages/web-rcp/src/index.css`) und die
+// Regie-Ansichten (`styles/regie.css`: Mischer, Videowand, Anlage). NICHT
 // geprueft — und nicht umgefaerbt — werden `styles/sony-rcp.css` und
 // `styles/ptz-panel.css`: die sind Nachbauten der Sony-Steuersoftware und der
 // AW-RP150. Ihre Farben sind kein Geschmack, sondern Wiedererkennung; wer das
@@ -64,3 +65,17 @@ const unlesbar = css
 assert.deepEqual(unlesbar, [], `Weiss auf Off-White: ${unlesbar.join(' | ')}`);
 
 console.log('brand:check ok — Oberflaechen-Regeln (ADR-007) eingehalten');
+
+// ─── Die Regie-Ansichten: nur Tokens, keine Form ──────────────────────────
+//
+// `styles/regie.css` kam mit dem Mischer, der Videowand und der Anlage dazu.
+// Es darf KEINE eigene Farbe mitbringen (rohes Hex), keine Rundung, keinen
+// Schatten, keinen Verlauf -- alles kommt aus den Tokens oben.
+const regie = readFileSync(resolve(hier, '..', 'packages/web-rcp/src/styles/regie.css'), 'utf8');
+const ohneKommentare = regie.replace(/\/\*[\s\S]*?\*\//g, '');
+assert.ok(!/#[0-9a-fA-F]{3,8}\b/.test(ohneKommentare), 'regie.css: rohes Hex gefunden -- Tokens benutzen');
+assert.ok(!/border-radius/.test(ohneKommentare), 'regie.css: Rundung gefunden');
+assert.ok(!/box-shadow/.test(ohneKommentare), 'regie.css: Schatten gefunden');
+assert.ok(!/gradient\(/.test(ohneKommentare), 'regie.css: Verlauf gefunden');
+assert.ok(/var\(--signal\)/.test(ohneKommentare), 'regie.css: das Tally-Rot kommt aus --signal');
+console.log('brand:check ok — regie.css nur aus Tokens, ohne Rundung, Schatten, Verlauf');

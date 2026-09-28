@@ -167,11 +167,11 @@ export const MODE_READBACK: Readonly<Record<ConnectionMode, readonly PaintField[
   // NICHT hier: `CameraState` hat keine Felder dafuer, und zwei erfundene
   // Paint-Felder, die niemand kommandieren kann, waeren zwei tote Regler.
   'b4-lens': ['iris'],
-  // HTTP-CGI ist ein reiner Steuerweg: pan/tilt/zoom/fokus/preset gehen
-  // hinaus, aber das Geraet gibt darueber keinen Bildzustand zurueck. Auch
-  // Power ist bei Sony nur kommandiert, nicht gelesen. Leere Liste heisst:
-  // dieser Weg liest nichts zurueck.
-  'http-cgi': [],
+  // HTTP-CGI: pan/tilt/zoom/fokus/preset gehen hinaus, das Geraet gibt
+  // darueber keinen Bildzustand zurueck. Nur Power wird GEFRAGT (Sony
+  // `inquiry.cgi?inq=sysinfo`, Vissonic VISCA-Inquiry ueber TCP 5678) --
+  // siehe `HttpCgiClient.readPower`.
+  'http-cgi': ['cameraPower'],
 };
 
 /** Liest dieser Weg dieses Feld ueberhaupt vom Geraet? */
@@ -333,7 +333,8 @@ export const MODE_CADENCE: Readonly<Record<ConnectionMode, ConfirmCadence>> = {
   // Blende, die vor zwei Sekunden dort stand.
   'b4-lens': { kind: 'poll', everyMs: 250 },
   // Nichts zurueckgelesen (MODE_READBACK leer), also kein Takt -- 'none'.
-  'http-cgi': { kind: 'none' },
+  // `HttpCgiClient.readPower` every 10 s, plus 1.5 s and 10 s after a power command.
+  'http-cgi': { kind: 'poll', everyMs: 10000 },
 }
 
 /**

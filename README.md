@@ -8,18 +8,6 @@ from a Bitfocus **Companion** surface or a USB **control panel**.
 
 ![LZ Camera Bridge – Web-Oberfläche mit dem Einrichtungs-Assistenten](docs/screenshot.png)
 
-> **Name vs. repository slug.** The product is **LZ Camera Bridge**; the
-> repository is still `larszu/sony-camera-bridge`, and that mismatch is
-> deliberate (decided 2026-09-16), not an oversight someone forgot to clean up.
-> Renaming a repository moves the Pages address and every clone URL, so it is
-> a separate decision from renaming the product. Everything that *is* the
-> product carries the new name — window title, installer, executable, app id,
-> package names, Companion module id. Everything that is a **coordinate** —
-> GitHub URLs, the Pages address, `BRIDGE_SOURCE.repo` in the multicam-planner
-> — still says `sony-camera-bridge`, because that is where the files actually
-> live. Do not "tidy" one side into the other: a coordinate that points
-> nowhere is worse than an inconsistent name.
-
 > **Status:** the bridge, protocols and UI are real and build clean; a
 > committed unit-test suite covers the protocol framing. Where a family was
 > verified against public docs or an official reference it is marked
@@ -32,7 +20,7 @@ from a Bitfocus **Companion** surface or a USB **control panel**.
 carries the control surface *and* the bridge; the bridge starts with the
 application, on `ws://localhost:9700`, and stops with it.
 
-**https://github.com/larszu/sony-camera-bridge/releases**
+**https://github.com/larszu/lz-camera-bridge/releases**
 
 That was not always true, and the difference matters if you read an older note:
 until 2026-09-16 the installer shipped the panel alone. It came up looking
@@ -52,7 +40,7 @@ failing silently.
 Every push to the default branch builds this repo's page from
 `.github/workflows/pages.yml` and publishes it:
 
-**https://larszu.github.io/sony-camera-bridge/**
+**https://larszu.github.io/lz-camera-bridge/**
 
 The workflow **asks the Pages API before it configures anything.** With no
 Pages site it still builds — that is a real check — and skips only the
@@ -61,7 +49,7 @@ A run that must stay red for a click nobody made teaches people to ignore red.
 
 Measured 2026-09-16: **published.** The Pages site exists, and the `deploy` job
 now runs through — the switch that no workflow can flip (`GITHUB_TOKEN` may not
-create a site) has been thrown. Every push to `master` publishes by itself.
+create a site) has been thrown. Every push to `main` publishes by itself.
 
 What the page carries is the README and `docs/`, rendered — **not the UI
 itself.** That is deliberate and not an omission: `web-rcp` is a client that
@@ -82,6 +70,7 @@ while operating no camera. The running program comes from the installer below.
 | Z CAM (E2 family) | `zcam` | `/ctrl/set` HTTP | verified |
 | Panasonic AW PTZ (AW‑UE/HE) | `panasonic-ptz` | `aw_ptz` / `aw_cam` CGI | **verified** (AW protocol) |
 | VISCA over IP (PTZOptics, Marshall, AVer, Sony BRC/SRG) | `visca` | UDP :1259 (raw) / :52381 (Sony header) | **verified** |
+| HTTP-CGI PTZ (Vissonic/PTZOptics `ptzctrl.cgi`, Sony SRG/BRC `/command/`) | `http-cgi` | HTTP GET, Referer + Digest; power via VISCA TCP :5678 (Vissonic) or `main.cgi` (Sony) | **verified** live on a Vissonic clone and a Sony SRG-A40 |
 | JVC ConnectedCam / KY‑PZ | `jvc` | Digest login + `/cgi-bin/api.cgi` | verified vocabulary (some steps *tuning*) |
 | BirdDog NDI PTZ | `birddog` | VISCA :52381 + REST :8080 | verified endpoints (*tuning*) |
 | VISCA on a serial line (same heads, RS‑232/422 wiring) | `visca-serial` | RS‑232 8N1, 9600 default, daisy‑chain address 1–7 | framing unit‑tested; *not yet on a camera* |
@@ -115,6 +104,41 @@ device stays silent, is in [`docs/dji-gimbal.md`](docs/dji-gimbal.md).
   whichever camera is connected.
 - **USB HID control panel** — a data-driven adapter maps a hardware panel's
   axes/buttons onto the command bus, so one panel controls any brand.
+- **Keyboard** — on the PTZ panel the arrow keys drive while held, `1`–`9`
+  recall presets, `Home` goes home; a window that loses focus stops the head.
+
+## Control room: switcher, video wall, site
+
+The bridge also drives the room around the cameras. This came over from the
+former `av-control-center` application (2026-09-28) and replaces it.
+
+- **Switcher** — a Vissonic **VIS-CATC** (one output, twelve multi-image
+  layouts) operated the way a panel works: a programme row over a preview row
+  and one **CUT**. The preview bus lives in the bridge, so every screen shows
+  the same pre-selection. Keys: `1`–`6` preview, `Shift`+digit take, `Enter`
+  or `Space` cut — by key *code*, so it works on every keyboard layout. Two
+  routes to the device, chosen per site: its network page (`POST /`) or the
+  RS-232 verb list from the manual, through a TCP-serial gateway or a port on
+  the bridge computer. Layouts, audio, freeze (serial only), a crosspoint list
+  for multi-window layouts. Protocol in [`docs/switcher.md`](docs/switcher.md).
+- **Tally per camera** — each camera names its switcher input; the bridge
+  derives programme/preview from the switcher and shows it on the camera list,
+  the wall, the PTZ panel and the video tiles. Companion gets
+  `switcherPreview`, `switcherTake`, `switcherCut`.
+- **Video** — live tiles from each camera's RTSP address. The bridge runs one
+  ffmpeg per stream and serves `GET /video/<n>.mjpeg` on its own port; the
+  page shows it in an `<img>`, no player. Click a tile to preview its input,
+  double-click to take. *Own window* opens the tiles alone for a second
+  screen. The stream address never leaves the bridge. ffmpeg is looked for
+  in `LZ_BRIDGE_FFMPEG`, `ffmpeg-portable/`, then `PATH`; the desktop app
+  brings its own.
+- **Site** — cameras and switcher as one file (`lz-site` v1). The desktop app
+  and `npm run bridge` keep it in `LZ_BRIDGE_CONFIG_DIR/site.json`
+  (default `~/.lz-camera-bridge`) and restore it on start, connecting what was
+  connected. Export downloads it; import replaces the room — also from the
+  settings export of the old av-control-center, so an existing room moves
+  with one file. The file carries the camera logins; keep it out of
+  repositories.
 
 ## Architecture
 
@@ -188,8 +212,8 @@ USB gamepad. See [`docs/b4/demand.md`](docs/b4/demand.md).
 
 | Path | What it is |
 |---|---|
-| `packages/bridge` | Node/TypeScript bridge server, camera clients, protocols, HID input |
-| `packages/web-rcp` | React UI (RCP + PTZ panel, connection wizard) |
+| `packages/bridge` | Node/TypeScript bridge server, camera clients, protocols, HID input, switcher (`src/switcher`), video hub (`src/multiview`), site file (`src/site`) |
+| `packages/web-rcp` | React UI: Cameras (RCP + PTZ panel, wizard), Wall, Switcher, Video, Site |
 | `packages/companion-module-lz-camera-bridge` | Bitfocus Companion module |
 | `packages/electron-app` | Desktop application: the web UI **and** the bridge, bundled into one installer |
 | `packages/firmware` | WIZ108SR serial↔TCP bridge firmware (C) |
@@ -275,7 +299,14 @@ address (the wizard shows the right defaults per protocol), and connect. PTZ
 cameras open the joystick panel automatically; paint cameras open the RCP.
 
 - **Sony BRC/SRG PTZ:** choose the *VISCA over IP* tab and set port **52381** —
-  the Sony transport header is applied automatically.
+  the Sony transport header is applied automatically. Where the room blocks
+  the VISCA ports, the *HTTP-CGI PTZ* tab drives the same head over its web
+  CGI (family *Sony*, login required; power is read back).
+- **Vissonic / PTZOptics PTZ:** *HTTP-CGI PTZ*, family *Vissonic*. No login
+  for control; power on/standby goes over VISCA TCP 5678 and is read back.
+  Stream address `rtsp://<ip>:554/1`.
+- **VIS-CATC switcher:** the *Switcher* view, *+ Switcher*, address of the
+  device page. Give each camera its switcher input in the connection panel.
 - **Sony FX/Alpha USB:** put the camera in *PC Remote* mode; install the `usb`
   module on the host.
 - **Canon:** activate CCAPI once via Canon's tool, then enter the shown IP/port.

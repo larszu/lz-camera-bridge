@@ -60,7 +60,17 @@ app.whenReady().then(() => {
   // nach dem Laden; horcht dann noch nichts auf 9700, sieht der Nutzer beim
   // Start einmal den Fehlversuch und wartet drei Sekunden auf den naechsten.
   // Die Reihenfolge kostet nichts und erspart genau das.
-  brueckenZustand = starteEingebauteBruecke();
+  // ffmpeg fuer die Videokacheln kommt mit der App (ffmpeg-static). Es liegt
+  // ausserhalb des asar (electron-builder.yml, asarUnpack), weil ein Archiv
+  // nichts ausfuehren kann; der Pfad muss deshalb umgeschrieben werden.
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const ffmpegPath = require('ffmpeg-static') as string | null;
+    if (ffmpegPath) process.env.LZ_BRIDGE_FFMPEG = ffmpegPath.replace('app.asar', 'app.asar.unpacked');
+  } catch {
+    // Ohne ffmpeg-static bleibt die Suche der Bruecke: ffmpeg-portable/, PATH.
+  }
+  brueckenZustand = starteEingebauteBruecke(undefined, app.getPath('userData'));
   if (!brueckenZustand.laeuft) {
     console.error(`[LZCameraBridge] ${brueckenZustand.fehler}`);
   }

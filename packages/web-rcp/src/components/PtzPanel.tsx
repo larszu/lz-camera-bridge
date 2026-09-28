@@ -16,19 +16,50 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
  *   recallPreset { value: n } / storePreset { value: n }
  */
 
+/**
+ * What a backend offers beyond the RP150 set. Read off the backend (see
+ * `ptzExtrasFor` in App.tsx), never assumed: a button with nothing behind
+ * it teaches the wrong panel.
+ */
+export interface PtzExtras {
+  /** `home` — drive to the home position. */
+  home?: boolean;
+  /** `osd` {action: menu|enter|back} — the camera's on-screen menu. */
+  osd?: boolean;
+  /** `setCameraPower` {on} with readback — a standby button with its state. */
+  power?: boolean;
+  /** `manualFocus` — leave auto focus without a move. */
+  manualFocus?: boolean;
+}
+
 interface PtzPanelProps {
   cameraId?: number;
+  /** Name from the plan or the site, shown next to the number. */
+  label?: string;
   disabled?: boolean;
   onCommand: (cmd: string, params: Record<string, unknown>) => void;
+  extras?: PtzExtras;
+  /** Power as the bridge last read it; undefined = never read. */
+  power?: boolean;
+  /** Tally from the switcher. */
+  tally?: 'program' | 'preview' | 'off';
 }
 
 const PRESETS_PER_PAGE = 12;
 const PRESET_PAGES = 9; // presets 1..108, AW-RP150-like "100 presets"
 const DRIVE_INTERVAL_MS = 120; // resend rate while joystick/rocker held
 
-export function PtzPanel({ cameraId = 1, disabled = false, onCommand }: PtzPanelProps) {
+export function PtzPanel({ cameraId = 1, label, disabled = false, onCommand, extras = {}, power, tally }: PtzPanelProps) {
   const [ptSpeed, setPtSpeed] = useState(70); // % speed scale like the RP150 PT SPEED dial
   const [storeMode, setStoreMode] = useState(false);
+  // Standby takes two clicks within four seconds: it is the one button on
+  // this panel that takes a picture away.
+  const [standbyArmed, setStandbyArmed] = useState(false);
+  useEffect(() => {
+    if (!standbyArmed) return;
+    const t = setTimeout(() => setStandbyArmed(false), 4000);
+    return () => clearTimeout(t);
+  }, [standbyArmed]);
   const [presetPage, setPresetPage] = useState(0);
   const [activePreset, setActivePreset] = useState<number | null>(null);
   const [iris, setIris] = useState(128);
@@ -167,7 +198,10 @@ export function PtzPanel({ cameraId = 1, disabled = false, onCommand }: PtzPanel
       {/* Header */}
       <div className="ptz-panel__header">
         <span className="ptz-panel__title">PTZ CONTROL</span>
-        <span className="ptz-panel__cam">CAM {cameraId}</span>
+        {tally && tally !== 'off' && (
+          <span className={`tile__tally tile__tally--${tally}`}>{tally === 'program' ? 'PGM' : 'PVW'}</span>
+        )}
+        <span className="ptz-panel__cam">CAM {cameraId}{label ? ` · ${label}` : ''}</span>
       </div>
 
       <div className="ptz-panel__body">
@@ -234,6 +268,11 @@ export function PtzPanel({ cameraId = 1, disabled = false, onCommand }: PtzPanel
               style={{ transform: `translate(${stick.x * 42}%, ${stick.y * 42}%)` }}
             />
           </div>
+          {extras.home && (
+            <button className="ptz-btn ptz-btn--af" onClick={() => cmd('home')} disabled={disabled} title="Home position (Home key)">
+              HOME
+            </button>
+          )}
           <label className="ptz-speed">
             PT SPEED
             <input
@@ -299,7 +338,43 @@ export function PtzPanel({ cameraId = 1, disabled = false, onCommand }: PtzPanel
             <button className="ptz-btn ptz-btn--af" onClick={() => cmd('autoFocus')} disabled={disabled}>
               PUSH AF
             </button>
+            {extras.manualFocus && (
+              <button className="ptz-btn ptz-btn--sm" onClick={() => cmd('manualFocus')} disabled={disabled} title="Manual focus">
+                MF
+              </button>
+            )}
           </div>
+
+          {(extras.osd || extras.power) && (
+            <div className="ptz-rocker">
+              {extras.osd && (
+                <>
+                  <span className="ptz-rocker__label">MENU</span>
+                  <button className="ptz-btn ptz-btn--sm" onClick={() => cmd('osd', { action: 'menu' })} disabled={disabled}>MENU</button>
+                  <button className="ptz-btn ptz-btn--sm" onClick={() => cmd('osd', { action: 'enter' })} disabled={disabled}>ENTER</button>
+                  <button className="ptz-btn ptz-btn--sm" onClick={() => cmd('osd', { action: 'back' })} disabled={disabled}>BACK</button>
+                </>
+              )}
+              {extras.power && (
+                <>
+                  <span className="ptz-rocker__label">POWER {power === undefined ? '?' : power ? 'ON' : 'STBY'}</span>
+                  {power === false || power === undefined ? (
+                    <button className="ptz-btn ptz-btn--sm" onClick={() => cmd('setCameraPower', { on: true })} disabled={disabled}>ON</button>
+                  ) : null}
+                  {power !== false ? (
+                    <button
+                      className={`ptz-btn ptz-btn--sm ${standbyArmed ? 'ptz-btn--store-armed' : ''}`}
+                      onClick={() => { if (standbyArmed) { cmd('setCameraPower', { on: false }); setStandbyArmed(false); } else setStandbyArmed(true); }}
+                      disabled={disabled}
+                      title="Standby takes two clicks"
+                    >
+                      {standbyArmed ? 'SURE?' : 'STBY'}
+                    </button>
+                  ) : null}
+                </>
+              )}
+            </div>
+          )}
 
           <label className="ptz-iris">
             IRIS

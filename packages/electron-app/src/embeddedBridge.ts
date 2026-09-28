@@ -24,7 +24,11 @@ import type { Server } from 'node:http';
 
 /** Was die gebuendelte Bruecke exportiert (siehe scripts/build-bridge.mjs). */
 interface BridgeServerKlasse {
-  new (wsPort?: number): { start(): void; stop(): void; httpServer?: Server };
+  new (
+    wsPort?: number,
+    companionPorts?: { http?: number; ws?: number },
+    opts?: { persist?: boolean; configDir?: string },
+  ): { start(): void; stop(): void; httpServer?: Server };
 }
 
 export interface BrueckenErgebnis {
@@ -40,14 +44,16 @@ const STANDARD_PORT = 9700;
 
 let laufende: { stop(): void } | null = null;
 
-export function starteEingebauteBruecke(port = STANDARD_PORT): BrueckenErgebnis {
+export function starteEingebauteBruecke(port = STANDARD_PORT, configDir?: string): BrueckenErgebnis {
   try {
     // Erst zur Laufzeit geladen und nicht oben importiert: `bridge.cjs`
     // entsteht im Build-Schritt (esbuild). Ein statischer Import liesse
     // `tsc` ueber eine Datei stolpern, die es beim Typpruefen noch nicht gibt.
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { BridgeServer } = require('./bridge.cjs') as { BridgeServer: BridgeServerKlasse };
-    const server = new BridgeServer(port);
+    // Die Anlage (Kameras, Mischer, Streams) liegt im Nutzerordner der App
+    // und ist beim naechsten Start wieder da -- siehe bridge/src/site.
+    const server = new BridgeServer(port, undefined, { persist: true, configDir });
     server.start();
     laufende = server;
     return { laeuft: true, port };
