@@ -1,0 +1,257 @@
+/* ─── Control room views: switcher, video wall, site ─────────────────────────
+ *
+ * Brand rules (ADR-007 / Brand Guide 2.0) apply here as in index.css: tokens
+ * only, no radius, no shadow, no gradient. `brand:check` scans this file.
+ *
+ * Tally follows the panel convention of the trade — programme red, preview
+ * green — but as a LINE and a DOT, never as a filled surface: red is the
+ * signal of the brand and lives on the top edge of the tile and on the
+ * programme button's dot. One red element per view is the rule; the video
+ * wall breaks it on purpose, because there the red IS the meaning (which
+ * camera is on air), and the guide names exactly that case: "LIVE".
+ */
+
+/* ─── Header navigation ─────────────────────────────────────────────────── */
+
+.nav {
+  margin-left: auto;
+  display: flex;
+  gap: 0;
+  border: 1px solid var(--border);
+}
+.nav__tab {
+  padding: 0 14px;
+  min-height: var(--ziel);
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+  border-right: 1px solid var(--border);
+  transition: color var(--dur, 0.2s), background var(--dur, 0.2s);
+}
+.nav__tab:last-child { border-right: 0; }
+.nav__tab:hover { color: var(--text); }
+.nav__tab--active { background: var(--accent); color: var(--accent-text); }
+.nav__tab--active:hover { color: var(--accent-text); }
+.nav__count {
+  margin-left: 6px;
+  font-weight: 400;
+  letter-spacing: 0;
+  opacity: 0.8;
+}
+
+.app__site {
+  color: var(--text-muted);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
+}
+
+/* ─── Head line: kicker + rule (brand: "Kopflinie") ───────────────────────── */
+
+.headline {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--text-muted);
+  margin-bottom: 16px;
+}
+.headline__kicker {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.headline__kicker::before {
+  content: '';
+  display: inline-block;
+  width: 0.55em;
+  height: 0.55em;
+  background: var(--signal);
+  transform: skewX(-11deg);
+  margin-right: 0.7em;
+  vertical-align: baseline;
+}
+.headline__title { font-size: 18px; font-weight: 800; letter-spacing: -0.01em; }
+.headline__meta { margin-left: auto; color: var(--text-muted); font-size: 12px; display: flex; gap: 12px; align-items: center; }
+
+/* ─── Generic view frame ─────────────────────────────────────────────────── */
+
+.view {
+  padding: 16px 24px 32px;
+  max-width: 1400px;
+  margin: 0 auto;
+  width: 100%;
+}
+.view__grid { display: grid; grid-template-columns: 1fr 340px; gap: 24px; align-items: start; }
+@media (max-width: 1000px) { .view__grid { grid-template-columns: 1fr; } }
+
+.empty {
+  padding: 32px;
+  border: 1px dashed var(--border);
+  color: var(--text-muted);
+  text-align: center;
+}
+.empty .btn { margin-top: 12px; }
+
+.hint { color: var(--text-muted); font-size: 12px; line-height: 1.5; }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.row--end { justify-content: flex-end; }
+.stack { display: flex; flex-direction: column; gap: 12px; }
+
+/* ─── Buses (PGM over PVW) ───────────────────────────────────────────────── */
+
+.bus { display: grid; grid-template-columns: 64px 1fr; gap: 8px; align-items: stretch; margin-bottom: 8px; }
+.bus__label {
+  display: flex; align-items: center;
+  font-size: 12px; font-weight: 800; letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--text-muted);
+}
+.bus__row { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 8px; }
+.src {
+  position: relative;
+  min-height: 56px;
+  padding: 8px 10px 8px 12px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  display: flex; flex-direction: column; justify-content: center; gap: 2px;
+  transition: border-color var(--dur, 0.2s), background var(--dur, 0.2s);
+}
+.src:hover { border-color: var(--text-muted); }
+.src:disabled { opacity: 0.4; cursor: default; }
+.src__num { font-size: 11px; letter-spacing: 0.16em; color: var(--text-muted); font-weight: 700; }
+.src__name { font-size: 14px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.src__signal { position: absolute; right: 8px; top: 8px; width: 6px; height: 6px; background: var(--border); }
+.src__signal--on { background: var(--success); }
+/* Programme: the accent surface with the brand dot; preview: the ice outline. */
+.src--program { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+.src--program .src__num { color: var(--accent-text); }
+.src--program::before {
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--signal);
+}
+.src--preview { border-color: var(--success); border-width: 2px; }
+.src--preview .src__num { color: var(--success); }
+
+.cut {
+  min-height: 72px;
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: 0.2em;
+  justify-content: center;
+}
+.bus__side { display: grid; grid-template-columns: 64px 1fr; gap: 8px; }
+
+/* ─── Layout picker ────────────────────────────────────────────────────── */
+
+.layouts { display: grid; grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 8px; }
+.layout {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  padding: 6px;
+  cursor: pointer;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 11px;
+  display: flex; flex-direction: column; gap: 4px; align-items: stretch;
+}
+.layout:hover { border-color: var(--text-muted); }
+.layout--active { border-color: var(--accent); color: var(--text); }
+.layout__thumb { display: block; width: 100%; aspect-ratio: 16 / 9; }
+.layout__win { fill: var(--surface2); stroke: var(--text-muted); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.layout--active .layout__win { stroke: var(--accent); }
+.layout__win--pgm { fill: var(--surface); }
+.layout__txt { fill: var(--text); font-size: 18px; font-weight: 700; }
+
+.windows { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px; }
+
+/* ─── Video wall ───────────────────────────────────────────────────────── */
+
+.wall {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(var(--wall-cols, 2), 1fr);
+}
+.wall--bare { padding: 8px; min-height: 100vh; }
+.tile {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  background: var(--surface);
+  border-top: 3px solid var(--border);
+  overflow: hidden;
+  cursor: pointer;
+  user-select: none;
+}
+.tile--program { border-top-color: var(--signal); }
+.tile--preview { border-top-color: var(--success); }
+.tile img { display: block; width: 100%; height: 100%; object-fit: contain; background: var(--bg); }
+.tile__bar {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 10px;
+  background: var(--bg);
+  font-size: 12px;
+}
+.tile__num { font-weight: 800; letter-spacing: 0.1em; }
+.tile__name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tile__tally { font-size: 10px; font-weight: 800; letter-spacing: 0.16em; padding: 2px 6px; }
+.tile__tally--program { background: var(--accent); color: var(--accent-text); }
+.tile__tally--program::before { content: ''; display: inline-block; width: 6px; height: 6px; background: var(--signal); margin-right: 6px; transform: skewX(-11deg); }
+.tile__tally--preview { border: 1px solid var(--success); color: var(--text); }
+.tile__empty {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center; text-align: center;
+  padding: 16px; color: var(--text-muted); font-size: 12px;
+}
+.tile__off { position: absolute; top: 8px; right: 8px; font-size: 10px; letter-spacing: 0.16em; color: var(--text-muted); }
+
+/* ─── Site ───────────────────────────────────────────────────────────── */
+
+.site-list { display: flex; flex-direction: column; gap: 4px; }
+.site-item {
+  display: grid; grid-template-columns: 40px 1fr auto; gap: 12px; align-items: center;
+  padding: 8px 12px; background: var(--surface); border: 1px solid var(--border);
+}
+.site-item__num { font-weight: 800; letter-spacing: 0.1em; color: var(--text-muted); }
+.site-item__name { font-weight: 700; }
+.site-item__meta { color: var(--text-muted); font-size: 12px; }
+.file-btn { position: relative; overflow: hidden; }
+.file-btn input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+
+/* ─── Small things ────────────────────────────────────────────────────── */
+
+/* A selected option among equals: the accent surface WITHOUT the dot. The
+   dot marks the one primary action of a view; a chosen audio channel is not
+   an action, and a second red element in the same view is forbidden. */
+.btn--on { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
+  padding: 3px 8px; border: 1px solid var(--border); color: var(--text-muted);
+}
+.chip--on { color: var(--text); border-color: var(--success); }
+.chip--warn { border-color: var(--warning); color: var(--text); }
+.kbd {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 11px; padding: 1px 5px; border: 1px solid var(--border); color: var(--text-muted);
+}
+.armed { background: var(--warning); color: var(--accent-text); }
+.error-line {
+  display: flex; align-items: center; gap: 12px;
+  padding: 8px 16px; background: var(--surface); border-left: 4px solid var(--danger); font-size: 12px;
+}
+.error-line button { margin-left: auto; }

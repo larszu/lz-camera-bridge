@@ -40,6 +40,8 @@ npmRebuild: false
 # genau der Meldung, die `embeddedBridge.ts` abfaengt, also sichtbar, aber
 # ohne Kamera. Die drei Module werden deshalb daneben ausgepackt.
 asarUnpack:
+  # ffmpeg fuer die Videokacheln: ausfuehrbar nur ausserhalb des Archivs.
+  - "**/node_modules/ffmpeg-static/**"
   - "**/node_modules/@serialport/**"
   - "**/node_modules/serialport/**"
   - "**/node_modules/usb/**"
@@ -84,6 +86,11 @@ nsis:
 mac:
   target:
     - dmg
+  # ffmpeg-static laedt beim Installieren nur die Architektur des Bau-Rechners.
+  # `scripts/ffmpeg-universal.mjs` macht daraus vor `dist:mac` ein Universal-
+  # Binary (lipo); diese Zeile sagt electron-builder, dass die Datei fuer x64
+  # trotzdem in Ordnung ist.
+  x64ArchFiles: "**/ffmpeg-static/ffmpeg"
   # `assets/icon.icns` stand hier und EXISTIERT NICHT. Aufgefallen ist das
   # nie, weil noch nie ein mac-Build gelaufen ist — der Eintrag war eine
   # Absichtserklaerung, keine Konfiguration, und der erste Lauf waere daran

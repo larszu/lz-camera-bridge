@@ -235,6 +235,10 @@ export class CompanionServer extends EventEmitter {
       { id: 'tallyProgram', label: 'Tally Program', category: 'Tally' },
       { id: 'tallyPreview', label: 'Tally Preview', category: 'Tally' },
       { id: 'tallyClear', label: 'Tally Clear', category: 'Tally' },
+      // Switcher (VIS-CATC): the bus in the bridge, see switcher/switcherBus.ts
+      { id: 'switcherPreview', label: 'Switcher: Preview source', category: 'Switcher' },
+      { id: 'switcherTake', label: 'Switcher: Take source', category: 'Switcher' },
+      { id: 'switcherCut', label: 'Switcher: Cut', category: 'Switcher' },
     ];
   }
 

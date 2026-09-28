@@ -7,14 +7,14 @@
   "main": "dist/main.js",
   "repository": {
     "type": "git",
-    "url": "https://github.com/larszu/sony-camera-bridge.git"
+    "url": "https://github.com/larszu/lz-camera-bridge.git"
   },
   "scripts": {
     "dev": "npm run build && electron dist/main.js",
     "build": "tsc && node scripts/build-bridge.mjs",
     "dist": "npm run build && electron-builder --publish never",
     "dist:win": "npm run build && electron-builder --win --publish never",
-    "dist:mac": "npm run build && electron-builder --mac --x64 --arm64 --publish never"
+    "dist:mac": "npm run build && node scripts/ffmpeg-universal.mjs && electron-builder --mac --x64 --arm64 --publish never"
   },
   "devDependencies": {
     "@types/finalhandler": "^1.2.3",
@@ -27,10 +27,11 @@
   },
   "license": "UNLICENSED",
   "dependencies": {
+    "ffmpeg-static": "^5.3.0",
     "serialport": "^12.0.0"
   },
   "optionalDependencies": {
-    "usb": "^2.14.0",
-    "node-hid": "^3.1.2"
+    "node-hid": "^3.1.2",
+    "usb": "^2.14.0"
   }
 }
