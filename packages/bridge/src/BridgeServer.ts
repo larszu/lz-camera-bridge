@@ -48,6 +48,12 @@ import { networkInterfaces } from 'os';
 import { Rs422Transport } from './transport/Rs422Transport.js';
 import { CameraState } from './protocol/CcuClient.js';
 import { makeBackend, CameraBackend, CameraConfig } from './cameras/backendFactory.js';
+import {
+  buildGo2rtcConfig,
+  buildLaunchScript,
+  buildVlcWindowsScript,
+  type MultiviewSource,
+} from './multiview/multiviewGenerators.js';
 import { WiznetDiscovery, WiznetDeviceConfig } from './discovery/WiznetDiscovery.js';
 import { CompanionServer, TallyState } from './companion/CompanionServer.js';
 import { HidControlSurface, HidSurfaceConfig } from './input/HidControlSurface.js';
@@ -95,7 +101,8 @@ interface ClientMessage {
     | 'command' | 'listPorts' | 'discoverWiznet' | 'configureWiznet' | 'discoverSonyUsb'
     | 'discoverSonyMnc' | 'listHidDevices' | 'enableControlSurface' | 'disableControlSurface'
     | 'setTally' | 'getTally' | 'enableDemand' | 'disableDemand'
-    | 'matchCameraPlan' | 'applyCameraPlan' | 'assignPlanCamera';
+    | 'matchCameraPlan' | 'applyCameraPlan' | 'assignPlanCamera'
+    | 'getMultiview';
   cameraNumber?: number;
   config?: CameraConfig;
   cmd?: string;
@@ -267,6 +274,28 @@ export class BridgeServer {
       case 'listPorts': {
         const ports = await Rs422Transport.listPorts();
         ws.send(JSON.stringify({ type: 'ports', ports }));
+        break;
+      }
+      // Multiviewer add-on: turn the configured stream URLs into the artefacts
+      // that show every camera at once (go2rtc for RTSP→WebRTC, plus local
+      // mpv/ffmpeg and VLC launchers). Only cameras that carry a streamUrl take
+      // part — the control path and the picture path are separate.
+      case 'getMultiview': {
+        const sources: MultiviewSource[] = [...this.cameras.values()]
+          .filter((slot) => Boolean(slot.config?.streamUrl))
+          .map((slot) => ({
+            label: slot.plan?.label ?? `Cam ${slot.num}`,
+            streamUrl: slot.config!.streamUrl!,
+          }));
+        ws.send(
+          JSON.stringify({
+            type: 'multiview',
+            sources,
+            go2rtc: buildGo2rtcConfig(sources),
+            launchScript: buildLaunchScript(sources),
+            vlcScript: buildVlcWindowsScript(sources),
+          }),
+        );
         break;
       }
 

@@ -23,6 +23,9 @@ export type CameraStatesByNumber = Record<number, CameraState>;
 export type ConnectionMode =
   | 'tcp' | 'serial' | 'lumix-http' | 'sony-usb' | 'blackmagic' | 'sony-mnc' | 'canon-ccapi'
   | 'zcam' | 'panasonic-ptz' | 'visca' | 'visca-serial' | 'jvc' | 'birddog'
+  // HTTP-CGI PTZ: alternative Steuerung ueber die Web-CGI der Kamera
+  // (Vissonic/PTZOptics ptzctrl.cgi, Sony SRG/BRC /command/) statt VISCA.
+  | 'http-cgi'
   // Gimbals: bewegen den Kopf, tragen aber kein Bild.
   | 'dji-osmo' | 'dji-ronin'
   // A B4 lens behind the ESP32-S3 interface in `packages/firmware-b4`.
@@ -56,6 +59,11 @@ export interface BridgeConfig {
   camPort?: number;
   camUser?: string;
   camPass?: string;
+  /** HTTP-CGI: Firmware-Familie und Preset-Versatz. */
+  cgiFamily?: 'vissonic' | 'sony';
+  cgiPresetOffset?: number;
+  /** Multiviewer: Stream-Adresse (RTSP/HLS/MJPEG) aus dem Streaming-Teil der Kamera. */
+  streamUrl?: string;
   /** VISCA ueber RS-232: Geraetepfad, Baudrate, Adresse in der Kette (1..7). */
   viscaSerialPath?: string;
   viscaBaudRate?: number;

@@ -86,11 +86,17 @@ const MODE_CAPS: Record<ConnectionMode, Partial<CameraCapabilities>> = {
   // between its own auto-iris and remote, so unlike the CCU's NDA-only
   // auto-setup codes, this one is a wire and can be honestly offered.
   'b4-lens': { iris: true, autoIris: true },
+  // HTTP-CGI PTZ (Vissonic/PTZOptics ptzctrl.cgi, Sony SRG/BRC /command/).
+  // The control CGI moves pan/tilt/zoom/focus and stores/recalls presets, but
+  // exposes no paint over this path — no iris, gain or white balance. So only
+  // focus is offered here; enabling more would light up regulators with
+  // nothing behind them on this transport.
+  'http-cgi': { focus: true },
 };
 
 /** Modes whose backend implements ptz/setZoom/setFocus/presets. */
 export const PTZ_MODES: ConnectionMode[] = [
-  'panasonic-ptz', 'visca', 'visca-serial', 'birddog', 'jvc', 'dji-osmo', 'dji-ronin',
+  'panasonic-ptz', 'visca', 'visca-serial', 'birddog', 'jvc', 'dji-osmo', 'dji-ronin', 'http-cgi',
 ];
 
 export function capabilitiesForMode(mode: ConnectionMode | undefined): CameraCapabilities {

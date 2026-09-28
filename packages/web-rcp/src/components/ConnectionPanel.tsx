@@ -10,6 +10,7 @@ const GENERIC_MODES: { id: ConnMode; label: string; port: number; hint: string }
   { id: 'visca', label: 'VISCA over IP', port: 1259, hint: 'PTZOptics/Marshall/AVer: Port 1259 · Sony BRC/SRG: Port 52381 (Header automatisch)' },
   { id: 'jvc', label: 'JVC ConnectedCam', port: 80, hint: 'GY-HC/HM-Serie – HTTP-API' },
   { id: 'birddog', label: 'BirdDog', port: 8080, hint: 'BirdDog NDI PTZ – REST-API' },
+  { id: 'http-cgi', label: 'HTTP-CGI PTZ', port: 80, hint: 'Vissonic/PTZOptics (ptzctrl.cgi) · Sony SRG/BRC (/command/) – alternative to VISCA' },
 ];
 
 interface Props {
