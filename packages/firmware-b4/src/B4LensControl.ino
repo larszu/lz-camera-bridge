@@ -34,6 +34,13 @@
 #include "config.h"
 #include "analog_filter.h"
 #include "calibration.h"
+#include "iris_loop.h"
+#include "demand.h"
+#if B4_DEMAND_HID
+#include <USB.h>
+#include <USBHIDGamepad.h>
+USBHIDGamepad gamepad;
+#endif
 // web_page.h is included further down, after `server` exists.
 
 // ── W5500 wiring on the Waveshare ESP32-S3-ETH ─────────────────────────────
@@ -60,16 +67,20 @@
 
 WebServer server(HTTP_PORT);
 Adafruit_ADS1115 ads;
+Adafruit_ADS1115 adsDemand; // second chip, 0x49 — demands (phase 4)
 Adafruit_MCP4728 dac;
 Calibration cal;
 
 AnalogFilter fIris(ADC_EMA_ALPHA, ADC_DEADBAND_COUNTS);
 AnalogFilter fZoom(ADC_EMA_ALPHA, ADC_DEADBAND_COUNTS);
 AnalogFilter fFocus(ADC_EMA_ALPHA, ADC_DEADBAND_COUNTS);
+AnalogFilter fDemZoom(ADC_EMA_ALPHA, ADC_DEADBAND_COUNTS);
+AnalogFilter fDemFocus(ADC_EMA_ALPHA, ADC_DEADBAND_COUNTS);
 
 struct Health {
   bool dacPresent = false;
   bool adcPresent = false;
+  bool demandAdcPresent = false;
   bool ethUp = false;
 } health;
 
@@ -82,8 +93,13 @@ struct Drive {
   const char *fault = nullptr; // non-null means motion is stopped and why
 } drive;
 
+#if B4_ENABLE_SERIAL_RX
+#include "lens_serial.h"
+#endif
+
 uint32_t lastFeedbackMs = 0;
 uint32_t lastLoopMs = 0;
+uint32_t loopDurationMs = 0; // what one pass of reading + loop really took
 float voltsPerCount = 0.000125f; // GAIN_ONE: 4.096 V / 32768
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -108,6 +124,15 @@ static bool readChannel(uint8_t ch, float &out) {
     acc += ads.readADC_SingleEnded(ch);
   }
   out = static_cast<float>(acc) / ADC_OVERSAMPLE;
+  return true;
+}
+
+/** Same as readChannel(), on the demand ADC. Absent chip = no reading, never zero. */
+static bool readDemandChannel(uint8_t ch, uint8_t oversample, float &out) {
+  if (!health.demandAdcPresent) return false;
+  int32_t acc = 0;
+  for (uint8_t i = 0; i < oversample; ++i) acc += adsDemand.readADC_SingleEnded(ch);
+  out = static_cast<float>(acc) / oversample;
   return true;
 }
 
@@ -196,18 +221,12 @@ static void serviceLoop(float irisCounts, bool haveFeedback) {
     return;
   }
 
-  const int error = static_cast<int>(drive.setpoint) - static_cast<int>(measured);
-  const float pct = fabsf(error) * 100.0f / 255.0f;
-
-  int step = static_cast<int>(error * LOOP_I_GAIN * 16.0f);
-  step = constrain(step, -LOOP_MAX_STEP_COUNTS, LOOP_MAX_STEP_COUNTS);
-
-  int next = static_cast<int>(drive.dacCode == 0 ? target : drive.dacCode) + step;
-  next = constrain(next, 0, 4095);
-  drive.dacCode = static_cast<uint16_t>(next);
+  const IrisLoopResult r = irisLoopStep(drive.setpoint, measured, target, drive.dacCode,
+                                       LOOP_I_GAIN, LOOP_MAX_STEP_COUNTS, LOOP_TOLERANCE_PCT);
+  drive.dacCode = r.dacCode;
   dac.setChannelValue(static_cast<MCP4728_channel_t>(DAC_CH_IRIS), drive.dacCode);
 
-  drive.holding = pct <= LOOP_TOLERANCE_PCT;
+  drive.holding = r.holding;
   drive.fault = nullptr;
 #endif
 }
@@ -217,6 +236,9 @@ static void serviceLoop(float irisCounts, bool haveFeedback) {
 // ───────────────────────────────────────────────────────────────────────────
 
 static bool gIrisOk = false, gZoomOk = false, gFocusOk = false;
+static bool gDemZoomOk = false, gDemFocusOk = false;
+static float gDemZoomDetect = 0, gDemFocusDetect = 0;
+static bool gDemZoomDetectOk = false, gDemFocusDetectOk = false;
 
 static String lensVolts(float counts) {
   return String(adcCountsToLensVolts(counts, voltsPerCount,
@@ -234,6 +256,7 @@ static void handleStatus() {
   String j = "{";
   j += "\"firmware\":\"b4-lens-control/1\",";
   j += "\"uptimeMs\":" + String(millis()) + ",";
+  j += "\"loopMs\":" + String(loopDurationMs) + ",";
   j += "\"driveCompiledIn\":" + String(B4_ENABLE_IRIS_DRIVE ? "true" : "false") + ",";
   j += "\"armed\":" + String(drive.armed ? "true" : "false") + ",";
   j += "\"calibrated\":" + String(cal.isValid() ? "true" : "false") + ",";
@@ -263,11 +286,40 @@ static void handleStatus() {
   }
   j += "},";
 
+  // Demands: present only when the second ADC answered, each field only when
+  // it was read. Detect is reported as a voltage and deliberately NOT turned
+  // into "plugged in / not" — what that pin means is still to be measured (#49).
+  if (health.demandAdcPresent) {
+    j += "\"demand\":{";
+    bool df = true;
+    auto field = [&](const char *name, float counts) {
+      if (!df) j += ",";
+      j += String("\"") + name + "Counts\":" + String(counts, 1) + ",\"" + name +
+           "Volts\":" + lensVolts(counts);
+      df = false;
+    };
+    if (gDemZoomOk) field("zoom", fDemZoom.smoothed());
+    if (gDemFocusOk) field("focus", fDemFocus.smoothed());
+    if (gDemZoomDetectOk) field("zoomDetect", gDemZoomDetect);
+    if (gDemFocusDetectOk) field("focusDetect", gDemFocusDetect);
+    if (PIN_DEMAND_VTR >= 0) { j += String(df ? "" : ",") + "\"vtr\":" + (digitalRead(PIN_DEMAND_VTR) == LOW ? "true" : "false"); df = false; }
+    if (PIN_DEMAND_RET >= 0) { j += String(df ? "" : ",") + "\"ret\":" + (digitalRead(PIN_DEMAND_RET) == LOW ? "true" : "false"); df = false; }
+    j += "},";
+  }
+
   j += "\"drive\":{\"setpoint\":" + String(drive.setpoint) +
        ",\"dacCode\":" + String(drive.dacCode) +
        ",\"closedLoop\":" + String(drive.closedLoop ? "true" : "false") +
        ",\"holding\":" + String(drive.holding ? "true" : "false");
   if (drive.fault) j += ",\"fault\":\"" + String(drive.fault) + "\"";
+  j += "}";
+
+  j += ",\"serial\":{\"rxCompiledIn\":" + String(B4_ENABLE_SERIAL_RX ? "true" : "false") +
+       ",\"txCompiledIn\":" + String(B4_ENABLE_SERIAL_TX ? "true" : "false");
+#if B4_ENABLE_SERIAL_RX
+  j += ",\"fromLens\":" + captureJson(capLens) + ",\"fromCamera\":" + captureJson(capCam);
+  if (lensName.known()) j += ",\"lensName\":\"" + String(lensName.name()) + "\"";
+#endif
   j += "}}";
 
   server.send(200, "application/json", j);
@@ -378,6 +430,10 @@ static void handleLiveCsv() {
   server.send(200, "text/csv", csv);
 }
 
+#if B4_ENABLE_SERIAL_RX
+#include "lens_serial_http.h"
+#endif
+
 #include "web_page.h"
 
 static void setupRoutes() {
@@ -390,6 +446,13 @@ static void setupRoutes() {
   server.on("/api/calibrate/clear", HTTP_POST, handleCalClear);
   server.on("/api/calibration.csv", HTTP_GET, handleCalCsv);
   server.on("/api/live.csv", HTTP_GET, handleLiveCsv);
+#if B4_ENABLE_SERIAL_RX
+  server.on("/api/capture.bin", HTTP_GET, handleCaptureBin);
+  server.on("/api/capture/clear", HTTP_POST, handleCaptureClear);
+#if B4_ENABLE_SERIAL_TX
+  server.on("/api/lens/send", HTTP_POST, handleLensSend);
+#endif
+#endif
   server.onNotFound([]() { refuse(404, "no such endpoint"); });
 }
 
@@ -405,16 +468,49 @@ void setup() {
   Serial.printf("  iris drive compiled in: %s\n", B4_ENABLE_IRIS_DRIVE ? "YES" : "no");
   Serial.printf("  serial TX to lens:      %s\n", B4_ENABLE_SERIAL_TX ? "YES" : "no (correct)");
 
+#if B4_ENABLE_SERIAL_RX
+  // Inversion in the UART, not in software — config.h §5.
+#if B4_ENABLE_SERIAL_TX
+  Serial1.begin(LENS_BAUD, SERIAL_8N1, PIN_LENS_RX_FROM_LENS, PIN_LENS_TX, true);
+  rgbLedWrite(PIN_TX_INDICATOR, 64, 0, 0); // red: this build can transmit
+  Serial.println(F("  LENS TX COMPILED IN. The jumper decides whether it reaches pin 12."));
+#else
+  Serial1.begin(LENS_BAUD, SERIAL_8N1, PIN_LENS_RX_FROM_LENS, -1, true);
+#endif
+  Serial2.begin(LENS_BAUD, SERIAL_8N1, PIN_LENS_RX_FROM_CAM, -1, true);
+  Serial.printf("  listening on the lens line: %d baud, inverted, RX GPIO %d / %d\n",
+                LENS_BAUD, PIN_LENS_RX_FROM_LENS, PIN_LENS_RX_FROM_CAM);
+#endif
+
   Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL, I2C_CLOCK_HZ);
   scanI2C();
 
   health.adcPresent = i2cPresent(ADDR_ADS1115) && ads.begin(ADDR_ADS1115);
   if (health.adcPresent) {
     ads.setGain(ADS_GAIN_SETTING);
+    ads.setDataRate(ADS_DATA_RATE);
     Serial.println(F("ADS1115 ready."));
   } else {
     Serial.println(F("ADS1115 NOT found — no position readback. Reading only what exists."));
   }
+
+#if B4_ENABLE_DEMAND
+  health.demandAdcPresent = i2cPresent(ADDR_ADS1115_DEMAND) && adsDemand.begin(ADDR_ADS1115_DEMAND);
+  if (health.demandAdcPresent) {
+    adsDemand.setGain(ADS_GAIN_SETTING);
+    adsDemand.setDataRate(ADS_DATA_RATE);
+    Serial.println(F("Demand ADS1115 (0x49) ready."));
+  } else {
+    Serial.println(F("No demand ADS1115 at 0x49 — demands not read."));
+  }
+  if (PIN_DEMAND_VTR >= 0) pinMode(PIN_DEMAND_VTR, INPUT_PULLUP);
+  if (PIN_DEMAND_RET >= 0) pinMode(PIN_DEMAND_RET, INPUT_PULLUP);
+#endif
+#if B4_DEMAND_HID
+  gamepad.begin();
+  USB.begin();
+  Serial.println(F("Demand also appears as a USB HID gamepad (X zoom, Y focus)."));
+#endif
 
   health.dacPresent = i2cPresent(ADDR_MCP4728) && dac.begin(ADDR_MCP4728);
   if (health.dacPresent) {
@@ -447,6 +543,9 @@ void setup() {
 
 void loop() {
   server.handleClient();
+#if B4_ENABLE_SERIAL_RX
+  serviceSerial(); // every pass, not every LOOP_INTERVAL: the UART FIFO is 128 bytes
+#endif
 
   if (!health.ethUp && ETH.linkUp()) {
     health.ethUp = true;
@@ -470,4 +569,30 @@ void loop() {
   if (gFocusOk) fFocus.push(c);
 
   serviceLoop(fIris.stable(), gIrisOk && fIris.primed());
+
+#if B4_ENABLE_DEMAND
+  gDemZoomOk = readDemandChannel(ADS_DEMAND_CH_ZOOM, DEMAND_OVERSAMPLE, c);
+  if (gDemZoomOk) fDemZoom.push(c);
+  gDemFocusOk = readDemandChannel(ADS_DEMAND_CH_FOCUS, DEMAND_OVERSAMPLE, c);
+  if (gDemFocusOk) fDemFocus.push(c);
+  gDemZoomDetectOk = readDemandChannel(ADS_DEMAND_CH_ZOOM_DETECT, 1, gDemZoomDetect);
+  gDemFocusDetectOk = readDemandChannel(ADS_DEMAND_CH_FOCUS_DETECT, 1, gDemFocusDetect);
+#endif
+#if B4_DEMAND_HID
+  {
+    uint32_t buttons = 0;
+    if (PIN_DEMAND_VTR >= 0 && digitalRead(PIN_DEMAND_VTR) == LOW) buttons |= 1u << 0;
+    if (PIN_DEMAND_RET >= 0 && digitalRead(PIN_DEMAND_RET) == LOW) buttons |= 1u << 1;
+    const int8_t x = gDemZoomOk ? demandHidAxis(fDemZoom.stable()) : 0;
+    const int8_t y = gDemFocusOk ? demandHidAxis(fDemFocus.stable()) : 0;
+    static int8_t lx = 0, ly = 0;
+    static uint32_t lb = 0;
+    if (x != lx || y != ly || buttons != lb) {
+      gamepad.send(x, y, 0, 0, 0, 0, HAT_CENTER, buttons);
+      lx = x; ly = y; lb = buttons;
+    }
+  }
+#endif
+
+  loopDurationMs = millis() - now;
 }

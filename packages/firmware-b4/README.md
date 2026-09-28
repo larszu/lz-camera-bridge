@@ -21,8 +21,11 @@ These are the load-bearing parts, and they are refusals rather than features:
 - **It cannot drive unless `B4_ENABLE_IRIS_DRIVE` is compiled in *and* the
   device is armed over the API.** Two gates, per the brief §3. A flashed board
   must not move a lens the moment a cable is plugged in.
-- **It never transmits on the lens serial line.** On a group C lens pin 11 is an
-  analog focus output; driving it would be driving against the lens's own buffer.
+- **It does not transmit on the lens serial line** — not in any default build.
+  The transmit path exists only in the `-serial` build (`B4_ENABLE_SERIAL_TX`),
+  refuses the disputed control codes until #47 has resolved them, and still
+  needs a physical jumper. On a group C lens pin 11 is an analog focus output;
+  driving it would be driving against the lens's own buffer.
 - **It does not guess a calibration curve.** With no table it reports
   `calibrated:false` and refuses. It does not fall back to a straight line
   between two voltages nobody measured — the same refusal `paintNudge` makes
@@ -39,6 +42,15 @@ table recorded per lens and stored in NVS.
 ```bash
 pio run -e waveshare-esp32-s3-eth -t upload    # default: reads, drives nothing
 ./tools/flash.sh --armed                       # drive compiled in; prompts first
+```
+
+For a group B lens (serial on pins 11/12) there is a third build that listens
+to both directions and has the transmit path compiled in — behind the
+`B4_COMMAND_CODES_RESOLVED` gate and a physical jumper. Procedure first:
+[`docs/b4/serial.md`](../../docs/b4/serial.md).
+
+```bash
+pio run -e waveshare-esp32-s3-eth-serial
 ```
 
 ## Test it without hardware
@@ -58,6 +70,33 @@ flat section, a non-monotonic step, and a perfectly straight line — the last o
 which usually means the DAC monitor was measured instead of pin 7.
 
 It is a test double. It proves things about this code and nothing about a lens.
+
+The pure headers are also tested on the host, without PlatformIO:
+
+```bash
+test/native/run.sh
+```
+
+That compiles `calibration.h` and `iris_loop.h` with the desktop C++ compiler
+(stubs for `Arduino.h` and `Preferences.h` in `test/native/stubs/`) and runs
+them against the same servo model the simulator serves: interpolation in both
+directions, refusal without a table, the NVS round trip, and the closed loop
+holding under 2 % — including against a table that has drifted since it was
+recorded, which the open loop cannot correct. CI runs it before the firmware
+build. The <2 % figure on a real lens is still a bench measurement (#40).
+## Demands (phase 4)
+
+A second ADS1115 at 0x49 reads a zoom and a focus demand; `/api/status` then
+carries a `demand` block (absent fields = not read). `--demand` on the simulator
+models it, and `POST /api/sim/demand {"axis":"zoom","position":null}` unplugs
+one. As a USB gamepad instead:
+
+```bash
+pio run -e waveshare-esp32-s3-eth-demand-hid -t upload
+```
+
+Wiring, the two output ways and what is still unmeasured:
+[`docs/b4/demand.md`](../../docs/b4/demand.md).
 
 ## HTTP API
 
@@ -81,6 +120,10 @@ A host sending volts would be asserting a curve it cannot know.
 |---|---|
 | `src/config.h` | **The only file you should need to touch.** Pins, divider values, loop gains, safety flags |
 | `src/calibration.h` | The NVS-backed table and its interpolation, both directions |
+| `src/iris_loop.h` | One step of the outer iris loop as a pure function, so the host tests reach it |
 | `src/analog_filter.h` | Oversample → EMA → deadband, adapted from `larszu/dmx-bicolor-controller` |
 | `src/B4LensControl.ino` | Setup, I²C scan, reading, the closed loop, HTTP |
 | `tools/` | Simulator, calibration recorder, curve inspector, flash script |
+| `src/b4_frame.h` | Serial frame, CRC, decoder, lens-name assembly, transmit gate — pure |
+| `src/lens_serial.h`, `lens_serial_http.h` | Capture and send, compiled only with the serial flags |
+| `test/native/` | Host tests for the pure headers — no board, no lens |

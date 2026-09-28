@@ -83,3 +83,26 @@ Nothing here has driven a motor. The state machine and every shutdown path are
 covered by tests, but the criteria are written about an axis, and an axis that
 exists only as a test fixture has not proved that its brake releases in the
 time its profile claims. The first real axis is issue #59.
+
+## Bench plan for the first axis (#59)
+
+Written ahead so the dolly is tested against the criteria and not against
+whatever happens to work. Hardware per #59: gimbal BLDC in direct drive,
+AS5600 on the shaft, a SimpleFOC-capable driver, module 0.8 rack. **Buy after
+phase 5**, as the issue says. Prices and part numbers are the issue's, not
+checked here.
+
+| # | Test | Pass when | Maps to |
+|---|---|---|---|
+| 1 | Profile for exactly this axis validates (`DeviceProfile.ts`) and is the one the runner loads | validation passes; a deliberately missing figure makes it fail | "Geräteprofil liegt vor und wird benutzt" |
+| 2 | Homing ten times from random positions | reported home position spread within what the profile states | "Referenzfahrt reproduzierbar" |
+| 3 | Setpoint, then hold 60 s | position within profile tolerance, no audible hunting | "fährt Sollwert an und hält ihn" |
+| 4 | Stop sending setpoints while moving | `stopped / setpoint-lost` after `setpointTimeoutMs`, torque off | Abschaltpfad 1 |
+| 5 | Unplug the AS5600 while moving | `stopped / feedback-lost` after `feedbackTimeoutMs`, torque off | Abschaltpfad 2 |
+| 6 | Freeze the control loop (debug hook) | `stopped / watchdog`, torque off | Abschaltpfad 3 |
+| 7 | Drive against a hand-held block (soft, e.g. foam on a board) | the axis stops and does **not** keep pushing | "hält kein Drehmoment gegen Widerstand" |
+| 8 | Slow move recorded on camera at 50 fps | no visible steps or jerks at the chosen speeds | "ruckfrei genug für eine Kamerafahrt" |
+
+Each of 4–6 alone, with the motor connected, as #57 and #59 require; after each,
+confirm the axis does not resume by itself (`clearStop()` needed). Results go
+under [`measurements/`](measurements/).

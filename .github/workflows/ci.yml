@@ -135,6 +135,15 @@ jobs:
         with:
           python-version: '3.12'
 
+      # Die reinen Kopfdateien der Firmware -- Kalibriertabelle und Irisregler --
+      # auf dem Host, gegen dasselbe Servomodell wie tools/simulator.py. Laeuft
+      # vor PlatformIO, weil es in Sekunden sagt, was sonst erst nach dem
+      # Xtensa-Bau auffiele. Beweist etwas ueber den Code, nichts ueber eine
+      # Optik (#40 bleibt offen bis zur Messung).
+      - name: Host-Tests der Firmware (Kalibrierung, Regler)
+        working-directory: packages/firmware-b4
+        run: test/native/run.sh
+
       - name: PlatformIO installieren
         run: pip install --upgrade platformio
 
@@ -151,6 +160,30 @@ jobs:
       - name: Bau (scharf — der treibende Pfad)
         working-directory: packages/firmware-b4
         run: pio run -e waveshare-esp32-s3-eth-armed
+
+      # Die serielle Leitung (Gruppe B): Mitlesen UND Sendepfad einkompiliert.
+      # Gebaut, damit der Sendepfad nicht verrottet -- und damit der naechste
+      # Schritt pruefen kann, dass er im Vorgabebau FEHLT (#48).
+      - name: Bau (serielle Leitung, mit Sendepfad)
+        working-directory: packages/firmware-b4
+        run: pio run -e waveshare-esp32-s3-eth-serial
+
+      - name: Ohne Flag ist der Sendepfad nicht im Binary
+        working-directory: packages/firmware-b4
+        run: |
+          test "$(grep -a -c 'B4 TX:' .pio/build/waveshare-esp32-s3-eth-serial/firmware.bin)" -ge 1 || {
+            echo "Merkmal fehlt im Sendebau -- die Pruefung unten wuerde nichts beweisen"; exit 1; }
+          for e in waveshare-esp32-s3-eth waveshare-esp32-s3-eth-armed; do
+            if grep -a -q 'B4 TX:' .pio/build/$e/firmware.bin; then
+              echo "$e enthaelt den Sendepfad"; exit 1; fi
+          done
+
+      # Der Demand als USB-HID-Gamepad (#52): eigener Bau, weil HID den
+      # TinyUSB-Stapel braucht (ARDUINO_USB_MODE=0). Ohne diesen Schritt
+      # faellt ein Bruch darin erst am Rechner auf, an dem der Demand steckt.
+      - name: Bau (Demand als USB-HID)
+        working-directory: packages/firmware-b4
+        run: pio run -e waveshare-esp32-s3-eth-demand-hid
 
       # Der scharfe Bau MUSS groesser sein als der sichere.
       #
@@ -197,3 +230,15 @@ jobs:
             -H 'Content-Type: application/json' -d '{"value":128}' \
             http://127.0.0.1:8098/api/iris)
           test "$code" = "409" || { echo "erwartet 409, bekommen $code"; exit 1; }
+
+      # Phase 4 im Simulator: der Demand erscheint im Status, und ein
+      # abgezogener Demand VERSCHWINDET daraus, statt als letzter Wert
+      # stehenzubleiben. Darauf baut die Freigabe in DemandSource auf.
+      - name: Simulator mit Demand, Abziehen laesst das Feld verschwinden
+        working-directory: packages/firmware-b4
+        run: |
+          python3 tools/simulator.py --port 8097 --demand &
+          sleep 2
+          curl -fsS http://127.0.0.1:8097/api/status | grep -q '"zoomCounts"'
+          curl -fsS -X POST -d '{"axis":"zoom","position":null}' http://127.0.0.1:8097/api/sim/demand
+          curl -fsS http://127.0.0.1:8097/api/status | python3 -c 'import json,sys; d=json.load(sys.stdin)["demand"]; sys.exit(1 if "zoomCounts" in d else 0)'
