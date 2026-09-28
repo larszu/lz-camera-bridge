@@ -4,8 +4,13 @@ Dieses Dokument hält fest, wo Live-Video in den Kamera-Karten (Einzelansicht
 und Multiview) technisch machbar ist, welcher Aufwand dahinter steckt und wie
 eine saubere Integration in die bestehende Bridge aussähe.
 
-> **Status:** Analyse/Planung. Es ist noch **kein** Video-Pfad im Code
-> implementiert — die Steuerung (RCP/PTZ) ist unberührt davon.
+> **Status (2026-09-28):** Kategorie 2 ist gebaut. `packages/bridge/src/multiview/RtspHub.ts`
+> holt jeden RTSP-Stream mit einem ffmpeg, verkleinert ihn und liefert ihn als
+> `multipart/x-mixed-replace` unter `GET /video/<n>.mjpeg` auf dem Port der
+> Bruecke; die Ansicht *Video* zeigt ihn in einem `<img>`. Ein ffmpeg je Stream,
+> geteilt von allen Kacheln; die Adresse bleibt in der Bruecke. Kategorie 1
+> (MJPEG direkt) und 3 (Sony SDK) sind weiter offen. Die go2rtc-/mpv-/VLC-
+> Generatoren (`multiviewGenerators.ts`) bleiben fuer den Weg ohne Bruecke.
 
 ## Die eine harte Randbedingung: der Browser
 

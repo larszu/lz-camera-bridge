@@ -23,6 +23,23 @@
  *   { type: 'enableDemand', demand } | { type: 'disableDemand' }
  *       Zoom-/Fokus-Demand an einem firmware-b4-Geraet als Quelle von
  *       setZoom/setFocus; siehe input/DemandSource.ts und docs/b4/demand.md.
+ *   { type: 'listSwitchers' | 'setSwitcherConfig' | 'connectSwitcher'
+ *          | 'disconnectSwitcher' | 'removeSwitcher', switcherNumber, switcherConfig? }
+ *   { type: 'switcherCommand', switcherNumber, cmd, params }
+ *       cmd: 'preview' {source} | 'cut' | 'take' {source} | 'route' {source, window}
+ *          | 'setLayout' {mode} | 'setAudio' {channel} | 'freeze' {seconds} | 'refresh'
+ *       Ein Mischer ist KEINE Kamera: eigene Slots, eigenes Vokabular
+ *       (switcher/VisCatcClient.ts). Der Vorschau-Bus liegt in der Bruecke.
+ *   { type: 'getSite' } | { type: 'importSite', site } | { type: 'setSiteName', name }
+ *       Die Anlage als Datei (site/siteFile.ts): Kameras + Mischer. Wird
+ *       bei eingeschalteter Persistenz (index.ts, Electron) auf Platte
+ *       gehalten und beim Start wiederhergestellt.
+ *
+ * HTTP auf demselben Port:
+ *   GET /video/<cameraNumber>.mjpeg   Livebild als multipart/x-mixed-replace
+ *                                     (multiview/RtspHub.ts) -- fuer <img>.
+ *   GET /video/<cameraNumber>.jpg     das letzte Bild.
+ *   GET /site.json                    die Anlage zum Herunterladen.
  *
  * Server → Client messages:
  *   { type: 'cameras', cameras: [{ cameraNumber, config, connected,
@@ -40,10 +57,16 @@
  *   { type: 'demandSource', active, bindings? }
  *   { type: 'tally' | 'ports' | 'wiznetDevices' | 'sonyUsbDevices'
  *          | 'sonyMncDevices' | 'hidDevices' | 'controlSurface' | 'wiznetConfigResult' }
+ *   { type: 'switchers', switchers: [{ switcherNumber, config, connected, state, inputLabels }] }
+ *   { type: 'switcherState', switcherNumber, state }
+ *   { type: 'cameraTally', tally: { [cameraNumber]: 'program' | 'preview' | 'off' } }
+ *       abgeleitet aus Programm/Vorschau des Mischers und `switcherInput`
+ *       je Kamera. Der globale `tally` (Companion) bleibt daneben bestehen.
+ *   { type: 'site', name, site, path? }
  */
 
 import { WebSocketServer, WebSocket } from 'ws';
-import { createServer } from 'http';
+import { createServer, type IncomingMessage, type ServerResponse } from 'http';
 import { networkInterfaces } from 'os';
 import { Rs422Transport } from './transport/Rs422Transport.js';
 import { CameraState } from './protocol/CcuClient.js';
@@ -54,6 +77,11 @@ import {
   buildVlcWindowsScript,
   type MultiviewSource,
 } from './multiview/multiviewGenerators.js';
+import { RtspHub, checkStreamUrl } from './multiview/RtspHub.js';
+import { VisCatcClient, type SwitcherConfig, type SwitcherState } from './switcher/VisCatcClient.js';
+import type { SourceTally } from './switcher/switcherBus.js';
+import { SitePersistence } from './site/persistence.js';
+import { emptySite, parseSite, type SiteFile } from './site/siteFile.js';
 import { WiznetDiscovery, WiznetDeviceConfig } from './discovery/WiznetDiscovery.js';
 import { CompanionServer, TallyState } from './companion/CompanionServer.js';
 import { HidControlSurface, HidSurfaceConfig } from './input/HidControlSurface.js';
@@ -95,6 +123,21 @@ interface CameraSlot {
   planMatchedBy?: 'model' | 'number' | 'manual';
 }
 
+interface SwitcherSlot {
+  num: number;
+  config: SwitcherConfig;
+  client: VisCatcClient | null;
+  connected: boolean;
+}
+
+export interface BridgeOptions {
+  /** Keep the site on disk and restore it on start. Off in tests. */
+  persist?: boolean;
+  configDir?: string;
+  /** Let the video hub fetch streams outside the private networks. */
+  allowAnyStreamHost?: boolean;
+}
+
 interface ClientMessage {
   type:
     | 'listCameras' | 'setCameraConfig' | 'connectCamera' | 'disconnectCamera' | 'removeCamera'
@@ -102,9 +145,16 @@ interface ClientMessage {
     | 'discoverSonyMnc' | 'listHidDevices' | 'enableControlSurface' | 'disableControlSurface'
     | 'setTally' | 'getTally' | 'enableDemand' | 'disableDemand'
     | 'matchCameraPlan' | 'applyCameraPlan' | 'assignPlanCamera'
-    | 'getMultiview';
+    | 'getMultiview'
+    | 'listSwitchers' | 'setSwitcherConfig' | 'connectSwitcher' | 'disconnectSwitcher' | 'removeSwitcher'
+    | 'switcherCommand'
+    | 'getSite' | 'importSite' | 'setSiteName';
   cameraNumber?: number;
   config?: CameraConfig;
+  switcherNumber?: number;
+  switcherConfig?: SwitcherConfig;
+  site?: string | Record<string, unknown>;
+  name?: string;
   cmd?: string;
   params?: Record<string, unknown>;
   deviceIp?: string;
@@ -144,6 +194,11 @@ export class BridgeServer {
   private hidSurfaceConfig: HidSurfaceConfig | null = null;
   private demandSource: DemandSource | null = null;
   private tally: TallyState = { program: false, preview: false, isoRec: false };
+  private switchers = new Map<number, SwitcherSlot>();
+  private readonly hub: RtspHub;
+  private readonly persistence: SitePersistence | null;
+  private siteName = '';
+  private readonly allowAnyStreamHost: boolean;
 
   /**
    * `companionPorts` ist da, damit eine zweite Bruecke im selben Prozess
@@ -156,9 +211,13 @@ export class BridgeServer {
   constructor(
     private readonly wsPort = 9700,
     companionPorts?: { http?: number; ws?: number },
+    opts: BridgeOptions = {},
   ) {
     this.companion = new CompanionServer(companionPorts?.http, companionPorts?.ws);
-    this.httpServer = createServer();
+    this.hub = new RtspHub();
+    this.persistence = opts.persist ? new SitePersistence(opts.configDir) : null;
+    this.allowAnyStreamHost = opts.allowAnyStreamHost ?? false;
+    this.httpServer = createServer((req, res) => this.handleHttp(req, res));
     this.wss = new WebSocketServer({ server: this.httpServer });
     this.wss.on('connection', (ws) => this.onClient(ws));
 
@@ -172,6 +231,7 @@ export class BridgeServer {
   }
 
   start(): void {
+    this.restoreSite();
     this.httpServer.listen(this.wsPort, () => {
       console.log(`[BridgeServer] WebSocket listening on ws://localhost:${this.wsPort}`);
       // AND the addresses somebody can actually hand out.
@@ -200,6 +260,9 @@ export class BridgeServer {
     this.disableControlSurface();
     this.disableDemand();
     for (const slot of this.cameras.values()) void slot.backend?.disconnect();
+    for (const slot of this.switchers.values()) slot.client?.disconnect();
+    this.hub.stopAll();
+    this.persistence?.flush();
     this.companion.stop();
     this.wss.close();
     this.httpServer.close();
@@ -210,7 +273,10 @@ export class BridgeServer {
   private onClient(ws: WebSocket): void {
     console.log('[BridgeServer] Web client connected');
     this.sendCameras(ws);
+    this.sendSwitchers(ws);
     ws.send(JSON.stringify({ type: 'tally', tally: this.tally }));
+    ws.send(JSON.stringify({ type: 'cameraTally', tally: this.cameraTally() }));
+    this.sendSite(ws);
     for (const [cameraNumber, state] of this.cameraStates.entries()) {
       ws.send(
         JSON.stringify({
@@ -248,6 +314,7 @@ export class BridgeServer {
         const slot = this.getOrCreateSlot(num);
         slot.config = { ...slot.config, ...(msg.config ?? {}) };
         this.broadcastCameras();
+        this.siteChanged();
         break;
       }
 
@@ -260,11 +327,62 @@ export class BridgeServer {
         break;
 
       case 'removeCamera':
-        await this.disconnectCamera(msg.cameraNumber ?? 0);
-        this.cameras.delete(msg.cameraNumber ?? 0);
-        this.vergissKamera(msg.cameraNumber ?? 0);
+        await this.removeCameraSlot(msg.cameraNumber ?? 0);
         this.broadcastCameras();
+        this.siteChanged();
         break;
+
+      // ─── Switcher ───────────────────────────────────────────────────────
+      case 'listSwitchers':
+        this.sendSwitchers(ws);
+        break;
+
+      case 'setSwitcherConfig': {
+        const num = msg.switcherNumber ?? 1;
+        const slot = this.getOrCreateSwitcher(num);
+        slot.config = { ...slot.config, ...(msg.switcherConfig ?? {}) };
+        this.sendSwitchers();
+        this.siteChanged();
+        break;
+      }
+
+      case 'connectSwitcher':
+        await this.connectSwitcher(msg.switcherNumber ?? 1);
+        break;
+
+      case 'disconnectSwitcher':
+        this.disconnectSwitcher(msg.switcherNumber ?? 1);
+        break;
+
+      case 'removeSwitcher':
+        this.disconnectSwitcher(msg.switcherNumber ?? 1);
+        this.switchers.delete(msg.switcherNumber ?? 1);
+        this.sendSwitchers();
+        this.broadcastCameraTally();
+        this.siteChanged();
+        break;
+
+      case 'switcherCommand':
+        await this.dispatchSwitcherCommand(ws, msg.switcherNumber ?? 1, msg.cmd ?? '', msg.params ?? {});
+        break;
+
+      // ─── Site ─────────────────────────────────────────────────────────────
+      case 'getSite':
+        this.sendSite(ws);
+        break;
+
+      case 'setSiteName':
+        this.siteName = String(msg.name ?? '').slice(0, 120);
+        this.sendSite();
+        this.siteChanged();
+        break;
+
+      case 'importSite': {
+        const text = typeof msg.site === 'string' ? msg.site : JSON.stringify(msg.site ?? null);
+        const site = parseSite(text); // throws with a sentence → sendError via the catch above
+        await this.applySite(site, true);
+        break;
+      }
 
       case 'command':
         if (!msg.cmd) break;
@@ -491,6 +609,13 @@ export class BridgeServer {
     this.cameraConfirmations.delete(num);
   }
 
+  /** Drop the slot entirely — the one place, used by `removeCamera` and by a site import. */
+  private async removeCameraSlot(num: number): Promise<void> {
+    await this.disconnectCamera(num);
+    this.cameras.delete(num);
+    this.vergissKamera(num);
+  }
+
   private async disconnectCamera(num: number): Promise<void> {
     const slot = this.cameras.get(num);
     if (!slot?.backend) return;
@@ -693,6 +818,7 @@ export class BridgeServer {
 
   private broadcastCameras(): void {
     this.sendCameras();
+    this.broadcastCameraTally();
   }
 
   // ─── HID control surface ────────────────────────────────────────────────
@@ -775,6 +901,283 @@ export class BridgeServer {
     this.broadcast({ type: 'demandSource', active: false });
   }
 
+
+  // ─── Switcher slots ───────────────────────────────────────────────────────
+
+  private getOrCreateSwitcher(num: number): SwitcherSlot {
+    let slot = this.switchers.get(num);
+    if (!slot) {
+      slot = { num, config: { kind: 'vis-catc' }, client: null, connected: false };
+      this.switchers.set(num, slot);
+    }
+    return slot;
+  }
+
+  private async connectSwitcher(num: number): Promise<void> {
+    const slot = this.switchers.get(num);
+    if (!slot) throw new Error(`Switcher ${num} is not configured`);
+    if (slot.client) {
+      slot.client.disconnect();
+      slot.client = null;
+      slot.connected = false;
+    }
+    const client = new VisCatcClient(slot.config);
+    slot.client = client;
+    client.on('connected', () => {
+      slot.connected = true;
+      console.log(`[BridgeServer] Switcher ${num} connected (${slot.config.path ?? 'http'})`);
+      this.sendSwitchers();
+      this.broadcastCameraTally();
+    });
+    client.on('stateChanged', (state: SwitcherState) => {
+      this.broadcast({ type: 'switcherState', switcherNumber: num, state });
+      this.broadcastCameraTally();
+    });
+    client.on('disconnected', () => {
+      slot.connected = false;
+      this.sendSwitchers();
+      this.broadcastCameraTally();
+    });
+    client.on('error', (err: Error) => {
+      this.broadcast({ type: 'error', message: err.message, switcherNumber: num });
+    });
+    await client.connect();
+  }
+
+  private disconnectSwitcher(num: number): void {
+    const slot = this.switchers.get(num);
+    if (!slot?.client) return;
+    slot.client.disconnect();
+    slot.client = null;
+    slot.connected = false;
+    this.sendSwitchers();
+    this.broadcastCameraTally();
+  }
+
+  private async dispatchSwitcherCommand(ws: WebSocket, num: number, cmd: string, params: Record<string, unknown>): Promise<void> {
+    const slot = this.switchers.get(num);
+    const client = slot?.client;
+    if (!client || !slot?.connected) {
+      this.sendError(ws, `Switcher ${num} is not connected`);
+      return;
+    }
+    const n = (k: string, d = 0) => Number(params[k] ?? d);
+    let ok = true;
+    switch (cmd) {
+      case 'preview': client.setPreview(n('source')); break;
+      case 'cut': ok = await client.doCut(); break;
+      case 'take': ok = await client.take(n('source')); break;
+      case 'route': ok = await client.route(n('source'), n('window', 1)); break;
+      case 'setLayout': ok = await client.setLayout(n('mode')); break;
+      case 'setAudio': ok = await client.setAudio(n('channel')); break;
+      case 'freeze': ok = await client.freeze(n('seconds', 3)); break;
+      case 'refresh': ok = await client.refresh(); break;
+      default:
+        this.sendError(ws, `'${cmd}' is not a switcher command`);
+        return;
+    }
+    // `false` with a reason has already gone out as an `error` event from the
+    // client; a false without one is the bus saying "nothing to do" (CUT
+    // without a preview), which is not an error.
+    void ok;
+  }
+
+  private sendSwitchers(ws?: WebSocket): void {
+    const switchers = [...this.switchers.values()].map((s) => ({
+      switcherNumber: s.num,
+      config: s.config,
+      connected: s.connected,
+      state: s.client?.state ?? null,
+      inputLabels: s.client?.inputLabels ?? s.config.inputLabels ?? null,
+    }));
+    const msg = JSON.stringify({ type: 'switchers', switchers });
+    if (ws) ws.send(msg);
+    else this.broadcastRaw(msg);
+  }
+
+  /**
+   * Tally per camera, derived — not stored. The first connected switcher's
+   * programme and preview against every camera's `switcherInput`. A camera
+   * without an input, or without a connected switcher, is `off`, not
+   * "unknown": the panel shows a lamp, and a lamp is either lit or not.
+   */
+  private cameraTally(): Record<number, SourceTally> {
+    const sw = [...this.switchers.values()].find((s) => s.connected && s.client);
+    const bus = sw?.client?.state;
+    const out: Record<number, SourceTally> = {};
+    for (const cam of this.cameras.values()) {
+      const input = cam.config?.switcherInput ?? 0;
+      let t: SourceTally = 'off';
+      if (bus && input > 0) {
+        if (bus.program === input) t = 'program';
+        else if (bus.preview === input) t = 'preview';
+      }
+      out[cam.num] = t;
+    }
+    return out;
+  }
+
+  private broadcastCameraTally(): void {
+    this.broadcast({ type: 'cameraTally', tally: this.cameraTally() });
+  }
+
+  // ─── Site ─────────────────────────────────────────────────────────────────
+
+  currentSite(): SiteFile {
+    const site = emptySite(this.siteName);
+    for (const s of [...this.cameras.values()].sort((a, b) => a.num - b.num)) {
+      site.cameras.push({ cameraNumber: s.num, config: s.config, autoConnect: s.connected || Boolean(s.backend) });
+    }
+    for (const s of [...this.switchers.values()].sort((a, b) => a.num - b.num)) {
+      site.switchers.push({ switcherNumber: s.num, config: s.config, autoConnect: s.connected || Boolean(s.client) });
+    }
+    return site;
+  }
+
+  private sendSite(ws?: WebSocket): void {
+    const msg = JSON.stringify({
+      type: 'site',
+      name: this.siteName,
+      site: this.currentSite(),
+      path: this.persistence?.path ?? null,
+    });
+    if (ws) ws.send(msg);
+    else this.broadcastRaw(msg);
+  }
+
+  private siteChanged(): void {
+    this.persistence?.save(this.currentSite());
+  }
+
+  private restoreSite(): void {
+    const site = this.persistence?.load();
+    if (!site) return;
+    console.log(`[BridgeServer] Site restored from ${this.persistence!.path}: ${site.cameras.length} cameras, ${site.switchers.length} switchers`);
+    void this.applySite(site, false);
+  }
+
+  /**
+   * Replace the whole room. Everything connected is disconnected first; the
+   * slots of the file take over; what the file marks `autoConnect` is
+   * connected, each on its own, so one dead camera does not hold up the rest.
+   */
+  private async applySite(site: SiteFile, announce: boolean): Promise<void> {
+    for (const num of [...this.cameras.keys()]) await this.removeCameraSlot(num);
+    for (const num of [...this.switchers.keys()]) {
+      this.disconnectSwitcher(num);
+      this.switchers.delete(num);
+    }
+    this.siteName = site.name;
+    for (const c of site.cameras) this.getOrCreateSlot(c.cameraNumber).config = { ...c.config };
+    for (const s of site.switchers) this.getOrCreateSwitcher(s.switcherNumber).config = { ...s.config };
+    this.broadcastCameras();
+    this.sendSwitchers();
+    this.sendSite();
+    if (announce) this.siteChanged();
+    for (const c of site.cameras) {
+      if (c.autoConnect === false) continue;
+      this.connectCamera(c.cameraNumber).catch((err) =>
+        this.broadcast({ type: 'error', message: (err as Error).message, cameraNumber: c.cameraNumber }),
+      );
+    }
+    for (const s of site.switchers) {
+      if (s.autoConnect === false) continue;
+      this.connectSwitcher(s.switcherNumber).catch((err) =>
+        this.broadcast({ type: 'error', message: (err as Error).message, switcherNumber: s.switcherNumber }),
+      );
+    }
+  }
+
+  // ─── HTTP: live video and the site file ───────────────────────────────────
+
+  private handleHttp(req: IncomingMessage, res: ServerResponse): void {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    const url = new URL(req.url ?? '/', 'http://bridge');
+    if (req.method !== 'GET') {
+      res.writeHead(405).end();
+      return;
+    }
+    if (url.pathname === '/health') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, service: 'lz-camera-bridge', cameras: this.cameras.size, switchers: this.switchers.size, streams: this.hub.activeCount }));
+      return;
+    }
+    if (url.pathname === '/site.json') {
+      const name = (this.siteName || 'site').replace(/[^\w.-]+/g, '_');
+      res.writeHead(200, {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Content-Disposition': `attachment; filename="${name}.lz-site.json"`,
+        'Cache-Control': 'no-store',
+      });
+      res.end(JSON.stringify(this.currentSite(), null, 2));
+      return;
+    }
+    const video = /^\/video\/(\d+)\.(mjpeg|jpg)$/.exec(url.pathname);
+    if (video) {
+      this.serveVideo(Number(video[1]), video[2] as 'mjpeg' | 'jpg', res);
+      return;
+    }
+    res.writeHead(404, { 'Content-Type': 'text/plain' });
+    res.end('LZ Camera Bridge: WebSocket on this port; /video/<n>.mjpeg, /site.json, /health');
+  }
+
+  private serveVideo(num: number, kind: 'mjpeg' | 'jpg', res: ServerResponse): void {
+    const slot = this.cameras.get(num);
+    const streamUrl = slot?.config.streamUrl;
+    if (!streamUrl) {
+      res.writeHead(404, { 'Content-Type': 'text/plain' });
+      res.end(`Camera ${num} has no stream address`);
+      return;
+    }
+    const refusal = checkStreamUrl(streamUrl, this.allowAnyStreamHost);
+    if (refusal) {
+      res.writeHead(400, { 'Content-Type': 'text/plain' });
+      res.end(refusal);
+      return;
+    }
+    if (kind === 'jpg') {
+      const frame = this.hub.lastFrame(streamUrl);
+      if (!frame) {
+        res.writeHead(503, { 'Content-Type': 'text/plain', 'Retry-After': '2' });
+        res.end('No picture yet');
+        return;
+      }
+      res.writeHead(200, { 'Content-Type': 'image/jpeg', 'Cache-Control': 'no-store' });
+      res.end(frame);
+      return;
+    }
+    res.writeHead(200, {
+      'Content-Type': 'multipart/x-mixed-replace; boundary=lzframe',
+      'Cache-Control': 'no-store',
+      Connection: 'close',
+    });
+    let closed = false;
+    const unsubscribe = this.hub.subscribe(streamUrl, {
+      frame: (jpeg) => {
+        if (closed) return;
+        // Drop frames when the client cannot keep up; a tile that lags a
+        // second is better than a bridge that buffers a minute.
+        if (res.writableLength > 2 * 1024 * 1024) return;
+        res.write(`--lzframe\r\nContent-Type: image/jpeg\r\nContent-Length: ${jpeg.length}\r\n\r\n`);
+        res.write(jpeg);
+        res.write('\r\n');
+      },
+      error: (reason) => {
+        if (closed) return;
+        // The stream stays open; the hub retries. A text part tells a
+        // curious reader why the picture froze — <img> simply keeps the last frame.
+        res.write(`--lzframe\r\nContent-Type: text/plain\r\nContent-Length: ${Buffer.byteLength(reason)}\r\n\r\n${reason}\r\n`);
+      },
+    });
+    const done = () => {
+      if (closed) return;
+      closed = true;
+      unsubscribe();
+    };
+    res.on('close', done);
+    res.on('error', done);
+  }
+
   // ─── Helpers ──────────────────────────────────────────────────────────────
 
   private broadcast(msg: unknown): void {
@@ -801,6 +1204,14 @@ export class BridgeServer {
       else this.tally[action === 'tallyProgram' ? 'program' : 'preview'] = !this.tally[action === 'tallyProgram' ? 'program' : 'preview'];
       this.companion.setTally(this.tally);
       this.broadcast({ type: 'tally', tally: this.tally });
+      return;
+    }
+
+    if (action === 'switcherCut' || action === 'switcherPreview' || action === 'switcherTake') {
+      const dummyWs = { readyState: WebSocket.OPEN, send: () => {} } as unknown as WebSocket;
+      const num = Number(params.switcherNumber ?? [...this.switchers.keys()][0] ?? 1);
+      const cmd = action === 'switcherCut' ? 'cut' : action === 'switcherPreview' ? 'preview' : 'take';
+      await this.dispatchSwitcherCommand(dummyWs, num, cmd, { source: Number(params.source ?? 0) });
       return;
     }
 

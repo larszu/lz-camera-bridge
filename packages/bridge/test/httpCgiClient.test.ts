@@ -17,7 +17,11 @@ import { createServer, type Server, type IncomingMessage } from 'node:http';
 import { createHash } from 'node:crypto';
 import { AddressInfo } from 'node:net';
 
-import { HttpCgiClient, sonyDirection, vissonicDirection } from '../src/cameras/HttpCgiClient.js';
+import { createServer as createTcpServer, type Server as TcpServer } from 'node:net';
+import {
+  HttpCgiClient, sonyDirection, vissonicDirection, parsePowerReply, isViscaDone,
+  VISCA_POWER_ON, VISCA_POWER_STANDBY, VISCA_POWER_INQUIRY,
+} from '../src/cameras/HttpCgiClient.js';
 import { MODE_READBACK, MODE_CADENCE } from '../src/protocol/valueOrigin.js';
 import { capabilitiesForMode, isPtzMode } from '../../web-rcp/src/capabilities.ts';
 
@@ -91,12 +95,104 @@ test('Vissonic: RCP-Verben landen als ptzctrl.cgi der Geraeteoberflaeche', async
   shut(server);
 });
 
-test('Vissonic: kein setCameraPower ueber die CGI', async () => {
+/** A PTZOptics-style head's VISCA-over-TCP side: ACK + completion, inquiry answers with the power state. */
+function fakeVisca() {
+  const received: string[] = [];
+  let power = '02';
+  const server: TcpServer = createTcpServer((socket) => {
+    socket.on('data', (chunk) => {
+      const hex = chunk.toString('hex');
+      received.push(hex);
+      if (hex === VISCA_POWER_INQUIRY) {
+        socket.write(Buffer.from(`9050${power}ff`, 'hex'));
+        return;
+      }
+      if (hex === VISCA_POWER_ON) power = '02';
+      if (hex === VISCA_POWER_STANDBY) power = '03';
+      // ACK, then completion — two frames in one chunk, as the real head does it.
+      socket.write(Buffer.from('9041ff9051ff', 'hex'));
+    });
+  });
+  return { server, received };
+}
+
+test('Vissonic: Ein/Aus geht ueber VISCA-TCP, nicht ueber die CGI, und wird zurueckgelesen', async () => {
   const { server } = fakeCamera();
   const port = await listen(server);
-  const cam = new HttpCgiClient({ host: '127.0.0.1', port, family: 'vissonic' });
-  assert.equal(await cam.handleRcpCommand('setCameraPower', { on: true }), false);
+  const visca = fakeVisca();
+  const viscaPort = await new Promise<number>((r) => visca.server.listen(0, '127.0.0.1', () => r((visca.server.address() as AddressInfo).port)));
+  const cam = new HttpCgiClient({ host: '127.0.0.1', port, family: 'vissonic', viscaPort, powerPollMs: 0 });
+  await cam.connect();
+  const states: unknown[] = [];
+  cam.on('stateChanged', (s) => states.push(s));
+
+  assert.equal(await cam.handleRcpCommand('setCameraPower', { on: false }), true);
+  assert.ok(visca.received.includes(VISCA_POWER_STANDBY));
+  await cam.readPower();
+  assert.deepEqual(states.at(-1), { cameraPower: false });
   assert.equal(await cam.handleRcpCommand('setIris', { value: 128 }), false);
+  cam.disconnect();
+  visca.server.close();
+  shut(server);
+});
+
+test('parsePowerReply liest beide Familien und raet nie', () => {
+  assert.equal(parsePowerReply('sony', 'ModelName=SRG-A40&Power=on&Serial=1'), true);
+  assert.equal(parsePowerReply('sony', 'Power=standby'), false);
+  assert.equal(parsePowerReply('sony', 'ModelName=SRG-A40'), null);
+  // ACK before the answer, as a real head sends it.
+  assert.equal(parsePowerReply('vissonic', '9041ff905002ff'), true);
+  assert.equal(parsePowerReply('vissonic', '905003ff'), false);
+  assert.equal(parsePowerReply('vissonic', '9041ff'), null);
+  assert.equal(parsePowerReply('vissonic', undefined), null);
+  assert.equal(isViscaDone(Buffer.from('9041ff', 'hex')), false);
+  assert.equal(isViscaDone(Buffer.from('9041ff9051ff', 'hex')), true);
+  assert.equal(isViscaDone(Buffer.from('906002ff', 'hex')), true);
+});
+
+test('home und OSD: Vissonic kennt beides, Sony nur home', async () => {
+  const { server, hits } = fakeCamera();
+  const port = await listen(server);
+  const vis = new HttpCgiClient({ host: '127.0.0.1', port, family: 'vissonic' });
+  assert.equal(await vis.handleRcpCommand('home', {}), true);
+  assert.equal(await vis.handleRcpCommand('osd', { action: 'menu' }), true);
+  assert.equal(await vis.handleRcpCommand('osd', { action: 'back' }), true);
+  assert.equal(await vis.handleRcpCommand('manualFocus', {}), true);
+  const sony = new HttpCgiClient({ host: '127.0.0.1', port, family: 'sony' });
+  assert.equal(await sony.handleRcpCommand('home', {}), true);
+  assert.equal(await sony.handleRcpCommand('osd', { action: 'menu' }), false);
+  const urls = hits.map((h) => h.url);
+  assert.deepEqual(urls, [
+    '/cgi-bin/ptzctrl.cgi?ptzcmd&home&12&10',
+    '/cgi-bin/ptzctrl.cgi?osdcmd&menu',
+    '/cgi-bin/ptzctrl.cgi?navigate_mode&OSD_BACK',
+    '/cgi-bin/ptzctrl.cgi?ptzcmd&mfocus',
+    '/command/ptzf.cgi?PanTiltReset=on',
+  ]);
+  shut(server);
+});
+
+test('Reihenfolge: ein Stop ueberholt nie seinen Move, und der neueste Move ersetzt den wartenden', async () => {
+  // A slow camera: every request takes a moment, so several pile up.
+  const hits: string[] = [];
+  const server = createServer((req, res) => {
+    hits.push(req.url ?? '');
+    setTimeout(() => { res.writeHead(200); res.end('ok'); }, 30);
+  });
+  const port = await listen(server);
+  const cam = new HttpCgiClient({ host: '127.0.0.1', port, family: 'vissonic' });
+  const all = [
+    cam.handleRcpCommand('ptz', { pan: 20, tilt: 0 }),   // goes out at once
+    cam.handleRcpCommand('ptz', { pan: 40, tilt: 0 }),   // waits …
+    cam.handleRcpCommand('ptz', { pan: 60, tilt: 0 }),   // … and replaces the 40
+    cam.handleRcpCommand('ptz', { pan: 0, tilt: 0 }),    // the stop, after the 60
+  ];
+  await Promise.all(all);
+  assert.deepEqual(hits, [
+    '/cgi-bin/ptzctrl.cgi?ptzcmd&right&5&4',
+    '/cgi-bin/ptzctrl.cgi?ptzcmd&right&14&12',
+    '/cgi-bin/ptzctrl.cgi?ptzcmd&ptzstop&1&1',
+  ]);
   shut(server);
 });
 
@@ -167,10 +263,9 @@ test('direction helpers map diagonals per family', () => {
   assert.equal(sonyDirection(0, 0), 'stop');
 });
 
-test('http-cgi is a control-only path in the value-origin model', () => {
-  // Reads nothing back, so no cadence — the contract other backends carry.
-  assert.deepEqual(MODE_READBACK['http-cgi'], []);
-  assert.deepEqual(MODE_CADENCE['http-cgi'], { kind: 'none' });
+test('http-cgi reads back power and nothing else in the value-origin model', () => {
+  assert.deepEqual(MODE_READBACK['http-cgi'], ['cameraPower']);
+  assert.deepEqual(MODE_CADENCE['http-cgi'], { kind: 'poll', everyMs: 10000 });
   // It is a PTZ mode and offers focus but no paint.
   assert.equal(isPtzMode('http-cgi'), true);
   const caps = capabilitiesForMode('http-cgi');

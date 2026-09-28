@@ -59,6 +59,10 @@ export interface CameraConfig {
   camHost?: string; camPort?: number; camUser?: string; camPass?: string;
   /** HTTP-CGI: welche Firmware-Familie (Vissonic/PTZOptics oder Sony SRG/BRC). */
   cgiFamily?: CgiFamily; cgiPresetOffset?: number;
+  /** A name for the panel: "Stage left" instead of a bare number. The plan label wins when a plan is matched. */
+  label?: string;
+  /** Which switcher input carries this camera's picture (1-based). 0/empty: none. Drives the per-camera tally. */
+  switcherInput?: number;
   /** VISCA ueber RS-232: Port, Baudrate und Adresse in der Kette (1..7). */
   viscaSerialPath?: string; viscaBaudRate?: number; viscaAddress?: number;
   /** DJI-Gimbals: serieller Pfad (Osmo: CDC, Ronin: SLCAN-Stecker). */

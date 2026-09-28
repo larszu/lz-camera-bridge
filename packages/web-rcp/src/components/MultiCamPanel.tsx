@@ -2,19 +2,15 @@ import React from 'react';
 import { SonyRcpPanel } from './SonyRcpPanel.tsx';
 import { PtzPanel } from './PtzPanel.tsx';
 import { capabilitiesForMode, isPtzMode } from '../capabilities.ts';
-import type { CameraStatesByNumber, TallyState } from '../types.ts';
+import type { CameraStatesByNumber, CameraTally, TallyState } from '../types.ts';
 import type { CameraSlot } from '../hooks/useBridge.ts';
-
-const MODE_LABEL: Record<string, string> = {
-  tcp: 'Sony CCU', serial: 'Sony RS-422', 'sony-usb': 'Sony USB', 'sony-mnc': 'Sony WiFi',
-  'lumix-http': 'Lumix', 'canon-ccapi': 'Canon', blackmagic: 'Blackmagic', zcam: 'Z CAM',
-  'panasonic-ptz': 'Pana PTZ', visca: 'VISCA', jvc: 'JVC', birddog: 'BirdDog',
-};
+import { MODE_LABEL, ptzExtrasFor } from '../App.tsx';
 
 interface Props {
   cameras: Record<number, CameraSlot>;
   cameraStates: CameraStatesByNumber;
   tally: TallyState;
+  cameraTally: CameraTally;
   onAddCamera: () => void;
   onConnect: (num: number) => void;
   onDisconnect: (num: number) => void;
@@ -82,21 +78,33 @@ export function MultiCamPanel(p: Props) {
                     {cam.planMatchedBy === 'number' ? ' ?' : ''}
                   </span>
                 )}
+                {!cam.plan && cam.config.label && <span className="multicam__card-plan">{cam.config.label}</span>}
                 <span className="multicam__card-mode">{MODE_LABEL[mode] ?? mode}</span>
+                {p.cameraTally[num] && p.cameraTally[num] !== 'off' && (
+                  <span className={`tile__tally tile__tally--${p.cameraTally[num]}`}>{p.cameraTally[num] === 'program' ? 'PGM' : 'PVW'}</span>
+                )}
                 <div className="multicam__card-actions">
-                  <button className="btn btn--sm" onClick={() => p.onEdit(num)} title="Konfigurieren">⚙</button>
+                  <button className="btn btn--sm" onClick={() => p.onEdit(num)} title="Set up">⚙</button>
                   {connected ? (
-                    <button className="btn btn--sm btn--danger" onClick={() => p.onDisconnect(num)}>Trennen</button>
+                    <button className="btn btn--sm btn--danger" onClick={() => p.onDisconnect(num)}>Disconnect</button>
                   ) : (
-                    <button className="btn btn--sm btn--primary" onClick={() => p.onConnect(num)}>Verbinden</button>
+                    <button className="btn btn--sm btn--primary" onClick={() => p.onConnect(num)}>Connect</button>
                   )}
-                  <button className="camera-list__remove" title="Entfernen" onClick={() => p.onRemove(num)}>✕</button>
+                  <button className="camera-list__remove" title="Remove" onClick={() => p.onRemove(num)}>✕</button>
                 </div>
               </div>
 
               <div className="multicam__card-body">
                 {ptz ? (
-                  <PtzPanel cameraId={num} disabled={!connected} onCommand={(cmd, params) => p.onCommand(num, cmd, params)} />
+                  <PtzPanel
+                    cameraId={num}
+                    label={cam.plan?.label ?? cam.config.label}
+                    disabled={!connected}
+                    onCommand={(cmd, params) => p.onCommand(num, cmd, params)}
+                    extras={ptzExtrasFor(cam.config)}
+                    power={state.cameraPower}
+                    tally={p.cameraTally[num]}
+                  />
                 ) : (
                   <SonyRcpPanel
                     state={state}

@@ -8,24 +8,37 @@
  *                GET /cgi-bin/ptzctrl.cgi?ptzcmd&<action>&<panSpeed>&<tiltSpeed>
  *                Verified against the camera's own web UI (build.min.js,
  *                object `navigator_api`) and a live PTZOptics-clone: the
- *                control CGI needs no authentication.
+ *                control CGI needs no authentication. Power is NOT on the
+ *                CGI at all — these clones take VISCA over TCP 5678, measured
+ *                on the installation: `81 09 04 00 FF` → `90 50 02 FF` (on)
+ *                or `90 50 03 FF` (standby).
  *
  *  - `sony`      Sony SRG/BRC CGI: GET /command/ptzf.cgi?PanTiltMove=...,
  *                ZoomMove=..., FocusMove=..., presetposition.cgi?PresetCall=...
  *                Verified live against a Sony SRG-A40: the CGI is refused with
  *                403 unless a `Referer` header matching the camera is sent, and
- *                then wants Digest authentication.
+ *                then wants Digest authentication. Power is
+ *                `/command/main.cgi?System=on|standby`, read back from
+ *                `/command/inquiry.cgi?inq=sysinfo` (`Power=on|standby`).
  *
  * Why this exists next to `ViscaClient`, which already drives the same heads:
  * some rooms block the VISCA UDP ports but allow HTTP, and the camera's own
  * app speaks exactly this CGI. It is an alternative transport to the same
  * cameras, deliberately not a second command vocabulary — the RCP verbs
  * (`ptz`, `setZoom`, `setFocus`, `recallPreset`, `storePreset`, `autoFocus`,
- * `setCameraPower`) map straight onto it, so the RCP behaves identically to
- * every other head.
+ * `setCameraPower`, `home`, `osd`) map straight onto it, so the RCP behaves
+ * identically to every other head.
+ *
+ * ORDER. Every request goes through one queue per camera. A `stop` that
+ * overtook its `move` on the network (each was its own fetch, the probe
+ * before it asynchronous) left the head running away — a real defect of the
+ * predecessor. In the queue a stop can never pass a move; and while a move
+ * is waiting, a newer move replaces it instead of queueing behind, so a
+ * slow camera gets the latest stick position, not a backlog.
  */
 import { EventEmitter } from 'events';
 import { createHash, randomBytes } from 'crypto';
+import { createConnection } from 'net';
 import { CameraState } from '../protocol/CcuClient.js';
 
 export type CgiFamily = 'vissonic' | 'sony';
@@ -42,7 +55,17 @@ export interface HttpCgiOptions {
    * 1 (offset 0). Configurable because it varies by firmware.
    */
   presetOffset?: number;
+  /** Poll the power state in this rhythm (ms). 0 disables. */
+  powerPollMs?: number;
+  /** VISCA-over-TCP port of a PTZOptics-style head (power only). */
+  viscaPort?: number;
 }
+
+export const VISCA_TCP_PORT = 5678;
+export const VISCA_POWER_ON = '8101040002ff';
+export const VISCA_POWER_STANDBY = '8101040003ff';
+export const VISCA_POWER_INQUIRY = '81090400ff';
+const POWER_POLL_MS = 10000;
 
 function clamp(value: number, min: number, max: number): number {
   if (!Number.isFinite(value)) return min;
@@ -55,6 +78,27 @@ function velocityToSpeed(value: number, max: number): number {
   return Math.max(1, Math.round((Math.abs(value) / 100) * max));
 }
 
+/** Power reply of either family → on/standby, or null when unreadable. */
+export function parsePowerReply(family: CgiFamily, body: string | undefined): boolean | null {
+  if (!body) return null;
+  if (family === 'sony') {
+    const m = /(?:^|&|\s)Power=(on|standby)/i.exec(body);
+    return m ? m[1].toLowerCase() === 'on' : null;
+  }
+  const hex = body.replace(/\s/g, '').toLowerCase();
+  // Answer x0 50 0p FF: p=2 on, p=3 standby. Skip preceding ACKs.
+  const m = /[89a-f]0500([23])ff/.exec(hex);
+  return m ? m[1] === '2' : null;
+}
+
+type QueueKind = 'ptz' | 'zoom' | 'focus' | 'other';
+
+interface Job {
+  kind: QueueKind;
+  run: () => Promise<void>;
+  resolve: () => void;
+}
+
 export class HttpCgiClient extends EventEmitter {
   private readonly host: string;
   private readonly port: number;
@@ -62,8 +106,14 @@ export class HttpCgiClient extends EventEmitter {
   private readonly username: string;
   private readonly password: string;
   private readonly presetOffset: number;
+  private readonly powerPollMs: number;
+  private readonly viscaPort: number;
   private connected = false;
   private readonly _state: CameraState = {};
+  private queue: Job[] = [];
+  private running = false;
+  private powerTimer: ReturnType<typeof setInterval> | null = null;
+  private powerRecheck: ReturnType<typeof setTimeout>[] = [];
 
   constructor(opts: HttpCgiOptions) {
     super();
@@ -73,6 +123,8 @@ export class HttpCgiClient extends EventEmitter {
     this.username = opts.username ?? '';
     this.password = opts.password ?? '';
     this.presetOffset = opts.presetOffset ?? (this.family === 'vissonic' ? -1 : 0);
+    this.powerPollMs = opts.powerPollMs ?? POWER_POLL_MS;
+    this.viscaPort = opts.viscaPort ?? VISCA_TCP_PORT;
   }
 
   get isConnected(): boolean {
@@ -92,10 +144,20 @@ export class HttpCgiClient extends EventEmitter {
     await this.request(probe);
     this.connected = true;
     this.emit('connected', { host: this.host, family: this.family });
+    void this.readPower();
+    if (this.powerPollMs > 0) {
+      this.powerTimer = setInterval(() => void this.readPower(), this.powerPollMs);
+      this.powerTimer.unref?.();
+    }
   }
 
   disconnect(): void {
     this.connected = false;
+    if (this.powerTimer) clearInterval(this.powerTimer);
+    this.powerTimer = null;
+    for (const t of this.powerRecheck) clearTimeout(t);
+    this.powerRecheck = [];
+    this.queue = [];
     this.emit('disconnected');
   }
 
@@ -106,37 +168,60 @@ export class HttpCgiClient extends EventEmitter {
         // Pan/tilt drive: RCP gives velocities -100..100, 0 = stop.
         const pan = num('pan');
         const tilt = num('tilt');
-        await this.request(this.ptzMovePath(pan, tilt));
+        await this.enqueue(pan === 0 && tilt === 0 ? 'other' : 'ptz', () => this.request(this.ptzMovePath(pan, tilt)));
         return true;
       }
+      case 'home':
+        await this.enqueue('other', () => this.request(this.homePath()));
+        return true;
       case 'setZoom': {
         const v = num('value'); // -100..100, + = tele, 0 = stop
-        await this.request(this.zoomPath(v));
+        await this.enqueue(v === 0 ? 'other' : 'zoom', () => this.request(this.zoomPath(v)));
         return true;
       }
       case 'setFocus': {
         const v = num('value'); // -100..100, + = near, 0 = stop
-        await this.request(this.focusPath(v));
+        await this.enqueue(v === 0 ? 'other' : 'focus', () => this.request(this.focusPath(v)));
         return true;
       }
       case 'autoFocus':
-        await this.request(this.focusModePath('auto'));
+        await this.enqueue('other', () => this.request(this.focusModePath('auto')));
+        return true;
+      case 'manualFocus':
+        await this.enqueue('other', () => this.request(this.focusModePath('manual')));
         return true;
       case 'recallPreset':
-        await this.request(this.presetPath('call', num('value')));
+        await this.enqueue('other', () => this.request(this.presetPath('call', num('value'))));
         return true;
       case 'storePreset':
-        await this.request(this.presetPath('set', num('value')));
+        await this.enqueue('other', () => this.request(this.presetPath('set', num('value'))));
         return true;
+      case 'osd': {
+        // On-screen menu: only the PTZOptics-style firmware exposes it over CGI.
+        if (this.family !== 'vissonic') return false;
+        const action = String(params['action'] ?? 'menu');
+        const path =
+          action === 'enter' ? '/cgi-bin/ptzctrl.cgi?navigate_mode&OSD_ENTER'
+          : action === 'back' ? '/cgi-bin/ptzctrl.cgi?navigate_mode&OSD_BACK'
+          : '/cgi-bin/ptzctrl.cgi?osdcmd&menu';
+        await this.enqueue('other', () => this.request(path));
+        return true;
+      }
       case 'setCameraPower': {
-        // Only Sony exposes power over this CGI; Vissonic has no equivalent.
-        if (this.family !== 'sony') {
-          console.log(`[HTTP-CGI] 'setCameraPower' wird von der ${this.family}-CGI nicht unterstützt`);
-          return false;
+        const on = Boolean(params['on']);
+        await this.enqueue('other', async () => {
+          if (this.family === 'sony') {
+            await this.request(`/command/main.cgi?System=${on ? 'on' : 'standby'}`);
+          } else {
+            await viscaTcp(this.host, this.viscaPort, on ? VISCA_POWER_ON : VISCA_POWER_STANDBY, 4000);
+          }
+        });
+        // Read back soon and again later: a head takes seconds to wake.
+        for (const ms of [1500, 10000]) {
+          const t = setTimeout(() => void this.readPower(), ms);
+          t.unref?.();
+          this.powerRecheck.push(t);
         }
-        await this.request(`/command/main.cgi?System=${params['on'] ? 'on' : 'standby'}`);
-        this._state.cameraPower = Boolean(params['on']);
-        this.emit('stateChanged', { cameraPower: this._state.cameraPower });
         return true;
       }
       default:
@@ -146,10 +231,67 @@ export class HttpCgiClient extends EventEmitter {
     }
   }
 
+  /** Ask the head whether it is on. Emits `stateChanged` only with an answer — never guesses. */
+  async readPower(): Promise<void> {
+    if (!this.connected) return;
+    try {
+      const body =
+        this.family === 'sony'
+          ? await this.request('/command/inquiry.cgi?inq=sysinfo')
+          : await viscaTcp(this.host, this.viscaPort, VISCA_POWER_INQUIRY, 3000);
+      const on = parsePowerReply(this.family, body);
+      if (on === null) return;
+      this._state.cameraPower = on;
+      this.emit('stateChanged', { cameraPower: on });
+    } catch {
+      // A head in standby often does not answer at all; that is not an error worth a banner.
+    }
+  }
+
+  // ── Queue ───────────────────────────────────────────────────────────────────
+
+  private enqueue(kind: QueueKind, run: () => Promise<unknown>): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      if (kind !== 'other') {
+        // The newest drive value replaces a waiting one of the same axis.
+        const i = this.queue.findIndex((j) => j.kind === kind);
+        if (i >= 0) {
+          const old = this.queue[i];
+          this.queue.splice(i, 1);
+          old.resolve();
+        }
+      }
+      this.queue.push({
+        kind,
+        run: () => run().then(() => undefined, reject),
+        resolve,
+      });
+      void this.pump();
+    });
+  }
+
+  private async pump(): Promise<void> {
+    if (this.running) return;
+    this.running = true;
+    try {
+      while (this.queue.length) {
+        const job = this.queue.shift()!;
+        try {
+          await job.run();
+        } finally {
+          job.resolve();
+        }
+      }
+    } finally {
+      this.running = false;
+    }
+  }
+
   // ── Path builders ───────────────────────────────────────────────────────────
 
   private ptzMovePath(pan: number, tilt: number): string {
     if (this.family === 'sony') {
+      if (pan === 0 && tilt === 0) return '/command/ptzf.cgi?PanTiltMove=stop,0,0';
       const dir = sonyDirection(pan, tilt);
       const p = velocityToSpeed(pan, 24) || (tilt !== 0 ? 1 : 0);
       const t = velocityToSpeed(tilt, 24) || (pan !== 0 ? 1 : 0);
@@ -163,6 +305,11 @@ export class HttpCgiClient extends EventEmitter {
     const p = Math.max(1, velocityToSpeed(pan, 24) || velocityToSpeed(tilt, 24));
     const t = Math.max(1, velocityToSpeed(tilt, 20) || velocityToSpeed(pan, 20));
     return `/cgi-bin/ptzctrl.cgi?ptzcmd&${dir}&${p}&${t}`;
+  }
+
+  private homePath(): string {
+    if (this.family === 'sony') return '/command/ptzf.cgi?PanTiltReset=on';
+    return '/cgi-bin/ptzctrl.cgi?ptzcmd&home&12&10';
   }
 
   private zoomPath(v: number): string {
@@ -274,6 +421,49 @@ export class HttpCgiClient extends EventEmitter {
     fields.push(`response="${response}"`);
     return `Digest ${fields.join(', ')}`;
   }
+}
+
+// ── VISCA over TCP (power only) ───────────────────────────────────────────────
+
+/**
+ * One raw VISCA packet over TCP, answered by the first completion or error
+ * frame (`x0 5y … FF` / `x0 6y … FF`); a bare ACK (`x0 4y FF`) is not the
+ * end. Returns the hex of everything received.
+ */
+export function viscaTcp(host: string, port: number, hex: string, timeoutMs: number): Promise<string> {
+  const packet = Buffer.from(hex.replace(/\s/g, ''), 'hex');
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    let received = Buffer.alloc(0);
+    const finish = (err?: Error) => {
+      if (settled) return;
+      settled = true;
+      socket.destroy();
+      if (err) reject(err);
+      else resolve(received.toString('hex'));
+    };
+    const socket = createConnection({ host, port }, () => socket.write(packet));
+    socket.setTimeout(timeoutMs);
+    socket.on('data', (chunk) => {
+      received = Buffer.concat([received, chunk]);
+      if (isViscaDone(received)) finish();
+    });
+    socket.on('timeout', () => (received.length ? finish() : finish(new Error(`VISCA ${host}:${port}: timeout`))));
+    socket.on('error', (err) => finish(err));
+    socket.on('close', () => (received.length ? finish() : finish(new Error(`VISCA ${host}:${port}: closed`))));
+  });
+}
+
+/** True once a completion (y=5) or error (y=6) frame is in the buffer. */
+export function isViscaDone(buf: Buffer): boolean {
+  let start = 0;
+  for (let i = 0; i < buf.length; i++) {
+    if (buf[i] !== 0xff) continue;
+    const y = (buf[start + 1] ?? 0) >> 4;
+    if (i - start >= 2 && (y === 5 || y === 6)) return true;
+    start = i + 1;
+  }
+  return false;
 }
 
 // ── Direction helpers ──────────────────────────────────────────────────────────

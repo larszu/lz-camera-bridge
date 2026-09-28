@@ -62,8 +62,12 @@ export interface BridgeConfig {
   /** HTTP-CGI: Firmware-Familie und Preset-Versatz. */
   cgiFamily?: 'vissonic' | 'sony';
   cgiPresetOffset?: number;
-  /** Multiviewer: Stream-Adresse (RTSP/HLS/MJPEG) aus dem Streaming-Teil der Kamera. */
+  /** Multiviewer: Stream-Adresse (RTSP) aus dem Streaming-Teil der Kamera. Die Bruecke holt sie, das Pult nie. */
   streamUrl?: string;
+  /** Name am Pult. Ein Plan-Label gewinnt. */
+  label?: string;
+  /** Eingang am Mischer, 1-basiert; 0/leer: keiner. Daraus entsteht das Tally je Kamera. */
+  switcherInput?: number;
   /** VISCA ueber RS-232: Geraetepfad, Baudrate, Adresse in der Kette (1..7). */
   viscaSerialPath?: string;
   viscaBaudRate?: number;
@@ -145,4 +149,59 @@ export interface CameraCapabilities {
   contrast?: boolean;
   saturation?: boolean;
   resetCc?: boolean;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Switcher (VIS-CATC) — mirrors packages/bridge/src/switcher/VisCatcClient.ts
+// ═══════════════════════════════════════════════════════════════════════════
+
+export type SwitcherPath = 'http' | 'serial';
+
+export interface SwitcherSerialConfig {
+  transport: 'none' | 'tcp' | 'port';
+  host?: string;
+  port?: number;
+  devicePath?: string;
+  baudRate?: number;
+}
+
+export interface SwitcherConfig {
+  kind?: 'vis-catc';
+  label?: string;
+  host?: string;
+  port?: number;
+  path?: SwitcherPath;
+  serial?: SwitcherSerialConfig;
+  inputLabels?: string[];
+  pgmWindow?: number;
+  timeoutMs?: number;
+}
+
+export interface SwitcherState {
+  outputs: Record<number, number>;
+  mode: number;
+  audio: number;
+  inputSignals: Record<string, boolean>;
+  version: string | null;
+  program: number;
+  preview: number;
+  readAt: number | null;
+}
+
+export interface SwitcherSlot {
+  switcherNumber: number;
+  config: SwitcherConfig;
+  connected: boolean;
+  state: SwitcherState | null;
+  inputLabels: string[] | null;
+}
+
+export type SourceTally = 'program' | 'preview' | 'off';
+export type CameraTally = Record<number, SourceTally>;
+
+export interface SiteInfo {
+  name: string;
+  path: string | null;
+  cameras: number;
+  switchers: number;
 }

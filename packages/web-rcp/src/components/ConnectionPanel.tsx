@@ -52,6 +52,12 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices,
   const [camPort, setCamPort] = useState(String(config.camPort ?? 80));
   const [camUser, setCamUser] = useState(config.camUser ?? '');
   const [camPass, setCamPass] = useState(config.camPass ?? '');
+  const [cgiFamily, setCgiFamily] = useState<'vissonic' | 'sony'>(config.cgiFamily ?? 'vissonic');
+  const [cgiPresetOffset, setCgiPresetOffset] = useState(String(config.cgiPresetOffset ?? (config.cgiFamily === 'sony' ? 0 : -1)));
+  // Picture and tally: for every camera, whatever drives it.
+  const [label, setLabel] = useState(config.label ?? '');
+  const [streamUrl, setStreamUrl] = useState(config.streamUrl ?? '');
+  const [switcherInput, setSwitcherInput] = useState(String(config.switcherInput ?? 0));
   const [hidSel, setHidSel] = useState('');
   // VISCA am Kabel. Eigene Felder und NICHT die des RS-422-Wegs mitbenutzt:
   // das sind zwei verschiedene Protokolle auf zwei verschiedenen Kabeln
@@ -148,15 +154,22 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices,
       cfg.camHost = camHost;
       cfg.camPort = Number(camPort);
       cfg.ccuId = Number(ccuId);
-      if (mode === 'jvc') {
+      if (mode === 'jvc' || mode === 'http-cgi') {
         cfg.camUser = camUser;
         cfg.camPass = camPass;
+      }
+      if (mode === 'http-cgi') {
+        cfg.cgiFamily = cgiFamily;
+        cfg.cgiPresetOffset = Number(cgiPresetOffset);
       }
     } else {
       cfg.serialPath = serialPath;
       cfg.baudRate = Number(baudRate);
       cfg.ccuId = Number(ccuId);
     }
+    cfg.label = label.trim();
+    cfg.streamUrl = streamUrl.trim();
+    cfg.switcherInput = Number(switcherInput) || 0;
     onSetConfig(cfg);
     setTimeout(onConnect, 100);
   };
@@ -173,7 +186,7 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices,
           TCP / network (Sony)
         </button>
         <button className={`mode-tab ${mode === 'serial' ? 'mode-tab--active' : ''}`} onClick={() => setMode('serial')}>
-          8-Pin RS-422 Seriell
+          8-pin RS-422 serial
         </button>
         <button className={`mode-tab ${mode === 'visca-serial' ? 'mode-tab--active' : ''}`} onClick={() => setMode('visca-serial')}>
           VISCA RS-232
@@ -476,22 +489,71 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices,
             <label>Camera no.</label>
             <input value={ccuId} onChange={(e) => setCcuId(e.target.value)} placeholder="0" type="number" />
           </div>
-          {mode === 'jvc' && (
+          {mode === 'http-cgi' && (
+            <div className="field">
+              <label>Firmware family</label>
+              <select
+                className="select-group__select"
+                value={cgiFamily}
+                onChange={(e) => {
+                  const f = e.target.value as 'vissonic' | 'sony';
+                  setCgiFamily(f);
+                  setCgiPresetOffset(String(f === 'sony' ? 0 : -1));
+                }}
+              >
+                <option value="vissonic">Vissonic / PTZOptics (ptzctrl.cgi, no login)</option>
+                <option value="sony">Sony SRG/BRC (/command/, Digest login)</option>
+              </select>
+            </div>
+          )}
+          {(mode === 'jvc' || mode === 'http-cgi') && (
             <>
               <div className="field field--sm">
-                <label>Benutzer</label>
-                <input value={camUser} onChange={(e) => setCamUser(e.target.value)} placeholder="jvc" autoComplete="off" />
+                <label>User</label>
+                <input value={camUser} onChange={(e) => setCamUser(e.target.value)} placeholder={mode === 'jvc' ? 'jvc' : 'admin'} autoComplete="off" />
               </div>
               <div className="field field--sm">
-                <label>Passwort</label>
+                <label>Password</label>
                 <input value={camPass} onChange={(e) => setCamPass(e.target.value)} type="password" autoComplete="new-password" />
               </div>
             </>
+          )}
+          {mode === 'http-cgi' && (
+            <div className="field field--sm">
+              <label>Preset offset</label>
+              <input value={cgiPresetOffset} onChange={(e) => setCgiPresetOffset(e.target.value)} type="number" title="Vissonic firmware counts presets from 0 (−1); Sony from 1 (0)" />
+            </div>
           )}
           <div className="field" style={{ alignSelf: 'flex-end', paddingBottom: '0.25rem' }}>
             <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>{genericMeta.hint}</span>
           </div>
         </div>
+      )}
+
+      {/* Picture and tally — independent of the control path. The stream
+          address stays in the bridge; the panel only ever asks for a number. */}
+      <div className="connection-row">
+        <div className="field">
+          <label>Name</label>
+          <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Stage left" />
+        </div>
+        <div className="field field--sm">
+          <label>Switcher input</label>
+          <input value={switcherInput} onChange={(e) => setSwitcherInput(e.target.value)} type="number" min={0} max={16} placeholder="0" title="Which switcher input carries this picture; 0 = none" />
+        </div>
+      </div>
+      <div className="connection-row">
+        <div className="field">
+          <label>Stream address (RTSP)</label>
+          <input value={streamUrl} onChange={(e) => setStreamUrl(e.target.value)} placeholder="rtsp://user:pass@192.168.1.131/media/video1" autoComplete="off" />
+        </div>
+      </div>
+      {mode === 'http-cgi' && (
+        <p className="hint" style={{ marginBottom: 12 }}>
+          {cgiFamily === 'sony'
+            ? 'Sony SRG: stream is rtsp://<user>:<password>@<ip>/media/video1. Power over the CGI.'
+            : 'Vissonic / PTZOptics: stream is rtsp://<ip>:554/1, no login. Power over VISCA TCP 5678.'}
+        </p>
       )}
 
       <div className="connection-actions">
@@ -505,10 +567,10 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices,
       {/* ── Control surface (e.g. Blackmagic USB-C panel) ── */}
       <div className="control-surface">
         <div className="control-surface__head">
-          <span className="panel__subtitle">Bedienpult (USB-HID)</span>
+          <span className="panel__subtitle">Control panel (USB-HID)</span>
           <span className={`status-dot status-dot--${controlSurfaceActive ? 'ok' : 'err'}`} />
           <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-            {controlSurfaceActive ? 'aktiv' : 'inaktiv'}
+            {controlSurfaceActive ? 'active' : 'inactive'}
           </span>
         </div>
         <div className="serial-port-row">
@@ -527,7 +589,7 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices,
         </div>
         <div className="connection-actions" style={{ marginTop: 6 }}>
           {controlSurfaceActive ? (
-            <button className="btn btn--danger btn--sm" onClick={onDisableControlSurface}>Panel trennen</button>
+            <button className="btn btn--danger btn--sm" onClick={onDisableControlSurface}>Disconnect panel</button>
           ) : (
             <button
               className="btn btn--primary btn--sm"
@@ -537,7 +599,7 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices,
                 if (d) onEnableControlSurface({ vendorId: d.vendorId, productId: d.productId, path: d.path, bindings: [] });
               }}
             >
-              Panel aktivieren
+              Enable panel
             </button>
           )}
         </div>

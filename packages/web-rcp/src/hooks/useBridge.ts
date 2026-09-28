@@ -10,6 +10,7 @@ import { useEffect, useRef, useCallback, useState } from 'react';
 import type {
   CameraState, CameraStatesByNumber, BridgeConfig, WiznetDevice,
   SonyUsbDevice, SonyMncDevice, HidDevice, TallyState,
+  SwitcherSlot, SwitcherState, SwitcherConfig, CameraTally, SiteInfo,
 } from '../types.ts';
 import type {
   CameraConfirmationsByNumber,
@@ -68,7 +69,11 @@ export interface CameraSlot {
 }
 
 const bridgeHost = window.location.hostname || 'localhost';
-const WS_URL = `ws://${bridgeHost}:9700`;
+const BRIDGE_PORT = 9700;
+const WS_URL = `ws://${bridgeHost}:${BRIDGE_PORT}`;
+/** The bridge's HTTP side on the same port: live video and the site download. */
+export const BRIDGE_HTTP = `http://${bridgeHost}:${BRIDGE_PORT}`;
+export const videoUrl = (cameraNumber: number) => `${BRIDGE_HTTP}/video/${cameraNumber}.mjpeg`;
 
 export function useBridge() {
   const ws = useRef<WebSocket | null>(null);
@@ -91,6 +96,9 @@ export function useBridge() {
   const [controlSurfaceActive, setControlSurfaceActive] = useState(false);
   const [tally, setTallyState] = useState<TallyState>({ program: false, preview: false, isoRec: false });
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [switchers, setSwitchers] = useState<Record<number, SwitcherSlot>>({});
+  const [cameraTally, setCameraTally] = useState<CameraTally>({});
+  const [site, setSite] = useState<SiteInfo>({ name: '', path: null, cameras: 0, switchers: 0 });
 
   const connect = useCallback(() => {
     if (ws.current?.readyState === WebSocket.OPEN) return;
@@ -210,6 +218,27 @@ export function useBridge() {
               unmatchedSlots: (msg.unmatchedSlots ?? []) as number[],
             });
             break;
+          case 'switchers': {
+            const rec: Record<number, SwitcherSlot> = {};
+            for (const s of msg.switchers as SwitcherSlot[]) rec[s.switcherNumber] = s;
+            setSwitchers(rec);
+            break;
+          }
+          case 'switcherState':
+            setSwitchers((prev) => {
+              const slot = prev[msg.switcherNumber as number];
+              if (!slot) return prev;
+              return { ...prev, [msg.switcherNumber as number]: { ...slot, state: msg.state as SwitcherState } };
+            });
+            break;
+          case 'cameraTally':
+            setCameraTally(msg.tally as CameraTally);
+            break;
+          case 'site': {
+            const s = msg.site as { cameras: unknown[]; switchers: unknown[] };
+            setSite({ name: String(msg.name ?? ''), path: (msg.path as string | null) ?? null, cameras: s.cameras.length, switchers: s.switchers.length });
+            break;
+          }
         }
       } catch { /* ignore malformed */ }
     };
@@ -268,12 +297,27 @@ export function useBridge() {
     [send],
   );
 
+  // ── Switcher and site ────────────────────────────────────────────────────
+  const setSwitcherConfig = useCallback((switcherNumber: number, switcherConfig: Partial<SwitcherConfig>) =>
+    send('setSwitcherConfig', { switcherNumber, switcherConfig }), [send]);
+  const connectSwitcher = useCallback((switcherNumber: number) => send('connectSwitcher', { switcherNumber }), [send]);
+  const disconnectSwitcher = useCallback((switcherNumber: number) => send('disconnectSwitcher', { switcherNumber }), [send]);
+  const removeSwitcher = useCallback((switcherNumber: number) => send('removeSwitcher', { switcherNumber }), [send]);
+  const switcherCommand = useCallback((switcherNumber: number, cmd: string, params: Record<string, unknown> = {}) =>
+    send('switcherCommand', { switcherNumber, cmd, params }), [send]);
+  const importSite = useCallback((text: string) => send('importSite', { site: text }), [send]);
+  const setSiteName = useCallback((name: string) => send('setSiteName', { name }), [send]);
+  const clearError = useCallback(() => setErrorMsg(null), []);
+
   return {
     status, cameras, cameraStates, cameraOrigins, cameraConfirmations, ports, wiznetDevices, sonyUsbDevices, sonyMncDevices,
     hidDevices, controlSurfaceActive, tally, errorMsg, planMatch,
+    switchers, cameraTally, site,
     send, setCameraConfig, connectCamera, disconnectCamera, removeCamera, sendCommand,
     listPorts, discoverWiznet, configureWiznet, discoverSonyUsb, discoverSonyMnc,
     listHidDevices, enableControlSurface, disableControlSurface, setTally,
     matchCameraPlan, applyCameraPlan, assignPlanCamera,
+    setSwitcherConfig, connectSwitcher, disconnectSwitcher, removeSwitcher, switcherCommand,
+    importSite, setSiteName, clearError,
   };
 }
