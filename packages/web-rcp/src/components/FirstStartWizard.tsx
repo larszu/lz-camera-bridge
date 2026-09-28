@@ -12,7 +12,7 @@ export function markWizardDone(): void {
 }
 
 type CameraType = 'sony-tcp' | 'sony-serial' | 'sony-usb' | 'lumix' | 'canon' | 'blackmagic' | 'sony-mnc'
-  | 'zcam' | 'panasonic-ptz' | 'visca' | 'jvc' | 'birddog';
+  | 'zcam' | 'panasonic-ptz' | 'visca' | 'jvc' | 'birddog' | 'http-cgi';
 
 // Generic network-camera types share the camHost/camPort fields.
 const GENERIC_WIZARD: Record<string, { port: number; label: string }> = {
@@ -21,6 +21,7 @@ const GENERIC_WIZARD: Record<string, { port: number; label: string }> = {
   visca: { port: 1259, label: 'VISCA over IP (PTZ)' },
   jvc: { port: 80, label: 'JVC ConnectedCam' },
   birddog: { port: 8080, label: 'BirdDog' },
+  'http-cgi': { port: 80, label: 'HTTP-CGI PTZ (Vissonic/Sony)' },
 };
 
 interface Props {
@@ -224,6 +225,7 @@ function StepCameraType({ value, onChange }: { value: CameraType; onChange: (v: 
     { id: 'visca', label: 'VISCA over IP – PTZ', sub: 'PTZOptics, Marshall, AVer, Sony/Pana PTZ … (one API, many brands)' },
     { id: 'jvc', label: 'JVC ConnectedCam – HTTP', sub: 'GY-HC900/HC500, GY-HM250… – web API' },
     { id: 'birddog', label: 'BirdDog – REST', sub: 'BirdDog NDI PTZ (P100/P200/P400, Maki, Eyes)' },
+    { id: 'http-cgi', label: 'HTTP-CGI PTZ', sub: 'Vissonic/PTZOptics (ptzctrl.cgi) or Sony SRG/BRC (/command/) – alternative to VISCA' },
   ];
 
   return (
