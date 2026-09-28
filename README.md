@@ -143,20 +143,22 @@ former `av-control-center` application (2026-09-28) and replaces it.
 ## Architecture
 
 ```
-Input surfaces                 Bridge (command bus)              Camera backends
-────────────────               ────────────────────              ───────────────
-Web RCP  ─┐                                                      ┌─ Sony CCU (700PTP)
-PTZ panel ┼─ WebSocket :9700 ─▶  BridgeServer                    ├─ Sony USB (PTP)
-Companion ┼─ HTTP/WS :9701-2 ─▶   dispatchCameraCommand ─(RCP)──▶├─ Canon CCAPI
-HID panel ─┘                      + per-mode connect/state       ├─ Lumix / Z CAM / Canon
-                                                                 ├─ Blackmagic REST
-                                                                 ├─ VISCA (raw / Sony)
-                                                                 └─ Panasonic/JVC/BirdDog PTZ
+Input surfaces                 Bridge :9700 (command bus)          Devices
+────────────────               ──────────────────────────          ───────
+Web panel   ─┐                                                     ┌─ Sony CCU (700PTP) · Sony USB (PTP)
+Cameras/Wall ┼─ WebSocket ────▶  BridgeServer                      ├─ Canon CCAPI · Lumix · Z CAM · Blackmagic
+Switcher     ┤                   camera slots ──(RCP verbs)───────▶├─ VISCA (IP / RS-232) · Panasonic AW · JVC · BirdDog
+Video tiles ─┼─ GET /video/n ─▶  RtspHub (ffmpeg → MJPEG) ◀────────┤  RTSP streams
+Site        ─┘  GET /site.json   site file (persisted)             ├─ HTTP-CGI PTZ (Vissonic/PTZOptics, Sony SRG)
+Companion   ── HTTP/WS :9701-2   switcher slots ──(route/cut)─────▶└─ Vissonic VIS-CATC (HTTP or RS-232)
+HID panel   ── USB                 └─ tally per camera ──▶ every client
 ```
 
-Every backend exposes the same `handleRcpCommand(cmd, params)` contract, so a
-single command vocabulary (`setIris`, `setMasterGain`, `ptz`, `recallPreset`, …)
-fans out to all of them. A visual walk-through lives in
+Every camera backend exposes the same `handleRcpCommand(cmd, params)` contract,
+so a single command vocabulary (`setIris`, `setMasterGain`, `ptz`,
+`recallPreset`, `home`, `setCameraPower`, …) fans out to all of them. A switcher
+is not a camera and has its own slot family and verbs (`preview`, `cut`, `take`,
+`route`, `setLayout`); the bridge derives the tally per camera from both. A visual walk-through lives in
 [`docs/architecture.html`](docs/architecture.html).
 
 Paint values can be trimmed relatively (`cmd: 'nudge'`) instead of only jumped
@@ -297,6 +299,13 @@ npm install node-hid --workspace=packages/bridge   # USB control-panel input
 Open the web UI and follow the setup wizard: pick a camera family, enter its
 address (the wizard shows the right defaults per protocol), and connect. PTZ
 cameras open the joystick panel automatically; paint cameras open the RCP.
+
+The header switches between five views: **Cameras** (one camera, its
+connection and panel), **Wall** (every camera's panel at once), **Switcher**,
+**Video** and **Site**. Under *Cameras* every camera also takes a name, its
+RTSP stream address and its switcher input — that is all the Video and
+Switcher views need. A room that already exists as a site file goes in under
+*Site → Import*; the bridge then connects everything by itself.
 
 - **Sony BRC/SRG PTZ:** choose the *VISCA over IP* tab and set port **52381** —
   the Sony transport header is applied automatically. Where the room blocks
