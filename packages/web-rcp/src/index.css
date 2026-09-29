@@ -826,3 +826,7 @@ input[type="range"]:disabled {
   outline: 2px solid var(--signal);
   outline-offset: 3px;
 }
+
+/* LZ Scopes injects its own panel CSS with a 3 px radius; ADR-007 says none. */
+.scopes .lzs-panel,
+.scopes .lzs-head select { border-radius: 0; }
