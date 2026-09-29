@@ -10,7 +10,15 @@ import { writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
-import { createMjpegParser, mjpegArgs, ffmpegCandidates, checkStreamUrl, isPrivateHost, RtspHub } from '../src/multiview/RtspHub.js';
+import { createMjpegParser, mjpegArgs, ffmpegCandidates, checkStreamUrl, isPrivateHost, RtspHub, explainFfmpegError, inputFlags } from '../src/multiview/RtspHub.js';
+
+test('SRT without libsrt says what to do; RTMP and RTSP get their own input flags', () => {
+  assert.match(explainFfmpegError('srt://10.0.0.1:9000', 'Error opening input: Protocol not found'), /libsrt/);
+  assert.equal(explainFfmpegError('rtsp://10.0.0.1/1', 'Connection refused'), 'Connection refused');
+  assert.deepEqual(inputFlags('rtmp://10.0.0.1/live/a'), ['-rw_timeout', '5000000']);
+  assert.deepEqual(inputFlags('srt://10.0.0.1:9000'), []);
+  assert.equal(inputFlags('rtsp://x/1')[1], 'tcp');
+});
 
 function part(payload: string): Buffer {
   return Buffer.concat([

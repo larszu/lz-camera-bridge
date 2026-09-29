@@ -357,6 +357,9 @@ export function useBridge() {
   const drivePlannedPreset = useCallback((cameraNumber: number, presetNumber: number) => send('drivePlannedPreset', { cameraNumber, presetNumber }), [send]);
   const storePlannedPresets = useCallback((cameraNumber: number, presetNumbers?: number[]) => send('storePlannedPresets', { cameraNumber, presetNumbers }), [send]);
   const calibratePose = useCallback((cameraNumber: number, presetNumber: number) => send('calibratePose', { cameraNumber, presetNumber }), [send]);
+  const zoomTo = useCallback((cameraNumber: number, zoom: number) => send('zoomTo', { cameraNumber, zoom }), [send]);
+  const captureZoomPoint = useCallback((cameraNumber: number, focalMm: number) => send('captureZoomPoint', { cameraNumber, focalMm }), [send]);
+  const clearZoomTable = useCallback((cameraNumber: number) => send('clearZoomTable', { cameraNumber }), [send]);
   const setPoseOffset = useCallback((cameraNumber: number, offset: { pan: number; tilt: number } | null) => send('setPoseOffset', { cameraNumber, offset }), [send]);
 
   return {
@@ -370,5 +373,6 @@ export function useBridge() {
     setSwitcherConfig, connectSwitcher, disconnectSwitcher, removeSwitcher, switcherCommand,
     importSite, setSiteName, clearError,
     poses, plannedProgress, readPose, drivePlannedPreset, storePlannedPresets, calibratePose, setPoseOffset,
+    zoomTo, captureZoomPoint, clearZoomTable,
   };
 }

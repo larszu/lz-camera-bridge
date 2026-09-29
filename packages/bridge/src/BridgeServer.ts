@@ -39,6 +39,11 @@
  *       der Kopf steht von Hand auf diesem Shot; die Differenz zur geplanten
  *       Pose wird als `poseOffset` gemerkt (protocol/ptzPose.ts).
  *   { type: 'setPoseOffset', cameraNumber, offset | null }
+ *   { type: 'zoomTo', cameraNumber, zoom }                 absolute Zoomstellung 0..1
+ *   { type: 'captureZoomPoint', cameraNumber, focalMm }
+ *       liest die Zoomstellung des Kopfs und merkt sie mit der abgelesenen
+ *       Brennweite in `zoomTable` — die gemessene Kurve dieses Modells.
+ *   { type: 'clearZoomTable', cameraNumber }
  *   { type: 'getSite' } | { type: 'importSite', site } | { type: 'setSiteName', name }
  *       Die Anlage als Datei (site/siteFile.ts): Kameras + Mischer. Wird
  *       bei eingeschalteter Persistenz (index.ts, Electron) auf Platte
@@ -164,12 +169,15 @@ interface ClientMessage {
     | 'listSwitchers' | 'setSwitcherConfig' | 'connectSwitcher' | 'disconnectSwitcher' | 'removeSwitcher'
     | 'switcherCommand'
     | 'getSite' | 'importSite' | 'setSiteName'
-    | 'readPose' | 'drivePlannedPreset' | 'storePlannedPresets' | 'calibratePose' | 'setPoseOffset';
+    | 'readPose' | 'drivePlannedPreset' | 'storePlannedPresets' | 'calibratePose' | 'setPoseOffset'
+    | 'zoomTo' | 'captureZoomPoint' | 'clearZoomTable';
   cameraNumber?: number;
   presetNumber?: number;
   presetNumbers?: number[];
   settleMs?: number;
   offset?: { pan: number; tilt: number } | null;
+  zoom?: number;
+  focalMm?: number;
   config?: CameraConfig;
   switcherNumber?: number;
   switcherConfig?: SwitcherConfig;
@@ -422,6 +430,42 @@ export class BridgeServer {
       case 'calibratePose': {
         const num = msg.cameraNumber ?? 0;
         await this.calibratePose(ws, num, msg.presetNumber ?? -1);
+        break;
+      }
+
+      case 'zoomTo': {
+        const num = msg.cameraNumber ?? 0;
+        const z = Number(msg.zoom);
+        if (!Number.isFinite(z)) { this.sendError(ws, 'zoomTo needs a zoom between 0 and 1', num); break; }
+        await this.dispatchCommand(ws, num, 'zoomAbsolute', { zoom: Math.min(1, Math.max(0, z)) });
+        break;
+      }
+
+      case 'captureZoomPoint': {
+        const num = msg.cameraNumber ?? 0;
+        const slot = this.cameras.get(num);
+        const focal = Number(msg.focalMm);
+        if (!slot) { this.sendError(ws, `Camera ${num} is not configured`, num); break; }
+        if (!Number.isFinite(focal) || focal <= 0) { this.sendError(ws, 'A focal length in mm is needed', num); break; }
+        const pose = await this.readPose(ws, num);
+        if (!pose) break;
+        if (pose.zoom === undefined) { this.sendError(ws, `Camera ${num} does not report its zoom position`, num); break; }
+        // Ein Punkt je Stellung: eine zweite Messung an derselben Stellung ersetzt die erste.
+        const rest = (slot.config.zoomTable ?? []).filter((p) => Math.abs(p.position - pose.zoom!) > 0.005);
+        slot.config.zoomTable = [...rest, { position: pose.zoom, focalMm: focal }].sort((a, b) => a.position - b.position);
+        this.broadcast({ type: 'pose', cameraNumber: num, pose });
+        this.broadcastCameras();
+        this.siteChanged();
+        break;
+      }
+
+      case 'clearZoomTable': {
+        const num = msg.cameraNumber ?? 0;
+        const slot = this.cameras.get(num);
+        if (!slot) { this.sendError(ws, `Camera ${num} is not configured`, num); break; }
+        delete slot.config.zoomTable;
+        this.broadcastCameras();
+        this.siteChanged();
         break;
       }
 

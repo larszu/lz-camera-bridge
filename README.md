@@ -6,7 +6,7 @@ AW‑RP150 — plus a normalizing **command bus** that drives cameras from many
 vendors over their native protocols. The same commands also reach every camera
 from a Bitfocus **Companion** surface or a USB **control panel**.
 
-![LZ Camera Bridge – Web-Oberfläche mit dem Einrichtungs-Assistenten](docs/screenshot.png)
+![LZ Camera Bridge — PTZ panel with the planned shots of a camera and its zoom curve](docs/screenshots/ptz-planned-shots.png)
 
 > **Status:** the bridge, protocols and UI are real and build clean; a
 > committed unit-test suite covers the protocol framing. Where a family was
@@ -113,7 +113,10 @@ device stays silent, is in [`docs/dji-gimbal.md`](docs/dji-gimbal.md).
   stores them in the head's own preset memory, and takes a one-time
   **offset** on site: steer the head onto one known shot, click *Head is
   here*, and the mounting error is applied to every shot. From then on any
-  panel or Companion recalls them by number. Details in
+  panel or Companion recalls them by number. Zoom from a focal length is
+  estimated between the ends of the lens until a **zoom curve** is measured:
+  drive the zoom to 0/25/50/75/100 %, read the focal length off the lens or
+  the camera menu, *Record point*. Details in
   [`docs/camera-plan.md`](docs/camera-plan.md).
 
 ## Control room: switcher, video wall, site
@@ -140,7 +143,9 @@ former `av-control-center` application (2026-09-28) and replaces it.
   double-click to take. *Own window* opens the tiles alone for a second
   screen. The stream address never leaves the bridge. ffmpeg is looked for
   in `LZ_BRIDGE_FFMPEG`, `ffmpeg-portable/`, then `PATH`; the desktop app
-  brings its own.
+  brings its own. **SRT needs an ffmpeg built with libsrt** — the bundled
+  one and Homebrew's default formula have none (RTSP and RTMP work with
+  both); the tile says so instead of staying black.
 - **Scopes** — *Scopes* on a video tile opens waveform (luma) and
   vectorscope under it; each panel's header switches to RGB parade,
   histogram, CIE and more, *4 scopes* fills the window with waveform,
@@ -155,6 +160,18 @@ former `av-control-center` application (2026-09-28) and replaces it.
   settings export of the old av-control-center, so an existing room moves
   with one file. The file carries the camera logins; keep it out of
   repositories.
+
+### Screens
+
+| | |
+|---|---|
+| ![Switcher view: programme row over preview row, CUT, the twelve layouts](docs/screenshots/switcher.png) | ![Video view: live tiles with programme and preview tally](docs/screenshots/video.png) |
+| **Switcher** — PGM over PVW, CUT, layouts, audio | **Video** — live tiles from RTSP/RTMP/SRT, tally on the top edge |
+| ![Wall view: every camera's panel at once](docs/screenshots/wall.png) | ![Site view: cameras and switcher of the room, export and import](docs/screenshots/site.png) |
+| **Wall** — every camera's panel at once | **Site** — the room as one file |
+
+Taken 2026-09-29 against demo cameras, a switcher stand-in and ffmpeg test
+patterns streamed over RTMP — no real room, so nothing to blank out.
 
 ## Architecture
 

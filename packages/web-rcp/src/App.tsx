@@ -85,6 +85,7 @@ export default function App() {
     setSwitcherConfig, connectSwitcher, disconnectSwitcher, removeSwitcher, switcherCommand,
     importSite, setSiteName, clearError,
     poses, plannedProgress, readPose, drivePlannedPreset, storePlannedPresets, calibratePose, setPoseOffset,
+    zoomTo, captureZoomPoint, clearZoomTable,
   } = bridge;
 
   const camNumbers = useMemo(
@@ -436,6 +437,9 @@ export default function App() {
                       onCalibrate={(n) => calibratePose(selected, n)}
                       onClearOffset={() => setPoseOffset(selected, null)}
                       onReadPose={() => readPose(selected)}
+                      onZoomTo={(z) => zoomTo(selected, z)}
+                      onCaptureZoom={(mm) => captureZoomPoint(selected, mm)}
+                      onClearZoomTable={() => clearZoomTable(selected)}
                     />
                   )}
                 </>

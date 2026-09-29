@@ -106,7 +106,8 @@ interface TileProps {
 
 function Tile({ cam, tally, canSwitch, onPreview, onTake, onEdit }: TileProps) {
   const num = cam.cameraNumber;
-  const name = cam.plan?.label ?? cam.config.label ?? '';
+  // Without the leading "CAM n" a plan label would repeat next to the number.
+  const name = (cam.plan?.label ?? cam.config.label ?? '').replace(/^cam\s*\d+\s*[—–-]?\s*/i, '');
   const hasStream = Boolean(cam.config.streamUrl);
   // A broken <img> stays broken; a new URL (cache-buster) reconnects it.
   const [attempt, setAttempt] = useState(0);
