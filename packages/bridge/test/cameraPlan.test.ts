@@ -31,7 +31,7 @@ test('parseCameraPlan nimmt nur an, was ein Kamera-Plan ist', () => {
   assert.equal(parseCameraPlan('{"kind":"etwas-anderes","formatVersion":1,"cameras":[]}'), null);
   // Eine kuenftige Version ist keine, die dieser Leser versteht. Sie
   // durchzuwinken hiesse, Felder still zu ignorieren, die etwas bedeuten.
-  assert.equal(parseCameraPlan('{"kind":"camera-list","formatVersion":2,"cameras":[]}'), null);
+  assert.equal(parseCameraPlan('{"kind":"camera-list","formatVersion":9,"cameras":[]}'), null);
   const p = parseCameraPlan(JSON.stringify(plan([{ id: 'c1', label: 'CAM 1', model: 'FX9' }])));
   assert.equal(p?.cameras.length, 1);
   assert.equal(p?.cameras[0].model, 'FX9');

@@ -106,6 +106,15 @@ device stays silent, is in [`docs/dji-gimbal.md`](docs/dji-gimbal.md).
   axes/buttons onto the command bus, so one panel controls any brand.
 - **Keyboard** — on the PTZ panel the arrow keys drive while held, `1`–`9`
   recall presets, `Home` goes home; a window that loses focus stops the head.
+- **Planned shots** — the MultiCam Planner's camera list (v3) carries each
+  camera's heading and its shots as pan/tilt/focal length in the room frame.
+  The bridge turns them into head angles, drives them (`ptzAbsolute` on
+  VISCA, Sony CGI, Panasonic AW and the Vissonic heads via VISCA TCP),
+  stores them in the head's own preset memory, and takes a one-time
+  **offset** on site: steer the head onto one known shot, click *Head is
+  here*, and the mounting error is applied to every shot. From then on any
+  panel or Companion recalls them by number. Details in
+  [`docs/camera-plan.md`](docs/camera-plan.md).
 
 ## Control room: switcher, video wall, site
 
@@ -125,8 +134,8 @@ former `av-control-center` application (2026-09-28) and replaces it.
   derives programme/preview from the switcher and shows it on the camera list,
   the wall, the PTZ panel and the video tiles. Companion gets
   `switcherPreview`, `switcherTake`, `switcherCut`.
-- **Video** — live tiles from each camera's RTSP address. The bridge runs one
-  ffmpeg per stream and serves `GET /video/<n>.mjpeg` on its own port; the
+- **Video** — live tiles from each camera's stream address (RTSP, SRT or
+  RTMP). The bridge runs one ffmpeg per stream and serves `GET /video/<n>.mjpeg` on its own port; the
   page shows it in an `<img>`, no player. Click a tile to preview its input,
   double-click to take. *Own window* opens the tiles alone for a second
   screen. The stream address never leaves the bridge. ffmpeg is looked for

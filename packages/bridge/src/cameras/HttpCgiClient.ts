@@ -40,6 +40,11 @@ import { EventEmitter } from 'events';
 import { createHash, randomBytes } from 'crypto';
 import { createConnection } from 'net';
 import { CameraState } from '../protocol/CcuClient.js';
+import {
+  parseSonyCgiPose, sonyCgiAbsolutePanTilt, sonyCgiAbsoluteZoom,
+  viscaAbsolutePanTilt, viscaZoomDirect, VISCA_INQ_PAN_TILT, VISCA_INQ_ZOOM,
+  parseViscaPanTilt, parseViscaZoom, VISCA_UNITS_PER_DEG, type Pose,
+} from '../protocol/ptzPose.js';
 
 export type CgiFamily = 'vissonic' | 'sony';
 
@@ -57,8 +62,10 @@ export interface HttpCgiOptions {
   presetOffset?: number;
   /** Poll the power state in this rhythm (ms). 0 disables. */
   powerPollMs?: number;
-  /** VISCA-over-TCP port of a PTZOptics-style head (power only). */
+  /** VISCA-over-TCP port of a PTZOptics-style head (power and absolute pose). */
   viscaPort?: number;
+  /** Position units per degree (VISCA scale), default 14.4. */
+  unitsPerDeg?: number;
 }
 
 export const VISCA_TCP_PORT = 5678;
@@ -108,6 +115,7 @@ export class HttpCgiClient extends EventEmitter {
   private readonly presetOffset: number;
   private readonly powerPollMs: number;
   private readonly viscaPort: number;
+  private readonly unitsPerDeg: number;
   private connected = false;
   private readonly _state: CameraState = {};
   private queue: Job[] = [];
@@ -125,6 +133,7 @@ export class HttpCgiClient extends EventEmitter {
     this.presetOffset = opts.presetOffset ?? (this.family === 'vissonic' ? -1 : 0);
     this.powerPollMs = opts.powerPollMs ?? POWER_POLL_MS;
     this.viscaPort = opts.viscaPort ?? VISCA_TCP_PORT;
+    this.unitsPerDeg = opts.unitsPerDeg ?? VISCA_UNITS_PER_DEG;
   }
 
   get isConnected(): boolean {
@@ -196,6 +205,32 @@ export class HttpCgiClient extends EventEmitter {
       case 'storePreset':
         await this.enqueue('other', () => this.request(this.presetPath('set', num('value'))));
         return true;
+      case 'ptzAbsolute': {
+        // The PTZOptics-style CGI has no absolute verb; those heads take VISCA
+        // over TCP 5678 (measured on the installation) — the same packets
+        // ViscaClient sends over UDP. Sony's CGI has AbsolutePanTilt.
+        const pan = num('pan');
+        const tilt = num('tilt');
+        const zoom = params['zoom'] !== undefined ? num('zoom') : undefined;
+        await this.enqueue('other', async () => {
+          if (this.family === 'sony') {
+            await this.request(sonyCgiAbsolutePanTilt(pan, tilt, 24, this.unitsPerDeg));
+            if (zoom !== undefined) await this.request(sonyCgiAbsoluteZoom(zoom));
+          } else {
+            await viscaTcp(this.host, this.viscaPort, hex(viscaAbsolutePanTilt(pan, tilt, this.unitsPerDeg)), 4000);
+            if (zoom !== undefined) await viscaTcp(this.host, this.viscaPort, hex(viscaZoomDirect(zoom)), 4000);
+          }
+        });
+        return true;
+      }
+      case 'zoomAbsolute': {
+        const zoom = num('zoom');
+        await this.enqueue('other', async () => {
+          if (this.family === 'sony') await this.request(sonyCgiAbsoluteZoom(zoom));
+          else await viscaTcp(this.host, this.viscaPort, hex(viscaZoomDirect(zoom)), 4000);
+        });
+        return true;
+      }
       case 'osd': {
         // On-screen menu: only the PTZOptics-style firmware exposes it over CGI.
         if (this.family !== 'vissonic') return false;
@@ -229,6 +264,22 @@ export class HttpCgiClient extends EventEmitter {
         console.log(`[HTTP-CGI] Unbekanntes oder nicht unterstütztes Kommando: ${cmd}`);
         return false;
     }
+  }
+
+  /** Where the head is. Sony: `inquiry.cgi?inq=ptzf`; Vissonic: VISCA inquiries over TCP. */
+  async readPose(): Promise<Pose> {
+    if (this.family === 'sony') {
+      const pose = parseSonyCgiPose(await this.request('/command/inquiry.cgi?inq=ptzf'), this.unitsPerDeg);
+      if (!pose) throw new Error('Sony CGI: AbsolutePTZF missing in the answer');
+      return pose;
+    }
+    const pt = parseViscaPanTilt(Buffer.from(await viscaTcp(this.host, this.viscaPort, hex(VISCA_INQ_PAN_TILT), 3000), 'hex'), this.unitsPerDeg);
+    if (!pt) throw new Error('VISCA: pan/tilt answer unreadable');
+    let zoom: number | undefined;
+    try {
+      zoom = parseViscaZoom(Buffer.from(await viscaTcp(this.host, this.viscaPort, hex(VISCA_INQ_ZOOM), 3000), 'hex')) ?? undefined;
+    } catch { /* pose without zoom */ }
+    return { ...pt, ...(zoom !== undefined ? { zoom } : {}) };
   }
 
   /** Ask the head whether it is on. Emits `stateChanged` only with an answer — never guesses. */
@@ -464,6 +515,10 @@ export function isViscaDone(buf: Buffer): boolean {
     start = i + 1;
   }
   return false;
+}
+
+function hex(bytes: number[]): string {
+  return Buffer.from(bytes).toString('hex');
 }
 
 // ── Direction helpers ──────────────────────────────────────────────────────────

@@ -10,6 +10,7 @@ import { SwitcherPanel } from './components/SwitcherPanel.tsx';
 import { SwitcherConfigPanel } from './components/SwitcherConfigPanel.tsx';
 import { VideoWall } from './components/VideoWall.tsx';
 import { SitePanel } from './components/SitePanel.tsx';
+import { PlannedShots } from './components/PlannedShots.tsx';
 import { FirstStartWizard, isWizardDone } from './components/FirstStartWizard.tsx';
 import { capabilitiesForMode, isPtzMode } from './capabilities.ts';
 import type { BridgeConfig, WiznetDevice } from './types.ts';
@@ -83,6 +84,7 @@ export default function App() {
     matchCameraPlan, applyCameraPlan,
     setSwitcherConfig, connectSwitcher, disconnectSwitcher, removeSwitcher, switcherCommand,
     importSite, setSiteName, clearError,
+    poses, plannedProgress, readPose, drivePlannedPreset, storePlannedPresets, calibratePose, setPoseOffset,
   } = bridge;
 
   const camNumbers = useMemo(
@@ -413,15 +415,30 @@ export default function App() {
               </div>
 
               {panelView === 'ptz' ? (
-                <PtzPanel
-                  cameraId={selected}
-                  label={cam?.plan?.label ?? cam?.config.label}
-                  disabled={!connected}
-                  onCommand={onCommand}
-                  extras={ptzExtrasFor(config)}
-                  power={shownState.cameraPower}
-                  tally={cameraTally[selected]}
-                />
+                <>
+                  <PtzPanel
+                    cameraId={selected}
+                    label={cam?.plan?.label ?? cam?.config.label}
+                    disabled={!connected}
+                    onCommand={onCommand}
+                    extras={ptzExtrasFor(config)}
+                    power={shownState.cameraPower}
+                    tally={cameraTally[selected]}
+                  />
+                  {cam && (
+                    <PlannedShots
+                      cam={cam}
+                      connected={connected}
+                      pose={poses[selected]}
+                      progress={plannedProgress[selected]}
+                      onDrive={(n) => drivePlannedPreset(selected, n)}
+                      onStoreAll={() => storePlannedPresets(selected)}
+                      onCalibrate={(n) => calibratePose(selected, n)}
+                      onClearOffset={() => setPoseOffset(selected, null)}
+                      onReadPose={() => readPose(selected)}
+                    />
+                  )}
+                </>
               ) : (
                 <SonyRcpPanel
                   state={shownState}
