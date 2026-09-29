@@ -34,7 +34,34 @@
  */
 
 export const CAMERA_LIST_KIND = 'camera-list';
-export const CAMERA_LIST_VERSION = 1;
+/** Gelesen werden v1 bis v3; geschrieben wird hier nichts. */
+export const CAMERA_LIST_READABLE_VERSIONS: readonly number[] = [1, 2, 3];
+export const CAMERA_LIST_VERSION = 3;
+
+/**
+ * Ein geplanter Shot (v3): Pan/Tilt in Grad im RAUM (MultiCam: Pan 0 = nach
+ * rechts im Grundriss, im Uhrzeigersinn positiv; Tilt negativ = nach unten),
+ * Brennweite und Fokusdistanz. Wie daraus eine Kopf-Pose wird, steht in
+ * `protocol/ptzPose.ts`.
+ */
+export interface PlanPreset {
+  number: number;
+  name: string;
+  segment?: string;
+  pan: number;
+  tilt: number;
+  focalMm?: number;
+  focusM?: number;
+  savedAt?: string;
+}
+
+export interface PlanLens {
+  manufacturer?: string;
+  model?: string;
+  focalMinMm?: number;
+  focalMaxMm?: number;
+  mount?: string;
+}
 
 /** Eine geplante Kamera, wie der MultiCam-Planner sie herausgibt. */
 export interface PlanCamera {
@@ -44,9 +71,18 @@ export interface PlanCamera {
   model?: string;
   /** Stabile Geraetetyp-Identitaet. Hier nur durchgereicht. */
   deviceTypeId?: string;
-  /** Meter im Raum, von links / von oben. */
+  /** Meter im Raum, von links / von oben; z = Hoehe. */
   x?: number;
   y?: number;
+  z?: number;
+  /** v3: geplante Ausrichtung des Kopfs in Ruhe — die Heimat-Richtung, Grad im Raum. */
+  pan?: number;
+  tilt?: number;
+  /** v2: eingestellte Brennweite und Optik. */
+  focalMm?: number;
+  lens?: PlanLens;
+  /** v3: gespeicherte Shots, nach Nummer. */
+  presets?: PlanPreset[];
 }
 
 export interface CameraPlan {
@@ -104,28 +140,63 @@ export function parseCameraPlan(text: string): CameraPlan | null {
   if (!roh || typeof roh !== 'object') return null;
   const o = roh as Record<string, unknown>;
   if (o.kind !== CAMERA_LIST_KIND) return null;
-  if (o.formatVersion !== CAMERA_LIST_VERSION) return null;
+  // Eine unbekannte Version wird benannt abgelehnt, nicht still gelesen: der
+  // Vertrag der Liste (cameraListContract) verlangt, dass ein Leser, der
+  // eine Version nicht kennt, die Presets nicht einfach verliert.
+  if (typeof o.formatVersion !== 'number' || !CAMERA_LIST_READABLE_VERSIONS.includes(o.formatVersion)) return null;
   if (!Array.isArray(o.cameras)) return null;
+
+  const num = (v: unknown): number | undefined => (typeof v === 'number' && Number.isFinite(v) ? v : undefined);
+  const str = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() !== '' ? v : undefined);
+  const nurBekannt = <T extends object>(obj: T): T =>
+    Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined)) as T;
 
   const cameras: PlanCamera[] = [];
   for (const c of o.cameras as unknown[]) {
     if (!c || typeof c !== 'object') continue;
     const x = c as Record<string, unknown>;
     if (typeof x.id !== 'string' || typeof x.label !== 'string') continue;
-    cameras.push({
+    const lensRaw = x.lens && typeof x.lens === 'object' ? (x.lens as Record<string, unknown>) : null;
+    const lens = lensRaw
+      ? nurBekannt<PlanLens>({
+          manufacturer: str(lensRaw.manufacturer), model: str(lensRaw.model),
+          focalMinMm: num(lensRaw.focalMinMm), focalMaxMm: num(lensRaw.focalMaxMm), mount: str(lensRaw.mount),
+        })
+      : undefined;
+    const presets: PlanPreset[] = [];
+    if (Array.isArray(x.presets)) {
+      for (const p of x.presets as unknown[]) {
+        if (!p || typeof p !== 'object') continue;
+        const q = p as Record<string, unknown>;
+        const number = num(q.number);
+        const pan = num(q.pan);
+        const tilt = num(q.tilt);
+        if (number === undefined || !Number.isInteger(number) || number < 0 || pan === undefined || tilt === undefined) continue;
+        presets.push(nurBekannt<PlanPreset>({
+          number, pan, tilt,
+          name: typeof q.name === 'string' ? q.name : '',
+          segment: str(q.segment), focalMm: num(q.focalMm), focusM: num(q.focusM), savedAt: str(q.savedAt),
+        }));
+      }
+      presets.sort((a, b) => a.number - b.number);
+    }
+    cameras.push(nurBekannt<PlanCamera>({
       id: x.id,
       label: x.label,
-      ...(typeof x.manufacturer === 'string' ? { manufacturer: x.manufacturer } : {}),
-      ...(typeof x.model === 'string' ? { model: x.model } : {}),
-      ...(typeof x.deviceTypeId === 'string' ? { deviceTypeId: x.deviceTypeId } : {}),
-      ...(typeof x.x === 'number' ? { x: x.x } : {}),
-      ...(typeof x.y === 'number' ? { y: x.y } : {}),
-    });
+      manufacturer: str(x.manufacturer),
+      model: str(x.model),
+      deviceTypeId: str(x.deviceTypeId),
+      x: num(x.x), y: num(x.y), z: num(x.z),
+      pan: num(x.pan), tilt: num(x.tilt),
+      focalMm: num(x.focalMm),
+      lens: lens && Object.keys(lens).length ? lens : undefined,
+      presets: presets.length ? presets : undefined,
+    }));
   }
 
   return {
     kind: CAMERA_LIST_KIND,
-    formatVersion: CAMERA_LIST_VERSION,
+    formatVersion: o.formatVersion,
     app: typeof o.app === 'string' ? o.app : '',
     appVersion: typeof o.appVersion === 'string' ? o.appVersion : '',
     exportedAt: typeof o.exportedAt === 'string' ? o.exportedAt : '',

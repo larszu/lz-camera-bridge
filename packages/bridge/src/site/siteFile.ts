@@ -27,6 +27,7 @@
  */
 import type { CameraConfig } from '../cameras/backendFactory.js';
 import type { SwitcherConfig } from '../switcher/VisCatcClient.js';
+import type { PlanCamera } from '../plan/cameraPlan.js';
 
 export const SITE_KIND = 'lz-site';
 export const SITE_FORMAT_VERSION = 1;
@@ -35,6 +36,9 @@ export interface SiteCamera {
   cameraNumber: number;
   config: CameraConfig;
   autoConnect?: boolean;
+  /** The planned camera on this slot (label, heading, shots) — kept so planned presets survive a restart. */
+  plan?: PlanCamera;
+  planMatchedBy?: 'model' | 'number' | 'manual';
 }
 
 export interface SiteSwitcher {
@@ -83,7 +87,13 @@ function normaliseSite(obj: Record<string, unknown>): SiteFile {
     const n = Number(c?.cameraNumber);
     if (!Number.isInteger(n) || n < 1 || seenCam.has(n) || !c.config || typeof c.config !== 'object') continue;
     seenCam.add(n);
-    site.cameras.push({ cameraNumber: n, config: c.config as CameraConfig, autoConnect: c.autoConnect !== false });
+    const plan = c.plan && typeof c.plan === 'object' && typeof (c.plan as PlanCamera).id === 'string' ? (c.plan as PlanCamera) : undefined;
+    site.cameras.push({
+      cameraNumber: n,
+      config: c.config as CameraConfig,
+      autoConnect: c.autoConnect !== false,
+      ...(plan ? { plan, planMatchedBy: (['model', 'number', 'manual'] as const).find((m) => m === c.planMatchedBy) ?? 'manual' } : {}),
+    });
   }
   const seenSw = new Set<number>();
   for (const s of switchers as Record<string, unknown>[]) {

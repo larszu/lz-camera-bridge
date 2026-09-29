@@ -22,6 +22,16 @@ import type {
 export type ConnectionStatus = 'idle' | 'connecting' | 'connected' | 'error' | 'disconnected';
 
 /** Eine geplante Kamera aus dem MultiCam-Planner (B-41.1). */
+export interface PlanPreset {
+  number: number;
+  name: string;
+  segment?: string;
+  pan: number;
+  tilt: number;
+  focalMm?: number;
+  focusM?: number;
+}
+
 export interface PlanCamera {
   id: string;
   label: string;
@@ -29,6 +39,23 @@ export interface PlanCamera {
   model?: string;
   x?: number;
   y?: number;
+  z?: number;
+  /** v3: planned heading of the head at rest (room frame) and its shots. */
+  pan?: number;
+  tilt?: number;
+  lens?: { focalMinMm?: number; focalMaxMm?: number; model?: string };
+  presets?: PlanPreset[];
+}
+
+export interface Pose { pan: number; tilt: number; zoom?: number }
+
+export interface PlannedProgress {
+  cameraNumber: number;
+  presetNumber: number;
+  step: 'driving' | 'stored' | 'failed' | 'done';
+  message?: string;
+  fit?: string;
+  at: number;
 }
 
 /** Wie eine Zuordnung belegt ist. Ein Vorschlag darf nicht wie eine Tatsache aussehen. */
@@ -99,6 +126,8 @@ export function useBridge() {
   const [switchers, setSwitchers] = useState<Record<number, SwitcherSlot>>({});
   const [cameraTally, setCameraTally] = useState<CameraTally>({});
   const [site, setSite] = useState<SiteInfo>({ name: '', path: null, cameras: 0, switchers: 0 });
+  const [poses, setPoses] = useState<Record<number, Pose>>({});
+  const [plannedProgress, setPlannedProgress] = useState<Record<number, PlannedProgress>>({});
 
   const connect = useCallback(() => {
     if (ws.current?.readyState === WebSocket.OPEN) return;
@@ -234,6 +263,19 @@ export function useBridge() {
           case 'cameraTally':
             setCameraTally(msg.tally as CameraTally);
             break;
+          case 'pose':
+            setPoses((prev) => ({ ...prev, [msg.cameraNumber as number]: msg.pose as Pose }));
+            break;
+          case 'plannedProgress':
+            setPlannedProgress((prev) => ({
+              ...prev,
+              [msg.cameraNumber as number]: {
+                cameraNumber: msg.cameraNumber as number, presetNumber: msg.presetNumber as number,
+                step: msg.step as PlannedProgress['step'], message: msg.message as string | undefined,
+                fit: msg.fit as string | undefined, at: Date.now(),
+              },
+            }));
+            break;
           case 'site': {
             const s = msg.site as { cameras: unknown[]; switchers: unknown[] };
             setSite({ name: String(msg.name ?? ''), path: (msg.path as string | null) ?? null, cameras: s.cameras.length, switchers: s.switchers.length });
@@ -308,6 +350,11 @@ export function useBridge() {
   const importSite = useCallback((text: string) => send('importSite', { site: text }), [send]);
   const setSiteName = useCallback((name: string) => send('setSiteName', { name }), [send]);
   const clearError = useCallback(() => setErrorMsg(null), []);
+  const readPose = useCallback((cameraNumber: number) => send('readPose', { cameraNumber }), [send]);
+  const drivePlannedPreset = useCallback((cameraNumber: number, presetNumber: number) => send('drivePlannedPreset', { cameraNumber, presetNumber }), [send]);
+  const storePlannedPresets = useCallback((cameraNumber: number, presetNumbers?: number[]) => send('storePlannedPresets', { cameraNumber, presetNumbers }), [send]);
+  const calibratePose = useCallback((cameraNumber: number, presetNumber: number) => send('calibratePose', { cameraNumber, presetNumber }), [send]);
+  const setPoseOffset = useCallback((cameraNumber: number, offset: { pan: number; tilt: number } | null) => send('setPoseOffset', { cameraNumber, offset }), [send]);
 
   return {
     status, cameras, cameraStates, cameraOrigins, cameraConfirmations, ports, wiznetDevices, sonyUsbDevices, sonyMncDevices,
@@ -319,5 +366,6 @@ export function useBridge() {
     matchCameraPlan, applyCameraPlan, assignPlanCamera,
     setSwitcherConfig, connectSwitcher, disconnectSwitcher, removeSwitcher, switcherCommand,
     importSite, setSiteName, clearError,
+    poses, plannedProgress, readPose, drivePlannedPreset, storePlannedPresets, calibratePose, setPoseOffset,
   };
 }

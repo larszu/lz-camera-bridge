@@ -67,3 +67,54 @@ Schreibweisen, zwei gleiche Modelle am Bus ergeben nichts, die Gegenrichtung
 derselben Regel, Modell schlägt Nummer, eine Zuordnung von Hand überlebt den
 Abgleich, ein Slot wird höchstens einmal vergeben, und ohne Beleg steht ein
 Grund da statt eines Schweigens.
+
+
+## Geplante Shots anfahren und speichern (v3)
+
+Seit v3 traegt die Kamera-Liste je Kamera die geplante **Ausrichtung** (`pan`,
+`tilt`, Grad im Raum: Pan 0 = nach rechts im Grundriss, im Uhrzeigersinn
+positiv; Tilt negativ = nach unten) und ihre **Shots** (`presets[]`: Nummer,
+Name, Pan, Tilt, Brennweite, Fokusdistanz). Die Bruecke liest v1 bis v3 und
+lehnt eine unbekannte Version benannt ab.
+
+`protocol/ptzPose.ts` rechnet einen Shot in eine Kopf-Pose um:
+
+```
+headPan  = shotPan  − homeHeading + offset.pan
+headTilt = shotTilt              + offset.tilt
+```
+
+`homeHeading` ist die Raumrichtung, in die der Kopf bei Pan 0 schaut — die
+geplante Ausrichtung der Kamera, solange die Anlage nichts anderes sagt
+(`config.homeHeading`). `offset` ist der Montagefehler, **vor Ort gemessen**:
+Kopf von Hand auf einen bekannten Shot steuern, *Head is here* — die Bruecke
+liest die echte Pose des Kopfs und merkt sich die Differenz zur geplanten.
+Ein Kopf, der 3° neben der Zeichnung sitzt, setzt jeden Shot 3° daneben; eine
+Messung korrigiert alle. Der Offset steht in der Anlagendatei.
+
+**Zoom** ist die ehrliche Luecke: der Kopf nimmt eine Zoom-*Position*
+(VISCA 0..0x4000, AW 0x555..0xFFF), der Plan kennt eine *Brennweite*. Die
+beiden Enden sind Definitionen (Position 0 = weit, Maximum = tele); dazwischen
+ist die Kurve je Modell nichtlinear. Ohne gemessene Tabelle interpoliert die
+Bruecke linear und sagt das (`fit: 'linear'`, im Panel „zoom estimated"); mit
+`config.zoomTable` (`[{ position, focalMm }]`, an diesem Modell gemessen)
+zwischen den Messpunkten.
+
+Absolute Fahrten je Weg:
+
+| Weg | Anfahren | Pose lesen |
+|---|---|---|
+| VISCA (IP, RS-232) | `81 01 06 02 …` AbsolutePosition, `81 01 04 47` Zoom Direct | `81 09 06 12`, `81 09 04 47` |
+| Sony SRG/BRC CGI | `ptzf.cgi?AbsolutePanTilt=`, `AbsoluteZoom=` | `inquiry.cgi?inq=ptzf` → `AbsolutePTZF` |
+| Vissonic / PTZOptics CGI | keine absolute CGI — VISCA ueber TCP 5678 | VISCA ueber TCP 5678 |
+| Panasonic AW | `#APC`, `#AXZ` | `#APC`, `#GZ` |
+
+Skala: 14,4 VISCA-Einheiten je Grad (Sony BRC/SRG, PTZOptics: ±170° = ±0x0990);
+`config.unitsPerDeg` fuer Koepfe, die abweichen. AW: ±175° = 0x2D08..0xD2F5.
+Die Tilt-Endwerte der AW-Koepfe sind *tuning*, nicht am Geraet gelesen.
+
+Nachrichten: `drivePlannedPreset`, `storePlannedPresets` (faehrt jeden Shot
+an, wartet `settleMs`, dann `storePreset` — Fortschritt als
+`plannedProgress`), `calibratePose`, `setPoseOffset`, `readPose` → `pose`.
+Die Demo-Kamera fuehrt eine Pose und ist damit der Pruefstand ohne Hardware
+(`test/plannedShots.test.ts`).

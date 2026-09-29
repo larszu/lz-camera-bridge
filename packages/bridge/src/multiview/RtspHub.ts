@@ -52,12 +52,23 @@ export function ffmpegCandidates(env = process.env, root = process.cwd(), os = p
   return list;
 }
 
+/**
+ * RTSP, SRT and RTMP(S) all come through one ffmpeg; only the input flags
+ * differ. RTSP is forced onto TCP (UDP loses frames on Wi-Fi and NATs), SRT
+ * and RTMP need no transport flag. `-timeout` is an RTSP socket option;
+ * SRT has its own connect timeout in the URL and RTMP times out with `-rw_timeout`.
+ */
+export function inputFlags(url: string): string[] {
+  const scheme = /^([a-z]+):/i.exec(url)?.[1]?.toLowerCase() ?? '';
+  if (scheme === 'rtsp' || scheme === 'rtsps') return ['-rtsp_transport', 'tcp', '-timeout', '5000000'];
+  if (scheme === 'rtmp' || scheme === 'rtmps') return ['-rw_timeout', '5000000'];
+  return [];
+}
+
 export function mjpegArgs(url: string, width = TILE_WIDTH, fps = TILE_FPS): string[] {
   return [
     '-hide_banner', '-loglevel', 'error', '-nostdin',
-    '-rtsp_transport', 'tcp',
-    // Socket limit in microseconds: a camera in standby must not hang a tile for minutes.
-    '-timeout', '5000000',
+    ...inputFlags(url),
     '-i', url,
     '-an',
     '-vf', `scale=${width}:-2`,
@@ -98,7 +109,9 @@ export function createMjpegParser(onFrame: (jpeg: Buffer) => void): (chunk: Buff
   };
 }
 
-/** Only rtsp:// on a private network — the bridge must not become a relay for the internet. */
+export const STREAM_SCHEMES = ['rtsp', 'rtsps', 'srt', 'rtmp', 'rtmps'];
+
+/** Only rtsp/srt/rtmp on a private network — the bridge must not become a relay for the internet. */
 export function checkStreamUrl(raw: string, allowAnyHost = false): string | null {
   let target: URL;
   try {
@@ -106,7 +119,7 @@ export function checkStreamUrl(raw: string, allowAnyHost = false): string | null
   } catch {
     return 'Not a valid stream address.';
   }
-  if (!/^rtsps?:$/.test(target.protocol)) return 'Only rtsp:// streams can be shown.';
+  if (!STREAM_SCHEMES.includes(target.protocol.replace(':', ''))) return 'Only rtsp://, srt:// and rtmp:// streams can be shown.';
   if (!allowAnyHost && !isPrivateHost(target.hostname)) return `${target.hostname} is outside the private networks.`;
   return null;
 }

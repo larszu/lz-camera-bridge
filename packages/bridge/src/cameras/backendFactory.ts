@@ -63,6 +63,17 @@ export interface CameraConfig {
   label?: string;
   /** Which switcher input carries this camera's picture (1-based). 0/empty: none. Drives the per-camera tally. */
   switcherInput?: number;
+  /**
+   * Planned shots → head poses (protocol/ptzPose.ts). `poseOffset` is the
+   * mounting error measured on site; `homeHeading` overrides the plan's
+   * camera heading as the room direction of the head's pan 0; `zoomTable`
+   * is a measured focal-length curve of this model; `unitsPerDeg` the VISCA
+   * position scale when a head deviates from 14.4.
+   */
+  poseOffset?: { pan: number; tilt: number };
+  homeHeading?: number;
+  zoomTable?: { position: number; focalMm: number }[];
+  unitsPerDeg?: number;
   /** VISCA ueber RS-232: Port, Baudrate und Adresse in der Kette (1..7). */
   viscaSerialPath?: string; viscaBaudRate?: number; viscaAddress?: number;
   /** DJI-Gimbals: serieller Pfad (Osmo: CDC, Ronin: SLCAN-Stecker). */
@@ -81,6 +92,12 @@ export interface CameraBackend extends EventEmitter {
   connect(): Promise<unknown>;
   disconnect(): void | Promise<void>;
   handleRcpCommand(cmd: string, params: Record<string, unknown>): Promise<boolean>;
+  /**
+   * Where the head is — pan/tilt in degrees, zoom 0..1. Only heads with a
+   * position inquiry have it; the bridge refuses a calibration on the others
+   * with a sentence instead of guessing.
+   */
+  readPose?(): Promise<{ pan: number; tilt: number; zoom?: number }>;
 }
 
 export interface BuiltBackend {
@@ -136,6 +153,12 @@ class SonyUsbBackend extends EventEmitter implements CameraBackend {
   }
 }
 
+/** A VISCA head that deviates from the 14.4 units/degree scale carries its own. */
+function withUnits(client: ViscaClient, unitsPerDeg?: number): ViscaClient {
+  if (unitsPerDeg && unitsPerDeg > 0) client.unitsPerDeg = unitsPerDeg;
+  return client;
+}
+
 const GENERIC_PORT: Record<string, number> = { zcam: 80, 'panasonic-ptz': 80, visca: 1259, jvc: 80, birddog: 8080, 'b4-lens': 80, 'http-cgi': 80 };
 
 /** Build a backend for a camera config. Throws for missing required fields. */
@@ -178,12 +201,12 @@ export function makeBackend(cfg: CameraConfig): BuiltBackend {
     case 'visca-serial': {
       if (!cfg.viscaSerialPath) throw new Error('Kein serieller Port fuer VISCA konfiguriert');
       return {
-        backend: new ViscaClient({
+        backend: withUnits(new ViscaClient({
           art: 'seriell',
           path: cfg.viscaSerialPath,
           baudRate: cfg.viscaBaudRate ?? 9600,
           adresse: cfg.viscaAddress ?? 1,
-        }),
+        }), cfg.unitsPerDeg),
         mapState: identity,
       };
     }
@@ -201,6 +224,7 @@ export function makeBackend(cfg: CameraConfig): BuiltBackend {
           username: cfg.camUser ?? '',
           password: cfg.camPass ?? '',
           presetOffset: cfg.cgiPresetOffset,
+          unitsPerDeg: cfg.unitsPerDeg,
         }),
         mapState: identity,
       };
@@ -212,7 +236,7 @@ export function makeBackend(cfg: CameraConfig): BuiltBackend {
       const backend =
         mode === 'zcam' ? new ZCamClient(host, port)
         : mode === 'panasonic-ptz' ? new PanasonicPtzClient(host, port)
-        : mode === 'visca' ? new ViscaClient(host, port)
+        : mode === 'visca' ? withUnits(new ViscaClient(host, port), cfg.unitsPerDeg)
         : mode === 'jvc' ? new JvcClient(host, port, cfg.camUser ?? '', cfg.camPass ?? '')
         : new BirddogClient(host, port);
       return { backend, mapState: identity };

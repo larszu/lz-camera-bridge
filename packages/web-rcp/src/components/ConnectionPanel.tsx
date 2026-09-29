@@ -544,7 +544,7 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices,
       </div>
       <div className="connection-row">
         <div className="field">
-          <label>Stream address (RTSP)</label>
+          <label>Stream address (RTSP · SRT · RTMP)</label>
           <input value={streamUrl} onChange={(e) => setStreamUrl(e.target.value)} placeholder="rtsp://user:pass@192.168.1.131/media/video1" autoComplete="off" />
         </div>
       </div>

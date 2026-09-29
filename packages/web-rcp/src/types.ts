@@ -68,6 +68,11 @@ export interface BridgeConfig {
   label?: string;
   /** Eingang am Mischer, 1-basiert; 0/leer: keiner. Daraus entsteht das Tally je Kamera. */
   switcherInput?: number;
+  /** Geplante Shots → Kopf-Pose: Montagefehler vor Ort, Heimat-Richtung, gemessene Zoomkurve, VISCA-Skala. */
+  poseOffset?: { pan: number; tilt: number };
+  homeHeading?: number;
+  zoomTable?: { position: number; focalMm: number }[];
+  unitsPerDeg?: number;
   /** VISCA ueber RS-232: Geraetepfad, Baudrate, Adresse in der Kette (1..7). */
   viscaSerialPath?: string;
   viscaBaudRate?: number;

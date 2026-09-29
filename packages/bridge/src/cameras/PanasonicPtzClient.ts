@@ -15,6 +15,7 @@
 import { EventEmitter } from 'events';
 import { CameraState } from '../protocol/CcuClient.js';
 import { GenericCameraClient, httpRequest } from './GenericCameraClient.js';
+import { awAbsolutePanTilt, awAbsoluteZoom, parseAwPanTilt, parseAwZoom, type Pose } from '../protocol/ptzPose.js';
 
 export class PanasonicPtzClient extends EventEmitter implements GenericCameraClient {
   private base: string;
@@ -44,6 +45,17 @@ export class PanasonicPtzClient extends EventEmitter implements GenericCameraCli
   disconnect(): void {
     this.connected = false;
     this.emit('disconnected');
+  }
+
+  /** `#APC` and `#GZ` are also queries: without arguments the head answers its position. */
+  async readPose(): Promise<Pose> {
+    const pt = parseAwPanTilt(await this.ptz('APC'));
+    if (!pt) throw new Error('AW: aPC answer unreadable');
+    let zoom: number | undefined;
+    try {
+      zoom = parseAwZoom(await this.ptz('GZ')) ?? undefined;
+    } catch { /* pose without zoom */ }
+    return { ...pt, ...(zoom !== undefined ? { zoom } : {}) };
   }
 
   private ptz(cmd: string): Promise<string> {
@@ -85,6 +97,14 @@ export class PanasonicPtzClient extends EventEmitter implements GenericCameraCli
         await this.ptz(`PTS${this.two(p)}${this.two(t)}`);
         return true;
       }
+      case 'ptzAbsolute':
+        // #APC[pan][tilt], #AXZ[zoom] — absolute, in the AW scale.
+        await this.ptz(awAbsolutePanTilt(num('pan'), num('tilt')));
+        if (params['zoom'] !== undefined) await this.ptz(awAbsoluteZoom(num('zoom')));
+        return true;
+      case 'zoomAbsolute':
+        await this.ptz(awAbsoluteZoom(num('zoom')));
+        return true;
       case 'recallPreset':
         // #R<xx> recalls preset 00-99.
         await this.ptz(`R${this.two(num('value'))}`);
