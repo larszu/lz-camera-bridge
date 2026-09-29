@@ -48,6 +48,10 @@
  *   GET /video/<cameraNumber>.mjpeg   Livebild als multipart/x-mixed-replace
  *                                     (multiview/RtspHub.ts) -- fuer <img>.
  *   GET /video/<cameraNumber>.jpg     das letzte Bild.
+ *   WS  /scope/<cameraNumber>?depth=8|16&width=960
+ *                                     rohe R'G'B'-Bilder im Frame-Protokoll
+ *                                     von LZ Scopes (multiview/ScopeStream.ts),
+ *                                     ein eigener ffmpeg je offenem Scope.
  *   GET /site.json                    die Anlage zum Herunterladen.
  *
  * Server → Client messages:
@@ -87,6 +91,7 @@ import {
   type MultiviewSource,
 } from './multiview/multiviewGenerators.js';
 import { RtspHub, checkStreamUrl } from './multiview/RtspHub.js';
+import { MAX_SCOPES, parseScopeQuery, runScope, sendFinal } from './multiview/ScopeStream.js';
 import { VisCatcClient, type SwitcherConfig, type SwitcherState } from './switcher/VisCatcClient.js';
 import type { SourceTally } from './switcher/switcherBus.js';
 import { SitePersistence } from './site/persistence.js';
@@ -185,6 +190,8 @@ interface ClientMessage {
 
 export class BridgeServer {
   private wss: WebSocketServer;
+  /** `/scope/<n>` — kept apart from `wss` so broadcasts never reach a scope socket. */
+  private scopeWss: WebSocketServer;
   private httpServer: ReturnType<typeof createServer>;
   private cameras = new Map<number, CameraSlot>();
   private cameraStates = new Map<number, CameraState>();
@@ -233,8 +240,17 @@ export class BridgeServer {
     this.persistence = opts.persist ? new SitePersistence(opts.configDir) : null;
     this.allowAnyStreamHost = opts.allowAnyStreamHost ?? false;
     this.httpServer = createServer((req, res) => this.handleHttp(req, res));
-    this.wss = new WebSocketServer({ server: this.httpServer });
+    this.wss = new WebSocketServer({ noServer: true });
     this.wss.on('connection', (ws) => this.onClient(ws));
+    this.scopeWss = new WebSocketServer({ noServer: true, perMessageDeflate: false });
+    this.httpServer.on('upgrade', (req, socket, head) => {
+      const scope = /^\/scope\/(\d+)$/.exec(new URL(req.url ?? '/', 'http://bridge').pathname);
+      const target = scope ? this.scopeWss : this.wss;
+      target.handleUpgrade(req, socket, head, (ws) => {
+        if (scope) this.onScope(ws, Number(scope[1]), new URL(req.url ?? '/', 'http://bridge').searchParams);
+        else target.emit('connection', ws, req);
+      });
+    });
 
     this.companion.on('command', (cmd: { action: string; params?: Record<string, unknown> }) => {
       this.handleCompanionCommand(cmd.action, cmd.params ?? {});
@@ -277,6 +293,8 @@ export class BridgeServer {
     for (const slot of this.cameras.values()) void slot.backend?.disconnect();
     for (const slot of this.switchers.values()) slot.client?.disconnect();
     this.hub.stopAll();
+    for (const ws of this.scopeWss.clients) ws.terminate();
+    this.scopeWss.close();
     this.persistence?.flush();
     this.companion.stop();
     this.wss.close();
@@ -1238,7 +1256,7 @@ export class BridgeServer {
     }
     if (url.pathname === '/health') {
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, service: 'lz-camera-bridge', cameras: this.cameras.size, switchers: this.switchers.size, streams: this.hub.activeCount }));
+      res.end(JSON.stringify({ ok: true, service: 'lz-camera-bridge', cameras: this.cameras.size, switchers: this.switchers.size, streams: this.hub.activeCount, scopes: this.scopeWss.clients.size }));
       return;
     }
     if (url.pathname === '/site.json') {
@@ -1257,7 +1275,20 @@ export class BridgeServer {
       return;
     }
     res.writeHead(404, { 'Content-Type': 'text/plain' });
-    res.end('LZ Camera Bridge: WebSocket on this port; /video/<n>.mjpeg, /site.json, /health');
+    res.end('LZ Camera Bridge: WebSocket on this port; /video/<n>.mjpeg, /scope/<n> (WebSocket), /site.json, /health');
+  }
+
+  /** One scope socket: checks like `serveVideo`, then its own ffmpeg until either side closes. */
+  private onScope(ws: WebSocket, num: number, params: URLSearchParams): void {
+    ws.on('error', () => {});
+    const streamUrl = this.cameras.get(num)?.config.streamUrl;
+    if (!streamUrl) return sendFinal(ws, 'error', `Camera ${num} has no stream address`);
+    const refusal = checkStreamUrl(streamUrl, this.allowAnyStreamHost);
+    if (refusal) return sendFinal(ws, 'error', refusal);
+    if (this.scopeWss.clients.size > MAX_SCOPES) {
+      return sendFinal(ws, 'error', `At most ${MAX_SCOPES} scopes at once — each one opens its own stream session.`);
+    }
+    void runScope(ws, streamUrl, parseScopeQuery(params)).catch((err) => sendFinal(ws, 'error', (err as Error).message));
   }
 
   private serveVideo(num: number, kind: 'mjpeg' | 'jpg', res: ServerResponse): void {

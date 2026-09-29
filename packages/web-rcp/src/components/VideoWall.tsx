@@ -2,12 +2,16 @@ import React, { useEffect, useMemo, useState } from 'react';
 import type { CameraSlot } from '../hooks/useBridge.ts';
 import { videoUrl } from '../hooks/useBridge.ts';
 import type { CameraTally, SwitcherSlot } from '../types.ts';
+import { ScopeOverlay, ScopePanel } from './ScopePanel.tsx';
 
 /**
  * The live pictures. Every tile is an <img> on the bridge's MJPEG endpoint —
  * no player, no WebRTC, one ffmpeg per camera in the bridge shared by every
  * window that shows it. Tally from the switcher on the top edge; a click
  * previews the camera's input, a double-click takes it.
+ *
+ * "Scopes" on a tile opens waveform + vectorscope under it (ScopePanel.tsx);
+ * those measure raw frames from the bridge's `/scope/<n>`, not this JPEG.
  */
 
 interface Props {
@@ -84,7 +88,8 @@ export function VideoWall({ cameras, cameraTally, switcher, onSwitcherCommand, o
       <div className="wall" style={{ '--wall-cols': cols } as React.CSSProperties}>{tiles}</div>
       <p className="hint">
         Click a tile to preview its switcher input, double-click to take it. The picture comes from the camera's stream
-        address (RTSP), scaled down by the bridge; the on-air signal is untouched.
+        address (RTSP), scaled down by the bridge; the on-air signal is untouched. Scopes measure the decoded stream,
+        not the tile picture; each open scope holds one more stream session on the camera.
       </p>
     </div>
   );
@@ -113,36 +118,62 @@ function Tile({ cam, tally, canSwitch, onPreview, onTake, onEdit }: TileProps) {
   }, [failed]);
 
   const switchable = canSwitch && (cam.config.switcherInput ?? 0) > 0;
+  const [scopes, setScopes] = useState<'off' | 'inline' | 'full'>('off');
 
   return (
-    <div
-      className={`tile tile--${tally}`}
-      onClick={switchable ? onPreview : undefined}
-      onDoubleClick={switchable ? onTake : undefined}
-      title={switchable ? `Input ${cam.config.switcherInput}: click = preview, double-click = take` : undefined}
-      style={{ cursor: switchable ? 'pointer' : 'default' }}
-    >
-      {hasStream ? (
-        <img
-          src={`${videoUrl(num)}?a=${attempt}`}
-          alt=""
-          onError={() => setFailed(true)}
-          draggable={false}
-        />
-      ) : (
-        <div className="tile__empty">
-          <span>
-            No stream address for camera {num}.
-            {onEdit && <><br /><button className="btn btn--sm" style={{ marginTop: 8 }} onClick={(e) => { e.stopPropagation(); onEdit(); }}>Set it up</button></>}
-          </span>
+    <div className="wall__cell">
+      <div
+        className={`tile tile--${tally}`}
+        onClick={switchable ? onPreview : undefined}
+        onDoubleClick={switchable ? onTake : undefined}
+        title={switchable ? `Input ${cam.config.switcherInput}: click = preview, double-click = take` : undefined}
+        style={{ cursor: switchable ? 'pointer' : 'default' }}
+      >
+        {hasStream ? (
+          <img
+            src={`${videoUrl(num)}?a=${attempt}`}
+            alt=""
+            onError={() => setFailed(true)}
+            draggable={false}
+          />
+        ) : (
+          <div className="tile__empty">
+            <span>
+              No stream address for camera {num}.
+              {onEdit && <><br /><button className="btn btn--sm" style={{ marginTop: 8 }} onClick={(e) => { e.stopPropagation(); onEdit(); }}>Set it up</button></>}
+            </span>
+          </div>
+        )}
+        {failed && hasStream && <span className="tile__off">reconnecting…</span>}
+        <div className="tile__bar">
+          <span className="tile__num">CAM {num}</span>
+          <span className="tile__name">{name}</span>
+          {tally !== 'off' && <span className={`tile__tally tile__tally--${tally}`}>{tally === 'program' ? 'PGM' : 'PVW'}</span>}
+          {hasStream && (
+            <button
+              className="tile__scopes"
+              aria-pressed={scopes !== 'off'}
+              onClick={(e) => { e.stopPropagation(); setScopes(scopes === 'off' ? 'inline' : 'off'); }}
+              onDoubleClick={(e) => e.stopPropagation()}
+              title="Waveform and vectorscope of this stream"
+            >
+              Scopes
+            </button>
+          )}
         </div>
-      )}
-      {failed && hasStream && <span className="tile__off">reconnecting…</span>}
-      <div className="tile__bar">
-        <span className="tile__num">CAM {num}</span>
-        <span className="tile__name">{name}</span>
-        {tally !== 'off' && <span className={`tile__tally tile__tally--${tally}`}>{tally === 'program' ? 'PGM' : 'PVW'}</span>}
       </div>
+      {hasStream && scopes === 'inline' && (
+        <ScopePanel
+          cameraNumber={num}
+          title={`CAM ${num}${name ? ` · ${name}` : ''}`}
+          scopes={['wf-luma', 'vector']}
+          onClose={() => setScopes('off')}
+          onExpand={() => setScopes('full')}
+        />
+      )}
+      {hasStream && scopes === 'full' && (
+        <ScopeOverlay cameraNumber={num} title={`CAM ${num}${name ? ` · ${name}` : ''}`} onClose={() => setScopes('inline')} />
+      )}
     </div>
   );
 }

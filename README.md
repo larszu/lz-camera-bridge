@@ -141,6 +141,13 @@ former `av-control-center` application (2026-09-28) and replaces it.
   screen. The stream address never leaves the bridge. ffmpeg is looked for
   in `LZ_BRIDGE_FFMPEG`, `ffmpeg-portable/`, then `PATH`; the desktop app
   brings its own.
+- **Scopes** — *Scopes* on a video tile opens waveform (luma) and
+  vectorscope under it; each panel's header switches to RGB parade,
+  histogram, CIE and more, *4 scopes* fills the window with waveform,
+  vectorscope, parade and histogram. They measure raw R'G'B' frames from
+  `WS /scope/<n>` (LZ Scopes frame protocol), not the JPEG of the tile: the
+  bridge starts its own ffmpeg per open scope and stops it when the panel
+  closes. Details in [`docs/live-video.md`](docs/live-video.md#scopes).
 - **Site** — cameras and switcher as one file (`lz-site` v1). The desktop app
   and `npm run bridge` keep it in `LZ_BRIDGE_CONFIG_DIR/site.json`
   (default `~/.lz-camera-bridge`) and restore it on start, connecting what was
@@ -158,6 +165,7 @@ Web panel   ─┐                                                     ┌─ So
 Cameras/Wall ┼─ WebSocket ────▶  BridgeServer                      ├─ Canon CCAPI · Lumix · Z CAM · Blackmagic
 Switcher     ┤                   camera slots ──(RCP verbs)───────▶├─ VISCA (IP / RS-232) · Panasonic AW · JVC · BirdDog
 Video tiles ─┼─ GET /video/n ─▶  RtspHub (ffmpeg → MJPEG) ◀────────┤  RTSP streams
+Scopes       ┼─ WS /scope/n ──▶  ScopeStream (ffmpeg → raw RGBA) ◀─┤
 Site        ─┘  GET /site.json   site file (persisted)             ├─ HTTP-CGI PTZ (Vissonic/PTZOptics, Sony SRG)
 Companion   ── HTTP/WS :9701-2   switcher slots ──(route/cut)─────▶└─ Vissonic VIS-CATC (HTTP or RS-232)
 HID panel   ── USB                 └─ tally per camera ──▶ every client
