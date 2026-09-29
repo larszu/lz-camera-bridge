@@ -238,10 +238,15 @@ const jsxTextMuster = () => />([^<>{}]{4,300})</g
 const AUSDRUCK = '\\{(?:[^{}]|\\{[^{}]*\\})*\\}'
 const jsxTextMitAusdruckMuster = () => new RegExp(`>((?:[^<>]|${AUSDRUCK})*?)<`, 'g')
 
+// `src/vendor/` ist fremder Quelltext (LZ Scopes, siehe dessen VENDOR.md) und
+// bleibt byte-gleich zum Original, damit er sich neu synchronisieren laesst.
+// Seine sichtbaren Texte uebersetzt der Einbau (`ScopePanel.tsx`), nicht die
+// Kopie. Ausserdem laufen die Muster unten auf seinen langen Code-Zeilen in
+// katastrophales Backtracking (gemessen 2026-09-29: >2 min ohne Ergebnis).
 const dateien = (dir, out = []) => {
   for (const name of readdirSync(dir)) {
     const p = join(dir, name)
-    if (statSync(p).isDirectory()) dateien(p, out)
+    if (statSync(p).isDirectory()) { if (name !== 'vendor') dateien(p, out) }
     else if (/\.tsx?$/.test(p)) out.push(p)
   }
   return out

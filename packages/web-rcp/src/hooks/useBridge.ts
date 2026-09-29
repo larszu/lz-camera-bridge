@@ -101,6 +101,9 @@ const WS_URL = `ws://${bridgeHost}:${BRIDGE_PORT}`;
 /** The bridge's HTTP side on the same port: live video and the site download. */
 export const BRIDGE_HTTP = `http://${bridgeHost}:${BRIDGE_PORT}`;
 export const videoUrl = (cameraNumber: number) => `${BRIDGE_HTTP}/video/${cameraNumber}.mjpeg`;
+/** Raw frames for the scopes (LZ Scopes frame protocol), one ffmpeg per open socket in the bridge. */
+export const scopeUrl = (cameraNumber: number, depth: 8 | 16 = 8, width = 960) =>
+  `${WS_URL}/scope/${cameraNumber}?depth=${depth}&width=${width}`;
 
 export function useBridge() {
   const ws = useRef<WebSocket | null>(null);
