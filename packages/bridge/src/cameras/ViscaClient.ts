@@ -21,6 +21,10 @@
 import { EventEmitter } from 'events';
 import dgram from 'dgram';
 import { CameraState } from '../protocol/CcuClient.js';
+import {
+  VISCA_INQ_PAN_TILT, VISCA_INQ_ZOOM, parseViscaPanTilt, parseViscaZoom,
+  viscaAbsolutePanTilt, viscaZoomDirect, VISCA_UNITS_PER_DEG, type Pose,
+} from '../protocol/ptzPose.js';
 import { GenericCameraClient } from './GenericCameraClient.js';
 import { ViscaSerialTransport, buildIfClearBroadcast, viscaKopf } from '../transport/ViscaSerialTransport.js';
 
@@ -78,6 +82,10 @@ export class ViscaClient extends EventEmitter implements GenericCameraClient {
    * und nicht in jedem Kommando fest hingeschrieben.
    */
   private readonly kopf: number;
+  /** Position units per degree of this head; the slot config may override the 14.4 default. */
+  unitsPerDeg = VISCA_UNITS_PER_DEG;
+  /** Reply frames waiting to be claimed by an inquiry, newest last. */
+  private pendingInquiry: ((frame: Buffer) => void) | null = null;
 
   constructor(host: string, port?: number, sonyHeader?: boolean);
   constructor(link: ViscaLink);
@@ -109,7 +117,7 @@ export class ViscaClient extends EventEmitter implements GenericCameraClient {
     if (this.link.art === 'seriell') {
       this.seriell = new ViscaSerialTransport({ path: this.link.path, baudRate: this.link.baudRate });
       this.seriell.on('error', (err) => this.emit('error', err));
-      this.seriell.on('paket', (paket: Buffer) => this.emit('visca', paket));
+      this.seriell.on('paket', (paket: Buffer) => this.onFrame(paket));
       await this.seriell.open();
       // Haengende Kommandos in der ganzen Kette abraeumen, bevor eigene
       // kommen -- eine Kamera, die noch auf eine alte Antwort wartet, nimmt
@@ -121,6 +129,12 @@ export class ViscaClient extends EventEmitter implements GenericCameraClient {
     }
     this.socket = dgram.createSocket('udp4');
     this.socket.on('error', (err) => this.emit('error', err));
+    // Replies come back on the same socket. Sony's transport header (8 bytes)
+    // is stripped so that every listener sees a bare VISCA frame.
+    this.socket.on('message', (msg: Buffer) => {
+      const frame = this.sonyHeader && msg.length > 8 ? msg.subarray(8) : msg;
+      this.onFrame(frame);
+    });
     if (this.sonyHeader) {
       // Reset the camera's sequence counter, then start counting from 1.
       await this.sendRaw(buildSonyResetSequence()).catch(() => {});
@@ -146,6 +160,49 @@ export class ViscaClient extends EventEmitter implements GenericCameraClient {
     }
     this.socket = null;
     this.emit('disconnected');
+  }
+
+  private onFrame(frame: Buffer): void {
+    this.emit('visca', frame);
+    // Inquiry answers are y0 50 … FF; ACK/completion (y0 4x / y0 5x FF, 3 bytes) are not.
+    if (this.pendingInquiry && frame.length > 3 && frame[1] === 0x50) {
+      const claim = this.pendingInquiry;
+      this.pendingInquiry = null;
+      claim(frame);
+    }
+  }
+
+  /** Send an inquiry and wait for its answer frame. */
+  private inquire(bytes: number[], timeoutMs = 1500): Promise<Buffer> {
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        if (this.pendingInquiry === claim) this.pendingInquiry = null;
+        reject(new Error('VISCA inquiry: no answer'));
+      }, timeoutMs);
+      const claim = (frame: Buffer) => {
+        clearTimeout(timer);
+        resolve(frame);
+      };
+      this.pendingInquiry = claim;
+      this.send(bytes, SONY_PAYLOAD_INQUIRY).catch((err) => {
+        clearTimeout(timer);
+        if (this.pendingInquiry === claim) this.pendingInquiry = null;
+        reject(err);
+      });
+    });
+  }
+
+  /** Where the head is: pan/tilt in degrees, zoom 0..1. Two inquiries, one answer each. */
+  async readPose(): Promise<Pose> {
+    const pt = parseViscaPanTilt(await this.inquire(VISCA_INQ_PAN_TILT), this.unitsPerDeg);
+    if (!pt) throw new Error('VISCA: pan/tilt answer unreadable');
+    let zoom: number | undefined;
+    try {
+      zoom = parseViscaZoom(await this.inquire(VISCA_INQ_ZOOM)) ?? undefined;
+    } catch {
+      /* a head without zoom readback still has a pose */
+    }
+    return { ...pt, ...(zoom !== undefined ? { zoom } : {}) };
   }
 
   private sendRaw(buf: Buffer): Promise<void> {
@@ -245,6 +302,14 @@ export class ViscaClient extends EventEmitter implements GenericCameraClient {
         return true;
       case 'recallPreset':
         await this.send([0x81, 0x01, 0x04, 0x3f, 0x02, num('value') & 0x7f, 0xff]);
+        return true;
+      case 'ptzAbsolute':
+        // Pan-tiltDrive AbsolutePosition, degrees in the head frame.
+        await this.send(viscaAbsolutePanTilt(num('pan'), num('tilt'), this.unitsPerDeg));
+        if (params['zoom'] !== undefined) await this.send(viscaZoomDirect(num('zoom')));
+        return true;
+      case 'zoomAbsolute':
+        await this.send(viscaZoomDirect(num('zoom')));
         return true;
       default:
         return false;

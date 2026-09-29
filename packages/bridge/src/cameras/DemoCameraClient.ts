@@ -62,6 +62,14 @@ export interface DemoCameraState extends CameraState {
 export class DemoCameraClient extends EventEmitter {
   private connected = false;
   readonly state: DemoCameraState = { ...START, isDemo: true };
+  /** The head's pose, held here like the paint state: absolute drives land, relative jogs move it a little. */
+  readonly pose = { pan: 0, tilt: 0, zoom: 0 };
+
+  /** The demo reports its pose — the one "camera" whose pose is by definition what was commanded. */
+  async readPose(): Promise<{ pan: number; tilt: number; zoom: number }> {
+    if (!this.connected) throw new Error('demo camera not connected');
+    return { ...this.pose };
+  }
 
   get isConnected(): boolean {
     return this.connected;
@@ -108,6 +116,23 @@ export class DemoCameraClient extends EventEmitter {
       case 'setShutterSpeed': this.state.shutterSpeed = num('value'); break;
       case 'setBars': this.state.bars = bool('on'); break;
       case 'setCameraPower': this.state.cameraPower = bool('on'); break;
+      case 'ptzAbsolute':
+        this.pose.pan = num('pan');
+        this.pose.tilt = num('tilt');
+        if (params['zoom'] !== undefined) this.pose.zoom = Math.min(1, Math.max(0, num('zoom')));
+        return true;
+      case 'zoomAbsolute':
+        this.pose.zoom = Math.min(1, Math.max(0, num('zoom')));
+        return true;
+      case 'ptz':
+        // A jog nudges the pose by a degree per call so that a calibration has something to measure.
+        this.pose.pan += Math.sign(num('pan'));
+        this.pose.tilt += Math.sign(num('tilt'));
+        return true;
+      case 'setZoom': case 'setFocus': case 'autoFocus': case 'home':
+      case 'recallPreset': case 'storePreset':
+        if (cmd === 'home') { this.pose.pan = 0; this.pose.tilt = 0; }
+        return true;
       default:
         return false;
     }

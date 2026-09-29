@@ -30,6 +30,15 @@
  *          | 'setLayout' {mode} | 'setAudio' {channel} | 'freeze' {seconds} | 'refresh'
  *       Ein Mischer ist KEINE Kamera: eigene Slots, eigenes Vokabular
  *       (switcher/VisCatcClient.ts). Der Vorschau-Bus liegt in der Bruecke.
+ *   { type: 'readPose', cameraNumber }                     → { type: 'pose', cameraNumber, pose }
+ *   { type: 'drivePlannedPreset', cameraNumber, presetNumber }
+ *   { type: 'storePlannedPresets', cameraNumber, presetNumbers?, settleMs? }
+ *       faehrt jeden geplanten Shot an und speichert ihn IM KOPF; Fortschritt
+ *       als { type: 'plannedProgress', cameraNumber, presetNumber, step, message? }.
+ *   { type: 'calibratePose', cameraNumber, presetNumber }
+ *       der Kopf steht von Hand auf diesem Shot; die Differenz zur geplanten
+ *       Pose wird als `poseOffset` gemerkt (protocol/ptzPose.ts).
+ *   { type: 'setPoseOffset', cameraNumber, offset | null }
  *   { type: 'getSite' } | { type: 'importSite', site } | { type: 'setSiteName', name }
  *       Die Anlage als Datei (site/siteFile.ts): Kameras + Mischer. Wird
  *       bei eingeschalteter Persistenz (index.ts, Electron) auf Platte
@@ -91,6 +100,7 @@ import {
   type CameraPlan, type PlanCamera, type SlotFacts,
 } from './plan/cameraPlan.js';
 import { NUDGE_ACTIONS, NUDGE_REFUSAL_LABEL, resolveNudge } from './protocol/paintNudge.js';
+import { calibrateOffset, shotToPose, type Pose } from './protocol/ptzPose.js';
 import {
   applyOrigins,
   applyConfirmations,
@@ -148,8 +158,13 @@ interface ClientMessage {
     | 'getMultiview'
     | 'listSwitchers' | 'setSwitcherConfig' | 'connectSwitcher' | 'disconnectSwitcher' | 'removeSwitcher'
     | 'switcherCommand'
-    | 'getSite' | 'importSite' | 'setSiteName';
+    | 'getSite' | 'importSite' | 'setSiteName'
+    | 'readPose' | 'drivePlannedPreset' | 'storePlannedPresets' | 'calibratePose' | 'setPoseOffset';
   cameraNumber?: number;
+  presetNumber?: number;
+  presetNumbers?: number[];
+  settleMs?: number;
+  offset?: { pan: number; tilt: number } | null;
   config?: CameraConfig;
   switcherNumber?: number;
   switcherConfig?: SwitcherConfig;
@@ -366,6 +381,44 @@ export class BridgeServer {
         await this.dispatchSwitcherCommand(ws, msg.switcherNumber ?? 1, msg.cmd ?? '', msg.params ?? {});
         break;
 
+      // ─── Planned shots ──────────────────────────────────────────────────
+      case 'readPose': {
+        const num = msg.cameraNumber ?? 0;
+        const pose = await this.readPose(ws, num);
+        if (pose) ws.send(JSON.stringify({ type: 'pose', cameraNumber: num, pose }));
+        break;
+      }
+
+      case 'drivePlannedPreset': {
+        const num = msg.cameraNumber ?? 0;
+        await this.drivePlanned(ws, num, msg.presetNumber ?? -1);
+        break;
+      }
+
+      case 'storePlannedPresets': {
+        const num = msg.cameraNumber ?? 0;
+        await this.storePlanned(ws, num, msg.presetNumbers, msg.settleMs);
+        break;
+      }
+
+      case 'calibratePose': {
+        const num = msg.cameraNumber ?? 0;
+        await this.calibratePose(ws, num, msg.presetNumber ?? -1);
+        break;
+      }
+
+      case 'setPoseOffset': {
+        const num = msg.cameraNumber ?? 0;
+        const slot = this.cameras.get(num);
+        if (!slot) { this.sendError(ws, `Camera ${num} is not configured`, num); break; }
+        const offset = msg.offset;
+        if (offset && Number.isFinite(offset.pan) && Number.isFinite(offset.tilt)) slot.config.poseOffset = { pan: offset.pan, tilt: offset.tilt };
+        else delete slot.config.poseOffset;
+        this.broadcastCameras();
+        this.siteChanged();
+        break;
+      }
+
       // ─── Site ─────────────────────────────────────────────────────────────
       case 'getSite':
         this.sendSite(ws);
@@ -506,6 +559,7 @@ export class BridgeServer {
         }
         ws.send(JSON.stringify({ type: 'cameraPlanMatch', ...ergebnis }));
         this.broadcastCameras();
+        this.siteChanged();
         break;
       }
 
@@ -533,6 +587,7 @@ export class BridgeServer {
           slot.planMatchedBy = 'manual';
         }
         this.broadcastCameras();
+        this.siteChanged();
         break;
       }
     }
@@ -1021,12 +1076,92 @@ export class BridgeServer {
     this.broadcast({ type: 'cameraTally', tally: this.cameraTally() });
   }
 
+
+  // ─── Planned shots ────────────────────────────────────────────────────────
+
+  private plannedPose(slot: CameraSlot, presetNumber: number): { pose: Pose; fit: string; name: string } | string {
+    const plan = slot.plan;
+    if (!plan) return `Camera ${slot.num} has no planned camera assigned (Wall → plan).`;
+    const shot = plan.presets?.find((p) => p.number === presetNumber);
+    if (!shot) return `The plan of camera ${slot.num} has no shot ${presetNumber}.`;
+    const homeHeading = slot.config.homeHeading ?? plan.pan ?? 0;
+    const lens = { focalMinMm: plan.lens?.focalMinMm, focalMaxMm: plan.lens?.focalMaxMm, zoomTable: slot.config.zoomTable };
+    const { fit, ...pose } = shotToPose(shot, homeHeading, slot.config.poseOffset, lens);
+    return { pose, fit, name: shot.name };
+  }
+
+  private async readPose(ws: WebSocket, num: number): Promise<Pose | null> {
+    const slot = this.cameras.get(num);
+    if (!slot?.backend || !slot.connected) { this.sendError(ws, `Camera ${num} is not connected`, num); return null; }
+    if (!slot.backend.readPose) { this.sendError(ws, `Camera ${num} cannot report its pose on this path`, num); return null; }
+    try {
+      return await slot.backend.readPose();
+    } catch (err) {
+      this.sendError(ws, `Camera ${num}: ${(err as Error).message}`, num);
+      return null;
+    }
+  }
+
+  private async drivePlanned(ws: WebSocket, num: number, presetNumber: number): Promise<boolean> {
+    const slot = this.cameras.get(num);
+    if (!slot) { this.sendError(ws, `Camera ${num} is not configured`, num); return false; }
+    const planned = this.plannedPose(slot, presetNumber);
+    if (typeof planned === 'string') { this.sendError(ws, planned, num); return false; }
+    const params: Record<string, unknown> = { pan: planned.pose.pan, tilt: planned.pose.tilt };
+    if (planned.pose.zoom !== undefined) params.zoom = planned.pose.zoom;
+    this.broadcast({ type: 'plannedProgress', cameraNumber: num, presetNumber, step: 'driving', message: planned.name, fit: planned.fit });
+    await this.dispatchCommand(ws, num, 'ptzAbsolute', params);
+    return true;
+  }
+
+  /**
+   * Drive every planned shot and store it in the head, one after the other.
+   * The settle time is the head's, not ours: a preset stored while the head
+   * still moves is the wrong preset. Progress goes to every client; one
+   * failed shot does not stop the rest.
+   */
+  private async storePlanned(ws: WebSocket, num: number, presetNumbers?: number[], settleMs = 4000): Promise<void> {
+    const slot = this.cameras.get(num);
+    if (!slot?.backend || !slot.connected) { this.sendError(ws, `Camera ${num} is not connected`, num); return; }
+    const shots = (slot.plan?.presets ?? []).filter((p) => !presetNumbers || presetNumbers.includes(p.number));
+    if (shots.length === 0) { this.sendError(ws, `Camera ${num} has no planned shots to store`, num); return; }
+    for (const shot of shots) {
+      if (shot.number < 1) {
+        this.broadcast({ type: 'plannedProgress', cameraNumber: num, presetNumber: shot.number, step: 'failed', message: 'preset number 0 cannot be stored in a head' });
+        continue;
+      }
+      const ok = await this.drivePlanned(ws, num, shot.number);
+      if (!ok) { this.broadcast({ type: 'plannedProgress', cameraNumber: num, presetNumber: shot.number, step: 'failed' }); continue; }
+      await new Promise((r) => setTimeout(r, Math.max(0, settleMs)));
+      const stored = await slot.backend.handleRcpCommand('storePreset', { value: shot.number, cameraNumber: num }).catch(() => false);
+      this.broadcast({ type: 'plannedProgress', cameraNumber: num, presetNumber: shot.number, step: stored ? 'stored' : 'failed', message: shot.name });
+    }
+    this.broadcast({ type: 'plannedProgress', cameraNumber: num, presetNumber: 0, step: 'done' });
+  }
+
+  private async calibratePose(ws: WebSocket, num: number, presetNumber: number): Promise<void> {
+    const slot = this.cameras.get(num);
+    if (!slot?.plan) { this.sendError(ws, `Camera ${num} has no planned camera assigned`, num); return; }
+    const shot = slot.plan.presets?.find((p) => p.number === presetNumber);
+    if (!shot) { this.sendError(ws, `The plan of camera ${num} has no shot ${presetNumber}`, num); return; }
+    const actual = await this.readPose(ws, num);
+    if (!actual) return;
+    const homeHeading = slot.config.homeHeading ?? slot.plan.pan ?? 0;
+    slot.config.poseOffset = calibrateOffset(shot, homeHeading, actual);
+    this.broadcast({ type: 'pose', cameraNumber: num, pose: actual, offset: slot.config.poseOffset });
+    this.broadcastCameras();
+    this.siteChanged();
+  }
+
   // ─── Site ─────────────────────────────────────────────────────────────────
 
   currentSite(): SiteFile {
     const site = emptySite(this.siteName);
     for (const s of [...this.cameras.values()].sort((a, b) => a.num - b.num)) {
-      site.cameras.push({ cameraNumber: s.num, config: s.config, autoConnect: s.connected || Boolean(s.backend) });
+      site.cameras.push({
+        cameraNumber: s.num, config: s.config, autoConnect: s.connected || Boolean(s.backend),
+        ...(s.plan ? { plan: s.plan, planMatchedBy: s.planMatchedBy } : {}),
+      });
     }
     for (const s of [...this.switchers.values()].sort((a, b) => a.num - b.num)) {
       site.switchers.push({ switcherNumber: s.num, config: s.config, autoConnect: s.connected || Boolean(s.client) });
@@ -1068,7 +1203,11 @@ export class BridgeServer {
       this.switchers.delete(num);
     }
     this.siteName = site.name;
-    for (const c of site.cameras) this.getOrCreateSlot(c.cameraNumber).config = { ...c.config };
+    for (const c of site.cameras) {
+      const slot = this.getOrCreateSlot(c.cameraNumber);
+      slot.config = { ...c.config };
+      if (c.plan) { slot.plan = c.plan; slot.planMatchedBy = c.planMatchedBy ?? 'manual'; }
+    }
     for (const s of site.switchers) this.getOrCreateSwitcher(s.switcherNumber).config = { ...s.config };
     this.broadcastCameras();
     this.sendSwitchers();
