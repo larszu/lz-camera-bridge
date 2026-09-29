@@ -107,11 +107,16 @@ Absolute Fahrten je Weg:
 | VISCA (IP, RS-232) | `81 01 06 02 …` AbsolutePosition, `81 01 04 47` Zoom Direct | `81 09 06 12`, `81 09 04 47` |
 | Sony SRG/BRC CGI | `ptzf.cgi?AbsolutePanTilt=`, `AbsoluteZoom=` | `inquiry.cgi?inq=ptzf` → `AbsolutePTZF` |
 | Vissonic / PTZOptics CGI | keine absolute CGI — VISCA ueber TCP 5678 | VISCA ueber TCP 5678 |
-| Panasonic AW | `#APC`, `#AXZ` | `#APC`, `#GZ` |
+| Panasonic AW | `#APC`, `#AXZ` | `#PTV` (UE150/UE100/UE80), sonst `#APC` und `#GZ` |
 
 Skala: 14,4 VISCA-Einheiten je Grad (Sony BRC/SRG, PTZOptics: ±170° = ±0x0990);
-`config.unitsPerDeg` fuer Koepfe, die abweichen. AW: ±175° = 0x2D08..0xD2F5.
-Die Tilt-Endwerte der AW-Koepfe sind *tuning*, nicht am Geraet gelesen.
+`config.unitsPerDeg` fuer Koepfe, die abweichen. Panasonic AW nach den
+Interface-Spezifikationen des Herstellers (HD/4K v1.12, UE150/HE145, UE100,
+UE80/50/40/30): Pan 0x2D09 (−175°) bis 0xD2F5 (+175°); Tilt **umgekehrt** —
+der Wert sinkt, wenn der Kopf nach oben schaut: 0x8E38 = −30°, 0x5555 = +90°,
+bei HE120/HE130/HR140 bis 0x1C71 = +210°. Die Tabellen des Herstellers drucken
+„5555(−30deg) – 8E38(+90deg)"; Rechnung und die #HAC-Zeile der UE80-Spezifikation
+zeigen die hier benutzte Richtung. Am Kopf gegengeprueft ist das noch nicht.
 
 Nachrichten: `drivePlannedPreset`, `storePlannedPresets` (faehrt jeden Shot
 an, wartet `settleMs`, dann `storePreset` — Fortschritt als

@@ -253,17 +253,22 @@ input[type="range"]:disabled {
 
 /* ─── Connection Panel ────────────────────────────────────────────────────── */
 
+/* Fourteen connection paths do not fit in one row of a 320 px sidebar: they
+   were squeezed to one letter per line. They wrap into a grid instead, each
+   tab wide enough for its label. */
 .mode-tabs {
-  display: flex;
-  gap: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
+  gap: 1px;
   margin-bottom: 12px;
   border-radius: 0;
   overflow: hidden;
   border: 1px solid var(--border);
+  background: var(--border);
 }
 
 .mode-tab {
-  flex: 1;
+  text-align: left;
   padding: 8px 12px;
   border: none;
   background: var(--bg);

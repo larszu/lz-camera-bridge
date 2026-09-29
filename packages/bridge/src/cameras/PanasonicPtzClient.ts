@@ -15,7 +15,7 @@
 import { EventEmitter } from 'events';
 import { CameraState } from '../protocol/CcuClient.js';
 import { GenericCameraClient, httpRequest } from './GenericCameraClient.js';
-import { awAbsolutePanTilt, awAbsoluteZoom, parseAwPanTilt, parseAwZoom, type Pose } from '../protocol/ptzPose.js';
+import { awAbsolutePanTilt, awAbsoluteZoom, parseAwPanTilt, parseAwPtv, parseAwZoom, type Pose } from '../protocol/ptzPose.js';
 
 export class PanasonicPtzClient extends EventEmitter implements GenericCameraClient {
   private base: string;
@@ -47,10 +47,16 @@ export class PanasonicPtzClient extends EventEmitter implements GenericCameraCli
     this.emit('disconnected');
   }
 
-  /** `#APC` and `#GZ` are also queries: without arguments the head answers its position. */
+  /**
+   * HD-generation heads answer `#APC` without data; UE150/UE100/UE80 answer
+   * `#PTV` (pan, tilt and zoom in one reply) and list no `#APC` query.
+   * The newer form is asked first because it also carries the zoom.
+   */
   async readPose(): Promise<Pose> {
+    const ptv = parseAwPtv(await this.ptz('PTV').catch(() => ''));
+    if (ptv) return ptv;
     const pt = parseAwPanTilt(await this.ptz('APC'));
-    if (!pt) throw new Error('AW: aPC answer unreadable');
+    if (!pt) throw new Error('AW: neither pTV nor aPC answer readable');
     let zoom: number | undefined;
     try {
       zoom = parseAwZoom(await this.ptz('GZ')) ?? undefined;

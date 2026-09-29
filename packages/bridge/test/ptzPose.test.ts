@@ -9,7 +9,7 @@ import {
   shotToPose, calibrateOffset, zoomForFocal, wrapDeg,
   viscaAbsolutePanTilt, viscaZoomDirect, parseViscaPanTilt, parseViscaZoom, nibbles4, fromNibbles4,
   sonyCgiAbsolutePanTilt, sonyCgiAbsoluteZoom, parseSonyCgiPose,
-  awAbsolutePanTilt, awAbsoluteZoom, parseAwPanTilt, parseAwZoom, AW_CENTER,
+  awAbsolutePanTilt, awAbsoluteZoom, parseAwPanTilt, parseAwPtv, parseAwZoom,
 } from '../src/protocol/ptzPose.js';
 import { parseCameraPlan } from '../src/plan/cameraPlan.js';
 
@@ -70,13 +70,16 @@ test('Sony CGI: AbsolutePanTilt/AbsoluteZoom and the inquiry answer', () => {
   assert.equal(parseSonyCgiPose('Power=on'), null);
 });
 
-test('Panasonic AW: #APC around 0x8000 and #AXZ between 0x555 and 0xFFF', () => {
-  assert.equal(awAbsolutePanTilt(0, 0), `APC7FFF${AW_CENTER.toString(16).toUpperCase()}`, 'pan 0 is the midpoint of the documented ends');
-  assert.equal(awAbsolutePanTilt(175, -30), 'APCD2F571C7');
-  assert.equal(awAbsolutePanTilt(-175, 0), 'APC2D088000');
+test('Panasonic AW: pan 0x2D09..0xD2F5, tilt inverted (0x5555 = +90° up), zoom 0x555..0xFFF, pTV reply', () => {
+  assert.equal(awAbsolutePanTilt(0, 0), 'APC7FFF8000', 'pan 0 is the midpoint of the documented ends');
+  assert.equal(awAbsolutePanTilt(-175, 90), 'APC2D095555');
+  assert.equal(awAbsolutePanTilt(175, -30), 'APCD2F58E38');
   assert.equal(awAbsoluteZoom(0), 'AXZ555');
   assert.equal(awAbsoluteZoom(1), 'AXZFFF');
-  assert.deepEqual(parseAwPanTilt('aPCD2F571C7'), { pan: 175, tilt: -30 });
+  assert.deepEqual(parseAwPanTilt('aPC2D095555'), { pan: -175, tilt: 90 });
+  assert.deepEqual(parseAwPanTilt('aPCD2F58E38'), { pan: 175, tilt: -30 });
+  assert.equal(parseAwPanTilt('aPC80001C71')?.tilt, 210);
+  assert.deepEqual(parseAwPtv('pTV80008000FFF555555'), { pan: 0, tilt: 0, zoom: 1 });
   assert.equal(parseAwZoom('gz555'), 0);
   assert.equal(parseAwZoom('axzFFF'), 1);
 });
