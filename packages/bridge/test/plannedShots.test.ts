@@ -90,7 +90,26 @@ test('drive, store and calibrate planned shots on the demo head; the offset surv
     c.send({ type: 'readPose', cameraNumber: 1 });
     pose = await c.waitFor((m) => m.type === 'pose');
     assert.equal(pose.pose.pan, 33);
+    // Zoom curve: drive to two stellings, record the focal length read off the lens.
+    c.send({ type: 'zoomTo', cameraNumber: 1, zoom: 0.25 });
+    await new Promise((r) => setTimeout(r, 50));
+    c.send({ type: 'captureZoomPoint', cameraNumber: 1, focalMm: 10 });
+    c.send({ type: 'zoomTo', cameraNumber: 1, zoom: 0.75 });
+    await new Promise((r) => setTimeout(r, 50));
+    c.send({ type: 'captureZoomPoint', cameraNumber: 1, focalMm: 60 });
+    const withTable = await c.waitFor<{ cameras: { config: { zoomTable?: { position: number; focalMm: number }[] } }[] }>(
+      (m) => m.type === 'cameras' && ((m.cameras as { config: { zoomTable?: unknown[] } }[])[0].config.zoomTable?.length ?? 0) === 2,
+    );
+    assert.deepEqual(withTable.cameras[0].config.zoomTable, [{ position: 0.25, focalMm: 10 }, { position: 0.75, focalMm: 60 }]);
+    // Shot 1 (66.65 mm) now uses the table: beyond the last point → 0.75, fit 'table'.
+    c.inbox = [];
+    c.send({ type: 'drivePlannedPreset', cameraNumber: 1, presetNumber: 1 });
+    const drove = await c.waitFor<{ fit: string }>((m) => m.type === 'plannedProgress' && m.step === 'driving');
+    assert.equal(drove.fit, 'table');
+    c.send({ type: 'clearZoomTable', cameraNumber: 1 });
+    await c.waitFor((m) => m.type === 'cameras' && (m.cameras as { config: { zoomTable?: unknown } }[])[0].config.zoomTable === undefined);
     // A shot the plan does not have is refused with a sentence.
+    c.inbox = [];
     c.send({ type: 'drivePlannedPreset', cameraNumber: 1, presetNumber: 9 });
     const err = await c.waitFor<{ message: string }>((m) => m.type === 'error');
     assert.match(err.message, /no shot 9/);

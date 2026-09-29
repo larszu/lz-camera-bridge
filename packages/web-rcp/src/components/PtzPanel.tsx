@@ -201,7 +201,10 @@ export function PtzPanel({ cameraId = 1, label, disabled = false, onCommand, ext
         {tally && tally !== 'off' && (
           <span className={`tile__tally tile__tally--${tally}`}>{tally === 'program' ? 'PGM' : 'PVW'}</span>
         )}
-        <span className="ptz-panel__cam">CAM {cameraId}{label ? ` · ${label}` : ''}</span>
+        {/* A plan label often carries the number already ("CAM 1 — Stage left"). */}
+        <span className="ptz-panel__cam">
+          {label && /^cam\s*\d/i.test(label) ? label : `CAM ${cameraId}${label ? ` · ${label}` : ''}`}
+        </span>
       </div>
 
       <div className="ptz-panel__body">

@@ -207,43 +207,67 @@ export function parseSonyCgiPose(body: string, unitsPerDeg = VISCA_UNITS_PER_DEG
 // ── Panasonic AW ────────────────────────────────────────────────────────────
 
 /**
- * `#APC[pan][tilt]`, 4 hex digits each, 0x8000 = centre. The AW protocol maps
- * −175..+175° pan to 0x2D08..0xD2F5 and −30..+90°/+210° tilt over the same
- * scale: 121.35 units per degree. Zoom `#AXZ[3 hex]`, 0x555 (wide)..0xFFF (tele).
+ * `#APC[pan][tilt]`, 4 hex digits each, 0x8000 = centre (home = `#APC80008000`).
+ * Source: Panasonic "HD/4K Integrated Camera Interface Specifications" v1.12
+ * and the AW-UE150/HE145, AW-UE100 and AW-UE80/50/40/30 interface specs.
+ *
+ *   Pan   0x2D09 (−175°) … 0xD2F5 (+175°), ≈121.35 counts per degree.
+ *   Tilt  INVERTED: the value falls as the head tilts up. 0x8E38 = −30°
+ *         (down), 0x5555 = +90° (up); HE120/HE130/HR140 reach 0x1C71 = +210°.
+ *         The spec tables print "5555(−30deg) – 8E38(+90deg)"; the arithmetic
+ *         and the UE80 spec's #HAC entry ("8E38(–30deg) – 5555(+90deg)") show
+ *         the direction used here.
+ *   Zoom  `#AXZ` 0x555 (wide) … 0xFFF (tele); `#GZ` answers `gz[3 hex]`.
+ *
+ * Position query: HD-generation heads answer `#APC` without data with
+ * `aPC[pan][tilt]`; UE150/UE100/UE80 list no such form and answer `#PTV`
+ * with `pTV[pan 4][tilt 4][zoom 3][focus 3][iris 3]` instead.
  */
-export const AW_PAN_MIN = 0x2d08; // −175°
+export const AW_PAN_MIN = 0x2d09; // −175°
 export const AW_PAN_MAX = 0xd2f5; // +175°
 export const AW_UNITS_PER_DEG = (AW_PAN_MAX - AW_PAN_MIN) / 350;
 export const AW_CENTER = 0x8000;
+/** Tilt scale per side: the spec's end values give 10923/90 up and 3640/30 down. */
+export const AW_TILT_UP_PER_DEG = (AW_CENTER - 0x5555) / 90;
+export const AW_TILT_DOWN_PER_DEG = (0x8e38 - AW_CENTER) / 30;
 export const AW_ZOOM_MIN = 0x555;
 export const AW_ZOOM_MAX = 0xfff;
 
-/**
- * Pan runs between the two documented end values; tilt uses the same scale
- * around 0x8000. *Tuning*: the tilt end values differ per AW model and have
- * not been read off a head here.
- */
 export function awAbsolutePanTilt(pan: number, tilt: number): string {
   const p = Math.round(AW_PAN_MIN + (Math.max(-175, Math.min(175, pan)) + 175) * AW_UNITS_PER_DEG);
-  const t = Math.round(AW_CENTER + tilt * AW_UNITS_PER_DEG);
+  const tc = Math.max(-30, Math.min(210, tilt));
+  const t = Math.round(AW_CENTER - tc * (tc >= 0 ? AW_TILT_UP_PER_DEG : AW_TILT_DOWN_PER_DEG));
   return `APC${hex4(p)}${hex4(t)}`;
 }
 export function awAbsoluteZoom(zoom01: number): string {
   return `AXZ${Math.round(AW_ZOOM_MIN + clamp01(zoom01) * (AW_ZOOM_MAX - AW_ZOOM_MIN)).toString(16).toUpperCase().padStart(3, '0')}`;
 }
-/** Reply `aPC[pan][tilt]` / `axz[zoom]` (the head answers the command in lower case). */
+function awPan(v: number): number {
+  return round1((v - AW_PAN_MIN) / AW_UNITS_PER_DEG - 175);
+}
+function awTilt(v: number): number {
+  const d = AW_CENTER - v;
+  return round1(d / (d >= 0 ? AW_TILT_UP_PER_DEG : AW_TILT_DOWN_PER_DEG));
+}
+function awZoom(v: number): number {
+  return clamp01((v - AW_ZOOM_MIN) / (AW_ZOOM_MAX - AW_ZOOM_MIN));
+}
+/** Reply `aPC[pan][tilt]`. */
 export function parseAwPanTilt(body: string): { pan: number; tilt: number } | null {
-  const m = /aPC([0-9a-fA-F]{4})([0-9a-fA-F]{4})/i.exec(body);
+  const m = /aPC([0-9a-fA-F]{4})([0-9a-fA-F]{4})/.exec(body);
   if (!m) return null;
-  return {
-    pan: round1((parseInt(m[1], 16) - AW_PAN_MIN) / AW_UNITS_PER_DEG - 175),
-    tilt: round1((parseInt(m[2], 16) - AW_CENTER) / AW_UNITS_PER_DEG),
-  };
+  return { pan: awPan(parseInt(m[1], 16)), tilt: awTilt(parseInt(m[2], 16)) };
+}
+/** Reply `pTV[pan 4][tilt 4][zoom 3][focus 3][iris 3]` (UE150/UE100/UE80). */
+export function parseAwPtv(body: string): Pose | null {
+  const m = /pTV([0-9a-fA-F]{4})([0-9a-fA-F]{4})([0-9a-fA-F]{3})/.exec(body);
+  if (!m) return null;
+  return { pan: awPan(parseInt(m[1], 16)), tilt: awTilt(parseInt(m[2], 16)), zoom: awZoom(parseInt(m[3], 16)) };
 }
 export function parseAwZoom(body: string): number | null {
   const m = /(?:a[xg]z|gz)([0-9a-fA-F]{3})/i.exec(body);
   if (!m) return null;
-  return clamp01((parseInt(m[1], 16) - AW_ZOOM_MIN) / (AW_ZOOM_MAX - AW_ZOOM_MIN));
+  return awZoom(parseInt(m[1], 16));
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────

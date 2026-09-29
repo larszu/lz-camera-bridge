@@ -225,7 +225,7 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices,
 
       {mode === 'demo' && (
         <div className="connection-row">
-          <p className="field" style={{ margin: 0 }}>
+          <p className="hint" style={{ margin: 0 }}>
             <strong>No camera, no address.</strong> The panel talks to a state
             held in the bridge: move a control and the value follows, so the
             surface can be tried on a laptop.

@@ -137,6 +137,20 @@ export function isPrivateHost(hostname: string): boolean {
   return false;
 }
 
+/**
+ * ffmpeg's last line, said so that someone at the panel knows what to do.
+ * The one case that needs it most: SRT is a protocol ffmpeg only has when it
+ * was built with libsrt — neither ffmpeg-static (bundled with the desktop
+ * app) nor Homebrew's default formula has it. Measured 2026-09-29:
+ * `ffmpeg -protocols` lists rtmp and tcp, no srt; RTSP is a demuxer and works.
+ */
+export function explainFfmpegError(url: string, line: string): string {
+  if (/protocol not found/i.test(line) && /^srt:/i.test(url)) {
+    return 'This ffmpeg has no SRT support. Install an ffmpeg built with libsrt and point LZ_BRIDGE_FFMPEG at it, or use the camera\'s RTSP or RTMP stream.';
+  }
+  return line;
+}
+
 interface Hub {
   url: string;
   subscribers: Set<FrameSubscriber>;
@@ -261,7 +275,8 @@ export class RtspHub {
     child.once('exit', (code) => {
       if (hub.child === child) hub.child = null;
       if (spawnFailed) return;
-      const reason = stderr.trim().split('\n').pop() || `ffmpeg exited (${code})`;
+      const last = stderr.trim().split('\n').pop() || `ffmpeg exited (${code})`;
+      const reason = explainFfmpegError(hub.url, last);
       if (hub.subscribers.size > 0) this.fail(hub, reason);
     });
   }
