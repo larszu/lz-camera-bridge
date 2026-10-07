@@ -24,7 +24,17 @@
  */
 
 #include <Arduino.h>
+#ifdef B4_BOARD_ESP32_DEVKIT
+#include <WiFi.h>
+#if __has_include("wifi_secrets.h")
+#include "wifi_secrets.h"
+#endif
+#if B4_DEMAND_HID
+#error "B4_DEMAND_HID needs native USB; the classic ESP32 has none"
+#endif
+#else
 #include <ETH.h>
+#endif
 #include <SPI.h>
 #include <Wire.h>
 #include <WebServer.h>
@@ -52,6 +62,7 @@ USBHIDGamepad gamepad;
 // SCK 15, MISO 14, MOSI 13) from a single secondary source. That would have
 // meant no Ethernet — and worse, GPIO 9 is the W5500's RESET and was being
 // driven as I²C SCL at the same time.
+#ifndef B4_BOARD_ESP32_DEVKIT
 #define B4_ETH_TYPE ETH_PHY_W5500
 #define B4_ETH_ADDR 1
 #define B4_ETH_MOSI 11
@@ -60,6 +71,7 @@ USBHIDGamepad gamepad;
 #define B4_ETH_CS 14
 #define B4_ETH_RST 9
 #define B4_ETH_IRQ 10
+#endif
 
 // ── I²C addresses ──────────────────────────────────────────────────────────
 #define ADDR_MCP4728 0x60
@@ -464,7 +476,7 @@ void setup() {
   while (!Serial && millis() - t0 < 2000) delay(10);
 
   Serial.println();
-  Serial.println(F("B4LensControl — ESP32-S3 B4 lens interface"));
+  Serial.println(F("B4LensControl — ESP32 B4 lens interface"));
   Serial.printf("  iris drive compiled in: %s\n", B4_ENABLE_IRIS_DRIVE ? "YES" : "no");
   Serial.printf("  serial TX to lens:      %s\n", B4_ENABLE_SERIAL_TX ? "YES" : "no (correct)");
 
@@ -472,7 +484,12 @@ void setup() {
   // Inversion in the UART, not in software — config.h §5.
 #if B4_ENABLE_SERIAL_TX
   Serial1.begin(LENS_BAUD, SERIAL_8N1, PIN_LENS_RX_FROM_LENS, PIN_LENS_TX, true);
+#ifdef B4_BOARD_ESP32_DEVKIT
+  pinMode(PIN_TX_INDICATOR, OUTPUT);
+  digitalWrite(PIN_TX_INDICATOR, HIGH); // blue LED on: this build can transmit
+#else
   rgbLedWrite(PIN_TX_INDICATOR, 64, 0, 0); // red: this build can transmit
+#endif
   Serial.println(F("  LENS TX COMPILED IN. The jumper decides whether it reaches pin 12."));
 #else
   Serial1.begin(LENS_BAUD, SERIAL_8N1, PIN_LENS_RX_FROM_LENS, -1, true);
@@ -532,9 +549,25 @@ void setup() {
   Serial.println(cal.load() ? F("Calibration table loaded from NVS.")
                             : F("No calibration table. Drive will refuse until one is recorded."));
 
+#ifdef B4_BOARD_ESP32_DEVKIT
+  WiFi.setHostname(HOSTNAME);
+#ifdef B4_WIFI_SSID
+  WiFi.mode(WIFI_AP_STA);
+#else
+  WiFi.mode(WIFI_AP);
+#endif
+  WiFi.setSleep(false);
+  WiFi.softAP(B4_AP_SSID, B4_AP_PASSWORD);
+  Serial.printf("Access point \"%s\": http://%s\n", B4_AP_SSID, WiFi.softAPIP().toString().c_str());
+#ifdef B4_WIFI_SSID
+  WiFi.begin(B4_WIFI_SSID, B4_WIFI_PASSWORD);
+  Serial.printf("Joining \"%s\"…\n", B4_WIFI_SSID);
+#endif
+#else
   SPI.begin(B4_ETH_SCK, B4_ETH_MISO, B4_ETH_MOSI);
   ETH.begin(B4_ETH_TYPE, B4_ETH_ADDR, B4_ETH_CS, B4_ETH_IRQ, B4_ETH_RST, SPI);
   ETH.setHostname(HOSTNAME);
+#endif
 
   setupRoutes();
   server.begin();
@@ -547,13 +580,22 @@ void loop() {
   serviceSerial(); // every pass, not every LOOP_INTERVAL: the UART FIFO is 128 bytes
 #endif
 
-  if (!health.ethUp && ETH.linkUp()) {
+#ifdef B4_BOARD_ESP32_DEVKIT
+  // ethUp means "joined the house network"; the AP is always there.
+  const bool linkUp = WiFi.status() == WL_CONNECTED;
+  const IPAddress linkIp = WiFi.localIP();
+  const char *linkName = "WLAN";
+#else
+  const bool linkUp = ETH.linkUp();
+  const IPAddress linkIp = ETH.localIP();
+  const char *linkName = "Ethernet";
+#endif
+  if (!health.ethUp && linkUp) {
     health.ethUp = true;
-    Serial.print(F("Ethernet up: http://"));
-    Serial.println(ETH.localIP());
-  } else if (health.ethUp && !ETH.linkUp()) {
+    Serial.printf("%s up: http://%s\n", linkName, linkIp.toString().c_str());
+  } else if (health.ethUp && !linkUp) {
     health.ethUp = false;
-    Serial.println(F("Ethernet link lost."));
+    Serial.printf("%s link lost.\n", linkName);
   }
 
   const uint32_t now = millis();
