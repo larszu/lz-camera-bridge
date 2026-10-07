@@ -6,13 +6,10 @@
  * Sony SDK is required — the bulk transfers go straight to the camera through
  * the optional native `usb` (libusb) module.
  *
- * Connection sequence (matches libgphoto2's Sony init):
- *   1. OpenSession
- *   2. SDIO_Connect(1) / SDIO_Connect(2)
- *   3. SDIO_GetExtDeviceInfo(version) — pulls the vendor property list
- *   4. SDIO_Connect(3)
- * After that, value properties are set with ControlDeviceA (0x9205) and
- * momentary buttons (capture, record, AF) with ControlDeviceB (0x9207).
+ * The handshake (protocol 3.00 with retry), confirmed writes, buttons and the
+ * RCP mapping live in `SonyPtpClient`, shared with the network path
+ * (`SonyPtpIpClient`). This file is only the USB transport: claim the
+ * Still-Image interface and move PTP containers over the bulk endpoints.
  *
  * NOTE: the camera must be set to "PC Remote" (USB control) mode. On Windows the
  * libusb path needs a WinUSB driver bound to the camera (e.g. via Zadig); this
@@ -21,7 +18,6 @@
  * model and may need per-model tuning.
  */
 
-import { EventEmitter } from 'events';
 import {
   packCommand,
   packData,
@@ -30,30 +26,10 @@ import {
   PTP_CONTAINER_RESPONSE,
   PTP_CONTAINER_HEADER_LEN,
   PTP_RC_OK,
-  PTP_OC_OpenSession,
-  PTP_OC_CloseSession,
-  PTP_OC_SONY_SDIO_Connect,
-  PTP_OC_SONY_SDIO_GetExtDeviceInfo,
-  PTP_OC_SONY_SDIO_SetExtDevicePropValue,
-  PTP_OC_SONY_SDIO_ControlDevice,
-  PTP_DPC_FNumber,
-  PTP_DPC_SONY_ISO,
-  PTP_DPC_SONY_ShutterSpeed,
-  PTP_DPC_SONY_ColorTemp,
-  PTP_DPC_SONY_ShutterRelease,
-  PTP_DPC_SONY_ShutterHalfRelease,
-  PTP_DPC_SONY_MovieRecButtonHold,
-  PTP_DPC_SONY_CustomWBCapture,
-  SONY_BUTTON_DOWN,
-  SONY_BUTTON_UP,
-  encodeFNumber,
-  encodeIso,
-  encodeShutterSpeed,
-  encodeColorTemp,
-  encodeButton,
-  irisPositionToFNumber,
-  GAIN_INDEX_TO_ISO,
 } from '../protocol/SonyPtp.js';
+import { SonyPtpClient, type SonyPtpState } from './SonyPtpClient.js';
+
+export type { SonyPtpState };
 
 const SONY_VENDOR_ID = 0x054c;
 const USB_CLASS_STILL_IMAGE = 6; // PTP interface class
@@ -63,14 +39,6 @@ const TRANSFER_TIMEOUT_MS = 4000;
 export interface SonyPtpTarget {
   id: string; // "usb:<bus>.<address>"
   model: string;
-}
-
-export interface SonyPtpState {
-  iris: number; // 0-255 RCP scale
-  masterGain: number; // gain index 0-6
-  shutterSpeed: number;
-  colorTemperature: number;
-  recording: boolean;
 }
 
 /** Lazily load the optional native `usb` module; returns null when absent. */
@@ -83,25 +51,12 @@ async function loadUsb(): Promise<any | null> {
   }
 }
 
-export class SonyPtpUsbClient extends EventEmitter {
+export class SonyPtpUsbClient extends SonyPtpClient {
   private device: any = null;
   private iface: any = null;
   private epOut: any = null;
   private epIn: any = null;
   private transactionId = 0;
-  private connected = false;
-
-  readonly state: SonyPtpState = {
-    iris: 128,
-    masterGain: 0,
-    shutterSpeed: 60,
-    colorTemperature: 5600,
-    recording: false,
-  };
-
-  get isConnected(): boolean {
-    return this.connected;
-  }
 
   // ── Connection ────────────────────────────────────────────────────────────
 
@@ -121,13 +76,8 @@ export class SonyPtpUsbClient extends EventEmitter {
     this.device.open();
     this.claimStillImageInterface();
 
-    // PTP + Sony handshake.
     this.transactionId = 0;
-    await this.transaction(PTP_OC_OpenSession, [1]);
-    await this.transaction(PTP_OC_SONY_SDIO_Connect, [1, 0, 0]);
-    await this.transaction(PTP_OC_SONY_SDIO_Connect, [2, 0, 0]);
-    await this.transaction(PTP_OC_SONY_SDIO_GetExtDeviceInfo, [0xc8]); // pulls vendor prop list (ignored)
-    await this.transaction(PTP_OC_SONY_SDIO_Connect, [3, 0, 0]);
+    await this.handshake();
 
     this.connected = true;
     this.emit('connected', target);
@@ -135,11 +85,7 @@ export class SonyPtpUsbClient extends EventEmitter {
 
   async disconnect(): Promise<void> {
     if (this.device) {
-      try {
-        if (this.connected) await this.transaction(PTP_OC_CloseSession, []);
-      } catch {
-        /* ignore */
-      }
+      await this.closeSession();
       try {
         this.iface?.release(true, () => {});
       } catch {
@@ -220,7 +166,7 @@ export class SonyPtpUsbClient extends EventEmitter {
    * Run one PTP transaction: Command → optional Data-out → Response.
    * Returns the data-in payload (if the camera sent one) or null.
    */
-  private async transaction(opcode: number, params: number[], dataOut?: Buffer): Promise<Buffer | null> {
+  protected async transaction(opcode: number, params: number[], dataOut?: Buffer): Promise<Buffer | null> {
     if (!this.epOut || !this.epIn) throw new Error('Not connected');
     const tid = ++this.transactionId;
 
@@ -251,105 +197,5 @@ export class SonyPtpUsbClient extends EventEmitter {
       throw new Error(`PTP-Fehler 0x${container.code.toString(16)} (op 0x${opcode.toString(16)})`);
     }
     return dataIn;
-  }
-
-  /** Set a value property (ControlDeviceA / 0x9205). */
-  private setControlA(propCode: number, value: Buffer): Promise<Buffer | null> {
-    return this.transaction(PTP_OC_SONY_SDIO_SetExtDevicePropValue, [propCode], value);
-  }
-
-  /** Press a momentary button property (ControlDeviceB / 0x9207). */
-  private async pressButton(propCode: number, hold = 60): Promise<void> {
-    await this.transaction(PTP_OC_SONY_SDIO_ControlDevice, [propCode], encodeButton(SONY_BUTTON_DOWN));
-    await new Promise((r) => setTimeout(r, hold));
-    await this.transaction(PTP_OC_SONY_SDIO_ControlDevice, [propCode], encodeButton(SONY_BUTTON_UP));
-  }
-
-  // ── High-level control ─────────────────────────────────────────────────────
-
-  async setIrisPosition(position: number): Promise<void> {
-    await this.setControlA(PTP_DPC_FNumber, encodeFNumber(irisPositionToFNumber(position)));
-    this.state.iris = position;
-    this.emitState();
-  }
-
-  async setGainIndex(index: number): Promise<void> {
-    const iso = GAIN_INDEX_TO_ISO[index] ?? 800;
-    await this.setControlA(PTP_DPC_SONY_ISO, encodeIso(iso));
-    this.state.masterGain = index;
-    this.emitState();
-  }
-
-  /** Sets shutter to 1/denominator. */
-  async setShutterDenominator(denominator: number): Promise<void> {
-    if (denominator <= 0) return;
-    await this.setControlA(PTP_DPC_SONY_ShutterSpeed, encodeShutterSpeed(1, denominator));
-    this.state.shutterSpeed = denominator;
-    this.emitState();
-  }
-
-  async setColorTemperature(kelvin: number): Promise<void> {
-    await this.setControlA(PTP_DPC_SONY_ColorTemp, encodeColorTemp(kelvin));
-    this.state.colorTemperature = kelvin;
-    this.emitState();
-  }
-
-  async executeAutoWhiteBalance(): Promise<void> {
-    await this.pressButton(PTP_DPC_SONY_CustomWBCapture);
-  }
-
-  async autoFocus(): Promise<void> {
-    await this.pressButton(PTP_DPC_SONY_ShutterHalfRelease, 200);
-  }
-
-  async capture(): Promise<void> {
-    await this.pressButton(PTP_DPC_SONY_ShutterRelease);
-  }
-
-  /** Toggle movie recording (the rec button is a single momentary toggle). */
-  async setRecording(on: boolean): Promise<void> {
-    await this.pressButton(PTP_DPC_SONY_MovieRecButtonHold);
-    this.state.recording = on;
-    this.emitState();
-  }
-
-  /**
-   * Map dashboard RCP commands onto camera control. Returns false for commands
-   * the USB/PTP path does not support (so the caller can report it).
-   */
-  async handleRcpCommand(cmd: string, params: Record<string, unknown>): Promise<boolean> {
-    const num = (k: string, d = 0) => Number(params[k] ?? d);
-    switch (cmd) {
-      case 'setIris':
-        await this.setIrisPosition(num('value'));
-        return true;
-      case 'setMasterGain':
-        await this.setGainIndex(num('value'));
-        return true;
-      case 'setShutterSpeed':
-        await this.setShutterDenominator(num('value'));
-        return true;
-      case 'setColorTemp':
-        await this.setColorTemperature(num('value', 5600));
-        return true;
-      case 'autoWhiteBalance':
-        await this.executeAutoWhiteBalance();
-        return true;
-      case 'setRecording':
-        await this.setRecording(Boolean(params['on']));
-        return true;
-      case 'setNdFilter':
-      case 'setBars':
-        // No PTP property exposed for these on Alpha/Cinema bodies.
-        console.log(`[SonyPTP] '${cmd}' wird über USB/PTP nicht unterstützt`);
-        return false;
-      default:
-        console.log(`[SonyPTP] Unbekanntes Kommando: ${cmd}`);
-        return false;
-    }
-  }
-
-  private emitState(): void {
-    this.emit('stateChanged', { ...this.state });
   }
 }
