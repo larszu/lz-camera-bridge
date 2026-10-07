@@ -44,6 +44,15 @@ pio run -e waveshare-esp32-s3-eth -t upload    # default: reads, drives nothing
 ./tools/flash.sh --armed                       # drive compiled in; prompts first
 ```
 
+On the **classic ESP32 DevKit** used on the bench (WLAN instead of Ethernet,
+own access point `b4-lens` at http://192.168.4.1) — pin map in
+[`docs/b4/pinout-esp32-devkit.md`](../../docs/b4/pinout-esp32-devkit.md):
+
+```bash
+pio run -e esp32-devkit -t upload          # safe
+pio run -e esp32-devkit-armed -t upload    # drive compiled in
+```
+
 For a group B lens (serial on pins 11/12) there is a third build that listens
 to both directions and has the transmit path compiled in — behind the
 `B4_COMMAND_CODES_RESOLVED` gate and a physical jumper. Procedure first:
