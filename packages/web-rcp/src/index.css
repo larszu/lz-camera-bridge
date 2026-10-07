@@ -1,6 +1,6 @@
 /* LZ Camera Bridge Dashboard — dark broadcast-style theme */
 
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; border-radius: var(--radius); }
 
 /* ADR-007 (av-planner-suite) — die Tokens des DASHBOARDS zeigen auf die
    Marken-Palette der Suite. Die Regelnamen bleiben unveraendert; die
@@ -16,7 +16,7 @@
 :root {
   --bg: #132040;          /* Deep Navy — Grund */
   --surface: #1D324F;     /* Zumpe Navy — Karten */
-  --surface2: #24405F;    /* abgeleitet — erhoben */
+  --surface2: color-mix(in oklab, #1D324F, #F6F5F0 6%); /* Stufe 2 */
   --border: rgba(246, 245, 240, 0.14);
   --text: #E1ECEF;        /* Eisblau — Fliesstext auf Dunkel */
   --text-muted: #8C9CB3;  /* Stahlblau — Meta, Platzhalter */
@@ -40,6 +40,81 @@
      ADR-007. Diese Oberflaeche wird im Regieraum auf einem Tablet bedient,
      nicht mit der Maus am Schreibtisch. */
   --ziel: 32px;
+
+  /* ── lzm-web 2026: Flaechenstufen, Linien, Zustaende, Bewegung ──────────
+     Neue Toene nur als Mischung zweier Palettenfarben. Tiefe kommt aus der
+     Flaechenstufe und der Haarlinie, nicht aus Schatten. */
+  color-scheme: dark;
+  --off-white: #F6F5F0;
+  --schiefer: #5C6B85;
+  --surface-0: var(--bg);
+  --surface-1: var(--surface);
+  --surface-2: color-mix(in oklab, #1D324F, var(--off-white) 6%);
+  --surface-3: color-mix(in oklab, #1D324F, var(--off-white) 10%);
+  --surface-4: color-mix(in oklab, #1D324F, var(--off-white) 14%);
+  --text-strong: var(--off-white);
+  --line-1: color-mix(in oklab, var(--off-white) 10%, transparent);
+  --line-3: color-mix(in oklab, var(--off-white) 32%, transparent);
+  --scrim: color-mix(in oklab, #132040 70%, transparent);
+  --state: var(--off-white);
+  --state-hover: 6%;
+  --state-press: 10%;
+  --font: 'Public Sans Variable', 'Public Sans', system-ui, 'Segoe UI', Roboto, Arial, sans-serif;
+  --fs-ui: 14px;
+  --fs-ui-sm: 13px;
+  --fs-kicker: 11px;
+  --track-kicker: 0.18em;
+  --ease: cubic-bezier(.2, .8, .2, 1);
+  --dur-1: 120ms;
+  --dur-2: 200ms;
+  --dur-3: 350ms;
+  --dur: var(--dur-1);
+}
+
+/* Hell: Print-Gewichtung -- Grund Off-White, Flaechen Weiss und Eisblau,
+   Text Navy, Sekundaertext Schiefer (Stahlblau nie als Text auf Hell). Die
+   Systemvorgabe gilt, die Wahl im Kopf (`data-theme`) schlaegt sie. */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark']) {
+    color-scheme: light;
+    --bg: var(--off-white);
+    --surface: #FFFFFF;
+    --surface2: #E1ECEF;
+    --surface-2: #E1ECEF;
+    --surface-3: #FFFFFF;
+    --surface-4: #FFFFFF;
+    --border: color-mix(in oklab, #1D324F 18%, transparent);
+    --line-1: color-mix(in oklab, #1D324F 10%, transparent);
+    --line-3: color-mix(in oklab, #1D324F 40%, transparent);
+    --text: #1D324F;
+    --text-strong: #1D324F;
+    --text-muted: var(--schiefer);
+    --accent: #1D324F;
+    --accent-text: var(--off-white);
+    --state: #1D324F;
+  }
+}
+:root[data-theme='light'] {
+  color-scheme: light;
+  --bg: var(--off-white);
+  --surface: #FFFFFF;
+  --surface2: #E1ECEF;
+  --surface-2: #E1ECEF;
+  --surface-3: #FFFFFF;
+  --surface-4: #FFFFFF;
+  --border: color-mix(in oklab, #1D324F 18%, transparent);
+  --line-1: color-mix(in oklab, #1D324F 10%, transparent);
+  --line-3: color-mix(in oklab, #1D324F 40%, transparent);
+  --text: #1D324F;
+  --text-strong: #1D324F;
+  --text-muted: var(--schiefer);
+  --accent: #1D324F;
+  --accent-text: var(--off-white);
+  --state: #1D324F;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --dur-2: 0ms; --dur-3: 120ms; }
 }
 
 /* ───────────────────────────────────────────────────────────────────────────
@@ -87,12 +162,17 @@ button, summary, [role='button'] {
 }
 
 body {
-  font-family: 'Public Sans', system-ui, 'Segoe UI', Roboto, Arial, sans-serif;
+  font-family: var(--font);
+  font-synthesis: none;
   background: var(--bg);
   color: var(--text);
   min-height: 100vh;
-  font-size: 13px;
+  font-size: var(--fs-ui-sm);
+  line-height: 1.45;
 }
+h1, h2, h3 { color: var(--text-strong); text-wrap: balance; }
+p { text-wrap: pretty; }
+::selection { background: color-mix(in oklab, var(--accent) 25%, transparent); }
 
 /* ─── Schieberegler: 24 px Trefferflaeche (WCAG 2.2 SC 2.5.8) ─────────────
  *
@@ -177,11 +257,12 @@ input[type="range"]:disabled {
   gap: 16px;
 }
 
-.app__logo { font-weight: 700; font-size: 15px; letter-spacing: 0.5px; }
+.app__logo, .app__title { font-weight: 800; font-size: 15px; color: var(--text-strong); }
 
 .app__error {
-  background: #5a1a1a;
-  color: #ff8888;
+  background: var(--surface-2);
+  color: var(--text-strong);
+  border-left: 2px solid var(--danger);
   padding: 4px 10px;
   border-radius: 0;
   font-size: 12px;
@@ -217,17 +298,19 @@ input[type="range"]:disabled {
 }
 
 .app__error-panel {
-  background: #5a1a1a;
-  color: #ff8888;
+  background: var(--surface-2);
+  color: var(--text-strong);
   padding: 12px;
   border-radius: 0;
   font-size: 12px;
-  border: 1px solid #ff4444;
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--danger);
 }
 
 @media (max-width: 900px) {
   .app__main--rcp {
     flex-direction: column;
+    align-items: stretch;
   }
   .app__sidebar {
     width: 100%;
@@ -238,18 +321,31 @@ input[type="range"]:disabled {
 
 .panel {
   background: var(--surface);
-  border: 1px solid var(--border);
+  border-top: 1px solid var(--border);
   border-radius: 0;
   padding: 14px 16px;
 }
 
-.panel__title {
-  font-size: 11px;
+/* Kicker als Panel-Kopf: Versalien nur hier, mit Kopflinie. */
+.panel__title, .rcp__section-title {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: var(--fs-kicker);
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 1px;
+  letter-spacing: var(--track-kicker);
   color: var(--text-muted);
   margin-bottom: 12px;
 }
+.panel__title::after, .rcp__section-title::after {
+  content: '';
+  height: 1px;
+  background: var(--line-3);
+}
+/* In a head row next to a button the kicker takes the rest of the width, so
+   the head line runs up to the button instead of stopping under the word. */
+.panel__header .panel__title, .camera-list__head .panel__title { flex: 1; margin-right: 12px; margin-bottom: 0; }
 
 /* ─── Connection Panel ────────────────────────────────────────────────────── */
 
@@ -269,19 +365,21 @@ input[type="range"]:disabled {
 
 .mode-tab {
   text-align: left;
-  padding: 8px 12px;
+  padding: 8px 12px 8px 10px;
   border: none;
+  border-left: 2px solid transparent;
   background: var(--bg);
   color: var(--text-muted);
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--fs-ui-sm);
   font-weight: 600;
-  transition: background 0.15s, color 0.15s;
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
 }
-.mode-tab:hover { color: var(--text); }
+.mode-tab:hover { color: var(--text-strong); background: color-mix(in oklab, var(--bg), var(--state) var(--state-hover)); }
 .mode-tab--active {
-  background: var(--accent);
-  color: var(--accent-text);
+  background: var(--surface-2);
+  border-left-color: var(--text-strong);
+  color: var(--text-strong);
 }
 
 .serial-port-row {
@@ -294,13 +392,18 @@ input[type="range"]:disabled {
 .btn--sm {
   padding: 5px 10px;
   border-radius: 0;
-  border: 1px solid var(--border);
-  background: var(--surface2);
-  color: var(--text);
+  border: 1px solid var(--line-3);
+  background: transparent;
+  color: var(--text-strong);
   cursor: pointer;
-  font-size: 14px;
+  font-size: var(--fs-ui-sm);
+  font-weight: 600;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
 }
-.btn--sm:hover { border-color: var(--accent); }
+.btn--sm:hover { border-color: var(--accent); background: color-mix(in oklab, var(--state) var(--state-hover), transparent); }
+.btn--sm:active { background: color-mix(in oklab, var(--state) var(--state-press), transparent); }
+.btn--sm:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .connection-row {
   display: flex;
@@ -321,26 +424,24 @@ input[type="range"]:disabled {
 .field--sm { flex: 0 0 90px; min-width: 80px; }
 
 .field label {
-  font-size: 11px;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-strong);
 }
 
 .field input, .select-group__select {
-  background: var(--bg);
+  background: var(--surface-2);
   border: 1px solid var(--border);
-  color: var(--text);
+  color: var(--text-strong);
   border-radius: 0;
   padding: 6px 8px;
-  font-size: 13px;
+  font: inherit;
+  font-size: var(--fs-ui-sm);
   width: 100%;
+  transition: border-color var(--dur-1) var(--ease);
 }
-
-.field input:focus, .select-group__select:focus {
-  outline: none;
-  border-color: var(--accent);
-}
+.field input:hover, .select-group__select:hover { border-color: var(--line-3); }
+.field input::placeholder { color: var(--text-muted); }
 
 .connection-actions { display: flex; gap: 8px; margin-bottom: 10px; }
 
@@ -368,19 +469,27 @@ input[type="range"]:disabled {
 .btn {
   padding: 7px 16px;
   border-radius: 0;
-  border: none;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-strong);
   cursor: pointer;
-  font-size: 13px;
+  font: inherit;
+  font-size: var(--fs-ui-sm);
   font-weight: 600;
-  transition: opacity 0.15s;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
 }
-.btn:hover { opacity: 0.85; }
-.btn:disabled { opacity: 0.4; cursor: default; }
-/* Der Punkt macht sichtbar, welcher der EINE primaere Knopf ist (ADR-007). */
-.btn--primary { background: var(--accent); color: var(--accent-text);
-  display: inline-flex; align-items: center; gap: 7px; }
-.btn--primary::before { content: ''; width: 6px; height: 6px; background: var(--signal); flex: none; }
-.btn--danger { background: var(--danger); color: #fff; }
+.btn:hover { background: color-mix(in oklab, var(--state) var(--state-hover), transparent); }
+.btn:active { background: color-mix(in oklab, var(--state) var(--state-press), transparent); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+/* Werkzeug-Modus (lzm-web): der Primaerknopf ist Off-White ohne Punkt.
+   Rot erscheint im Werkzeug nur als Fokusring und als echter Tally-Zustand. */
+.btn--primary { background: var(--accent); color: var(--accent-text); }
+.btn--primary:hover { background: color-mix(in oklab, var(--accent), var(--bg) 10%); }
+.btn--secondary { border-color: var(--line-3); }
+.btn--secondary:hover { border-color: var(--accent); }
+/* Gefaehrlich: Ghost mit Text in der Statusrot-Mischung, nie Tally-Rot. */
+.btn--danger { background: transparent; border-color: var(--line-3); color: color-mix(in oklab, var(--danger), var(--text-strong) 35%); }
 
 /* ─── RCP Dashboard ───────────────────────────────────────────────────────── */
 
@@ -394,17 +503,9 @@ input[type="range"]:disabled {
 
 .rcp__section {
   background: var(--surface);
-  border: 1px solid var(--border);
+  border-top: 1px solid var(--border);
   border-radius: 0;
   padding: 14px 16px;
-}
-
-.rcp__section-title {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  color: var(--text-muted);
-  margin-bottom: 12px;
 }
 
 .rcp__grid {
@@ -426,9 +527,8 @@ input[type="range"]:disabled {
 }
 
 .dial__label {
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  font-size: 12px;
+  font-weight: 600;
   color: var(--text-muted);
 }
 
@@ -436,7 +536,7 @@ input[type="range"]:disabled {
   font-size: 18px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  color: var(--accent);
+  color: var(--text-strong);
 }
 
 .dial__unit { font-size: 11px; color: var(--text-muted); }
@@ -446,10 +546,11 @@ input[type="range"]:disabled {
   accent-color: var(--accent);
   cursor: pointer;
 }
-.dial__slider:disabled { opacity: 0.4; cursor: default; }
+.dial__slider:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .dial__pct {
-  font-size: 10px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
   color: var(--text-muted);
   text-align: right;
 }
@@ -459,18 +560,19 @@ input[type="range"]:disabled {
 .toggle {
   padding: 8px 18px;
   border-radius: 0;
-  border: 1px solid var(--border);
-  background: var(--surface2);
-  color: var(--text);
+  border: 1px solid var(--line-3);
+  background: transparent;
+  color: var(--text-strong);
   cursor: pointer;
-  font-size: 13px;
+  font: inherit;
+  font-size: var(--fs-ui-sm);
   font-weight: 600;
   min-width: 100px;
   text-align: center;
-  transition: background 0.15s, color 0.15s;
+  transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
 }
-.toggle:hover { border-color: var(--accent); }
-.toggle:disabled { opacity: 0.4; cursor: default; }
+.toggle:hover { border-color: var(--accent); background: color-mix(in oklab, var(--state) var(--state-hover), transparent); }
+.toggle:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* ─── Select ──────────────────────────────────────────────────────────────── */
 
@@ -485,19 +587,9 @@ input[type="range"]:disabled {
 }
 
 .select-group__label {
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  font-size: 12px;
+  font-weight: 600;
   color: var(--text-muted);
-}
-
-.select-group__select {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  color: var(--text);
-  border-radius: 0;
-  padding: 6px 8px;
-  font-size: 13px;
 }
 
 /* ─── WIZnet Panel ────────────────────────────────────────────────────────── */
@@ -542,7 +634,7 @@ input[type="range"]:disabled {
 .wiznet-card__ident {
   font-weight: 700;
   font-size: 13px;
-  color: var(--accent);
+  color: var(--text-strong);
 }
 
 .wiznet-card__fw {
@@ -573,7 +665,7 @@ input[type="range"]:disabled {
 .wizard-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.7);
+  background: var(--scrim);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -582,7 +674,7 @@ input[type="range"]:disabled {
 }
 
 .wizard {
-  background: var(--surface);
+  background: var(--surface-4);
   border: 1px solid var(--border);
   border-radius: 0;
   width: 90%;
@@ -599,8 +691,9 @@ input[type="range"]:disabled {
 
 .wizard__header h2 {
   margin: 0 0 4px;
-  font-size: 18px;
-  color: var(--text);
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text-strong);
 }
 
 .wizard__device {
@@ -630,7 +723,7 @@ input[type="range"]:disabled {
   height: 28px;
   border-radius: 0;
   background: var(--bg);
-  border: 2px solid var(--border);
+  border: 1px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -638,7 +731,7 @@ input[type="range"]:disabled {
   font-weight: 700;
   color: var(--text-muted);
   margin-bottom: 4px;
-  transition: all 0.2s;
+  transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
 }
 
 .wizard__step--active .wizard__step-dot {
@@ -648,19 +741,18 @@ input[type="range"]:disabled {
 }
 
 .wizard__step--done .wizard__step-dot {
-  background: var(--success);
   border-color: var(--success);
-  color: #fff;
+  color: var(--text-strong);
 }
 
 .wizard__step-label {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-muted);
   text-align: center;
 }
 
 .wizard__step--active .wizard__step-label {
-  color: var(--accent);
+  color: var(--text-strong);
   font-weight: 600;
 }
 
@@ -672,8 +764,9 @@ input[type="range"]:disabled {
 
 .wizard__section h3 {
   margin: 0 0 12px;
-  font-size: 15px;
-  color: var(--text);
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text-strong);
 }
 
 .wizard__hint {
@@ -695,35 +788,37 @@ input[type="range"]:disabled {
 
 .wizard__mode-btn {
   flex: 1;
-  background: var(--surface2);
-  border: 2px solid var(--border);
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  border-left: 2px solid transparent;
   border-radius: 0;
   padding: 16px;
   cursor: pointer;
   text-align: center;
-  transition: all 0.2s;
+  color: var(--text-strong);
+  transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
 }
 
 .wizard__mode-btn:hover {
-  border-color: var(--accent);
+  border-color: var(--line-3);
 }
 
 .wizard__mode-btn--active {
-  border-color: var(--accent);
-  background: rgba(0, 180, 216, 0.1);
+  background: var(--surface-2);
+  border-left-color: var(--text-strong);
 }
 
 .wizard__mode-icon {
-  font-size: 28px;
   display: block;
-  margin-bottom: 8px;
+  margin: 0 auto 8px;
+  color: var(--text-strong);
 }
 
 .wizard__mode-title {
   display: block;
   font-weight: 700;
   font-size: 14px;
-  color: var(--text);
+  color: var(--text-strong);
   margin-bottom: 4px;
 }
 
@@ -749,18 +844,13 @@ input[type="range"]:disabled {
 .wizard__field input[type="text"],
 .wizard__field input[type="number"],
 .wizard__field select {
-  background: var(--bg);
+  background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: 0;
   padding: 8px 10px;
-  font-size: 14px;
-  color: var(--text);
-}
-
-.wizard__field input:focus,
-.wizard__field select:focus {
-  outline: none;
-  border-color: var(--accent);
+  font: inherit;
+  font-size: var(--fs-ui);
+  color: var(--text-strong);
 }
 
 .wizard__field input[type="checkbox"] {
@@ -835,3 +925,17 @@ input[type="range"]:disabled {
 /* LZ Scopes injects its own panel CSS with a 3 px radius; ADR-007 says none. */
 .scopes .lzs-panel,
 .scopes .lzs-head select { border-radius: 0; }
+
+/* ── lzm-web: Zustaende, die jede Flaeche teilt ────────────────────────── */
+.skeleton { background: var(--surface-2); animation: puls 1.6s var(--ease) infinite; }
+@keyframes puls { 50% { opacity: 0.55; } }
+@media (prefers-reduced-motion: reduce) { .skeleton { animation: none; } }
+.app :is(button, a, input, select, textarea) { scroll-margin-top: 72px; }
+.theme-toggle { margin-left: 8px; }
+@media (max-width: 640px) {
+  .app__header { padding: 8px 16px; }
+  .app__header .nav { order: 3; width: 100%; margin-left: 0; overflow-x: auto; }
+  .app__header .nav__tab { flex: 1; padding: 0 8px; }
+  .theme-toggle { margin-left: auto; }
+}
+.icon { display: block; flex: none; }

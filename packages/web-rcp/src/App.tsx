@@ -19,6 +19,8 @@ import './styles/sony-rcp.css';
 import './styles/wizard.css';
 import './styles/ptz-panel.css';
 import './styles/regie.css';
+import './styles/dashboard.css';
+import { Icon, type IconName } from './components/Icon.tsx';
 
 type PanelView = 'rcp' | 'ptz';
 /** The five views. `single`/`multi` are the panel; the other three came with the control room. */
@@ -61,7 +63,37 @@ function initialView(): { view: ViewMode; bare: boolean } {
   return { view: 'single', bare: false };
 }
 
+type Theme = 'auto' | 'dark' | 'light';
+const THEME_KEY = 'lzcb.theme';
+const THEME_NEXT: Record<Theme, Theme> = { auto: 'dark', dark: 'light', light: 'auto' };
+const THEME_ICON: Record<Theme, IconName> = { auto: 'auto', dark: 'moon', light: 'sun' };
+
+function readTheme(): Theme {
+  try {
+    const t = localStorage.getItem(THEME_KEY);
+    return t === 'dark' || t === 'light' ? t : 'auto';
+  } catch {
+    return 'auto';
+  }
+}
+
+/** Light/dark follows the system; the choice in the header overrides it. */
+function useTheme(): [Theme, () => void] {
+  const [theme, setTheme] = useState<Theme>(readTheme);
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme === 'auto') delete root.dataset.theme;
+    else root.dataset.theme = theme;
+    try {
+      if (theme === 'auto') localStorage.removeItem(THEME_KEY);
+      else localStorage.setItem(THEME_KEY, theme);
+    } catch { /* private window: the choice lasts for this session */ }
+  }, [theme]);
+  return [theme, () => setTheme((t) => THEME_NEXT[t])];
+}
+
 export default function App() {
+  const [theme, cycleTheme] = useTheme();
   const [{ view: firstView, bare }] = useState(initialView);
   const [panelView, setPanelView] = useState<PanelView>('rcp');
   const [viewMode, setViewModeState] = useState<ViewMode>(firstView);
@@ -241,6 +273,14 @@ export default function App() {
             </button>
           ))}
         </nav>
+        <button
+          className="btn btn--sm theme-toggle"
+          onClick={cycleTheme}
+          title={`Theme: ${theme} (click to change)`}
+          aria-label={`Theme: ${theme}`}
+        >
+          <Icon name={THEME_ICON[theme]} size={16} />
+        </button>
       </header>
 
       {errorMsg && viewMode !== 'single' && (
@@ -361,8 +401,9 @@ export default function App() {
                   <button
                     className="camera-list__remove"
                     title="Remove"
+                    aria-label="Remove"
                     onClick={(e) => { e.stopPropagation(); removeCamera(n); }}
-                  >✕</button>
+                  ><Icon name="x" size={14} /></button>
                 </div>
               );
             })}
