@@ -77,7 +77,7 @@ tr{ break-inside:avoid; }
 </div>
 
 <h1>Die Blende<br>fernsteuern<span class="pt">.</span></h1>
-<p class="sub">Ein ESP32-S3 im 12-poligen Hirose-Kabel zwischen Kamera und
+<p class="sub">Ein ESP32 im 12-poligen Hirose-Kabel zwischen Kamera und
 2/3"-Objektiv. Er liest, wo die Lamellen stehen, und stellt sie.</p>
 
 <div class="stop">
@@ -85,18 +85,18 @@ tr{ break-inside:avoid; }
   <p>Die Spannungswerte auf diesen Seiten stammen aus fremder Rekonstruktion an
   einer Fujinon-Optik. Die Pinbelegung ist durch ein zweites Dokument bestätigt,
   die Spannungen sind es nicht. <strong>An der eigenen Optik nachmessen.</strong></p>
-  <p>Auf Pin 6 liegen 12 V. Die GPIOs des ESP32-S3 vertragen 3,3 V und sind nicht
+  <p>Auf Pin 6 liegen 12 V. Die GPIOs des ESP32 vertragen 3,3 V und sind nicht
   5-V-tolerant. Ein verrutschter Draht kostet den Chip, ein falsch belegter
   Steuerpin die Servoelektronik der Optik.</p>
 </div>
 
 <h2>Was gebraucht wird</h2>
-<table><thead><tr><th>Teil</th><th>Wofür</th></tr></thead><tbody><tr><td>Waveshare ESP32-S3-ETH</td><td>Rechner und Netzanschluss. 16 MB Flash, 8 MB PSRAM, W5500</td></tr><tr><td>MCP4728, I²C, 12 Bit</td><td>Sollwert. Zwingend — der ESP32-S3 hat keinen eigenen DAC</td></tr><tr><td>ADS1115, I²C, 16 Bit</td><td>Rücklesung von Blende, Zoom und Fokus</td></tr><tr><td>LM358 oder TL072, DIP-8</td><td>Hebt 0–3,3 V auf 2,5–6,6 V, aus der 12-V-Schiene</td></tr><tr><td>Widerstände 10 k, 16 k, 6,8 k, 1 k</td><td>Teiler und Verstärkerstufe</td></tr><tr><td>Hirose-Verlängerung 12-polig</td><td>Zum Auftrennen. Alle zwölf Adern müssen belegt sein</td></tr><tr><td>Netzteil 12 V</td><td>Versorgt die Optik, wenn keine Kamera dranhängt</td></tr></tbody></table>
+<table><thead><tr><th>Teil</th><th>Wofür</th></tr></thead><tbody><tr><td>ESP32-DevKit (ESP32-D0WD-V3, CP2102)</td><td>Rechner, Netz über WLAN. 4 MB Flash</td></tr><tr><td>MCP4728, I²C, 12 Bit</td><td>Sollwert. Der eingebaute DAC des ESP32 ist zu grob und zu ungenau</td></tr><tr><td>ADS1115, I²C, 16 Bit</td><td>Rücklesung von Blende, Zoom und Fokus</td></tr><tr><td><strong>LM358</strong>, DIP-8 — <strong>kein TL072</strong></td><td>Hebt 0–3,3 V auf 2,5–6,6 V</td></tr><tr><td>Spannungsregler 9 V (z. B. 7809)</td><td>Versorgt den LM358 und begrenzt damit Pin 5 im Fehlerfall</td></tr><tr><td>Widerstände 100 k, 68 k, 16 k, 10 k, 1 k</td><td>Teiler und Verstärkerstufe</td></tr><tr><td>Hirose-Verlängerung 12-polig</td><td>Zum Auftrennen. Alle zwölf Adern müssen belegt sein</td></tr><tr><td>Labornetzteil 12 V, Strombegrenzung</td><td>Versorgt die Optik; Begrenzung auf 1,0 A</td></tr></tbody></table>
 
 <h2>Der Steckverbinder</h2>
 <p>Pin 1 bis 10 sind in beiden Betriebsarten gleich; 11 und 12 unterscheiden sich
 je nach Optikgruppe.</p>
-<table><thead><tr><th>Pin</th><th>Analog (Gruppe C)</th><th>Mit seriell (Gruppe B)</th><th>Richtung</th></tr></thead><tbody><tr><td class="n">1</td><td>RET SW, Rückkanalwahl</td><td>gleich</td><td>Optik → Kamera</td></tr><tr><td class="n">2</td><td>VTR SW, Start/Stop</td><td>gleich</td><td>Optik → Kamera</td></tr><tr><td class="n">3</td><td>GND</td><td>gleich</td><td>—</td></tr><tr><td class="n">4</td><td>Iris-Servo</td><td>Iris-Auto freigeben</td><td>Kamera → Optik</td></tr><tr><td class="n">5</td><td><strong>Iris-Steuersignal</strong></td><td>gleich</td><td>Kamera → Optik</td></tr><tr class="warn"><td class="n">6</td><td><strong>+12 V</strong></td><td>gleich</td><td>Kamera → Optik</td></tr><tr><td class="n">7</td><td><strong>Iris-Position</strong></td><td>gleich</td><td>Optik → Kamera</td></tr><tr><td class="n">8</td><td>Iris-Mode (Auto 0 V / Remote 5 V)</td><td>gleich</td><td>Kamera → Optik</td></tr><tr><td class="n">9</td><td>Extender</td><td>gleich</td><td>Optik → Kamera</td></tr><tr><td class="n">10</td><td>Zoom-Position</td><td>gleich</td><td>Optik → Kamera</td></tr><tr><td class="n">11</td><td>Fokus-Position</td><td>TXD</td><td>Optik → Kamera</td></tr><tr><td class="n">12</td><td>—</td><td>RXD</td><td>Kamera → Optik</td></tr></tbody></table>
+<table><thead><tr><th>Pin</th><th>Analog (Gruppe C)</th><th>Mit seriell (Gruppe B)</th><th>Richtung</th></tr></thead><tbody><tr><td class="n">1</td><td>RET SW, Rückkanalwahl</td><td>gleich</td><td>Optik → Kamera</td></tr><tr><td class="n">2</td><td>VTR SW, Start/Stop</td><td>gleich</td><td>Optik → Kamera</td></tr><tr><td class="n">3</td><td>GND</td><td>gleich</td><td>—</td></tr><tr><td class="n">4</td><td>Forced Iris Servo (Taste) — offen lassen</td><td>gleich</td><td>Kamera → Optik</td></tr><tr><td class="n">5</td><td><strong>Iris-Steuersignal</strong></td><td>gleich</td><td>Kamera → Optik</td></tr><tr class="warn"><td class="n">6</td><td><strong>+12 V</strong></td><td>gleich</td><td>Kamera → Optik</td></tr><tr><td class="n">7</td><td><strong>Iris-Position</strong></td><td>gleich</td><td>Optik → Kamera</td></tr><tr><td class="n">8</td><td>Iris-Mode (Auto offen/0 V · Remote 5 V über 1 kΩ)</td><td>gleich</td><td>Kamera → Optik</td></tr><tr><td class="n">9</td><td>Extender</td><td>gleich</td><td>Optik → Kamera</td></tr><tr><td class="n">10</td><td>Zoom-Position</td><td>gleich</td><td>Optik → Kamera</td></tr><tr><td class="n">11</td><td>Fokus-Position</td><td>TXD</td><td>Optik → Kamera</td></tr><tr><td class="n">12</td><td>—</td><td>RXD</td><td>Kamera → Optik</td></tr></tbody></table>
 
 <div class="box">
   <div class="lbl">Wichtig für die Planung</div>
@@ -106,8 +106,12 @@ je nach Optikgruppe.</p>
 </div>
 
 <h3>Signalpegel</h3>
-<table><thead><tr><th>Signal</th><th>Unteres Ende</th><th>Oberes Ende</th></tr></thead><tbody><tr><td>Iris-Steuerung (Pin 5) und Iris-Position (Pin 7)</td><td class="n">geschlossen 2,5 V</td><td class="n">F16 3,4 V · F2.8 6,2 V</td></tr><tr><td>Zoom-Position (Pin 10)</td><td class="n">Weitwinkel 2 V</td><td class="n">Tele 7 V</td></tr><tr><td>Fokus-Position (Pin 11, Gruppe C)</td><td class="n">nah 2 V</td><td class="n">unendlich 7 V</td></tr></tbody></table>
+<table><thead><tr><th>Signal</th><th>Unteres Ende</th><th>Oberes Ende</th></tr></thead><tbody><tr><td>Iris-Steuerung (Pin 5) und Iris-Position (Pin 7)</td><td class="n">zu: Sollwert 2,1–2,9 V · Rückmeldung 1,5–2,9 V</td><td class="n">F16 3,4 V · F2.8 6,2 V</td></tr><tr><td>Zoom-Position (Pin 10)</td><td class="n">Weitwinkel 2 V</td><td class="n">Tele 7 V</td></tr><tr><td>Fokus-Position (Pin 11, Gruppe C)</td><td class="n">nah 2 V</td><td class="n">unendlich 7 V</td></tr></tbody></table>
 
+
+<p>Pin 5/7 nach ARIB TR-B37 (Norm, an dieser Optik noch nicht gemessen). Pin 5
+hat ≥ 100 kΩ Eingangswiderstand, Pin 6 liefert laut Norm 10–17 V. Quellen:
+<code>docs/b4/recherche-2026-10.md</code>.</p>
 
 <h2>Welche Gruppe hat die Optik?</h2>
 <p>Das entscheidet den größten Teil des Vorhabens, kostet nichts und braucht nur
@@ -123,9 +127,9 @@ dann messen. Das Ergebnis gehört notiert, auch wenn es nicht funktioniert hat.<
 <h2>Aufbau 1 · Nur lesen</h2>
 <p>Drei Teiler, sechs Widerstände. Hier gibt es nichts zu verlieren, und hier
 sollte der erste Abend hingehen.</p>
-<pre>Objektiv-Pin --[ 10k ]--+-- ADS1115 Ax
-                        |
-                     [ 6k8 ]
+<pre>Objektiv-Pin --[ 100k ]--+-- ADS1115 Ax
+                         |
+                      [ 68k ]
                         |
                        GND  -- gemeinsam mit ESP32 und 12-V-Netzteil</pre>
 <table><thead><tr><th>Objektiv-Pin</th><th>Signal</th><th>ADS1115</th></tr></thead><tbody><tr><td class="n">7</td><td>Iris-Position</td><td class="n">A0</td></tr><tr><td class="n">10</td><td>Zoom-Position</td><td class="n">A1</td></tr><tr><td class="n">11</td><td>Fokus-Position (nur Gruppe C)</td><td class="n">A2</td></tr></tbody></table>
@@ -138,12 +142,14 @@ Widerstandswerte gehören in <code>config.h</code> — ein 5-%-Widerstand ist ei
 <pre>ESP32 --I2C--&gt; MCP4728 --&gt; Verstaerkerstufe --&gt; 1k --&gt; Pin 5
                (0-3,3 V)    (2,5-6,6 V)
 
-Pin 8  --&gt; 5 V     Remote statt Eigenautomatik
-Pin 6  --&gt; +12 V   Pin 3 --&gt; GND, gemeinsam mit dem ESP32</pre>
+Pin 8  --&gt; 1k --&gt; 5 V   Remote statt Eigenautomatik
+Pin 4  offen             Forced Iris Servo, wird nicht gebraucht
+Pin 6  --&gt; +12 V --&gt; 9-V-Regler --&gt; LM358
+Pin 3  --&gt; GND, gemeinsam mit dem ESP32</pre>
 
 <div class="box">
   <div class="lbl">MCP4728 und ADS1115 an 3,3 V betreiben</div>
-  <p>Der I²C-Bus des ESP32-S3 ist 3,3 V, damit passen die Pegel ohne Wandler. Und
+  <p>Der I²C-Bus des ESP32 ist 3,3 V, damit passen die Pegel ohne Wandler. Und
   die Rechnung unten setzt 0–3,3 V am DAC voraus: bei 5 V bräuchte die Stufe eine
   Verstärkung von 0,82, die ein nichtinvertierender Verstärker nicht erzeugen
   kann — er geht nie unter 1.</p>
@@ -151,7 +157,7 @@ Pin 6  --&gt; +12 V   Pin 3 --&gt; GND, gemeinsam mit dem ESP32</pre>
 
 <h3>Die Verstärkerstufe</h3>
 <p>Nichtinvertierender Verstärker mit Summierung am Plus-Eingang. Vier
-Widerstände, ein Operationsverstärker aus der 12-V-Schiene.</p>
+Widerstände, ein Operationsverstärker hinter dem 9-V-Regler.</p>
 <div class="two">
 <div>
 <pre>Ra = 16k  von 3,3 V      zum +Eingang
@@ -169,35 +175,42 @@ Vout = Vp * (1 + R2/R1)
 </div>
 </div>
 <p><strong>Nicht vertauschen:</strong> 16k an 3,3 V, 10k an den DAC — sonst 4,06–6,60 V,
-die Blende schließt nie. Alles Weitere regelt die Kennlinie. LM358 und TL072 passen in
-dieselben Löcher; Rail-to-Rail ist nicht nötig.</p>
+die Blende schließt nie. Alles Weitere regelt die Kennlinie.</p>
+<p><strong>Nur LM358, kein TL072:</strong> am +Eingang liegen unten 1,27 V, außerhalb
+des Gleichtaktbereichs des TL072 — sein Ausgang kann dann nach oben springen.
+<strong>Der LM358 hängt am 9-V-Regler</strong>, nicht direkt an 12 V: fällt R1 ab, gäbe
+er sonst etwa 10,5 V auf Pin 5. Mit 9 V bleibt es bei etwa 7,5 V.</p>
 
 <h3>Zwei Dinge an der Optik selbst</h3>
 <ul>
-<li>Der <strong>Iris-Schalter am Tubus steht auf A</strong>. Auf M folgt die Blende dem Ring und ignoriert Pin 5 vollständig.</li>
-<li><strong>Pin 8 liegt auf 5 V</strong>, sonst nimmt die Optik gar keine Fernsteuerung an.</li>
+<li>Zum Steuern steht der <strong>Iris-Schalter am Tubus auf A</strong>. Auf M folgt die Blende dem Ring und ignoriert Pin 5 vollständig.</li>
+<li><strong>Den Irisring nur in M von Hand drehen.</strong> Canon warnt: Drehen in A kann das Objektiv beschädigen.</li>
+<li><strong>Pin 8 liegt über 1 kΩ auf 5 V</strong>, sonst nimmt die Optik keine Fernsteuerung an.</li>
+<li><strong>Pin 5 nie offen lassen, solange A steht.</strong> Reihenfolge: Verstärker auf ≈ 2,54 V → Pin 5 verbinden → Pin 8 auf 5 V → erst dann A.</li>
 </ul>
 
 
 <h2>Belegte Pins am Board</h2>
-<p>Am Waveshare ESP32-S3-ETH ist mehr vergeben, als ein allgemeiner S3-Pinout zeigt.</p>
-<table><thead><tr><th>Funktion</th><th>GPIO</th></tr></thead><tbody><tr><td>W5500 Ethernet</td><td class="n">9 RST · 10 INT · 11 MOSI · 12 MISO · 13 SCLK · 14 CS</td></tr><tr><td>TF-Karte</td><td class="n">4 CS · 5 MISO · 6 MOSI · 7 SCLK</td></tr><tr><td>RGB-LED</td><td class="n">21</td></tr><tr><td>Kameraheader</td><td class="n">1 · 2 · 3 · 15 · 18 · 38 · 39 · 40 · 41 · 42 · 45 · 46 · 47 · 48</td></tr><tr><td>Native USB</td><td class="n">19 · 20</td></tr><tr><td>SPI-Flash</td><td class="n">26–32</td></tr><tr><td>Octal-PSRAM (S3R8)</td><td class="n">33–37</td></tr><tr class="warn"><td><strong>Frei</strong></td><td class="n"><strong>8 · 16 · 17 · 43 · 44</strong></td></tr></tbody></table>
-<p><strong>I²C liegt auf GPIO 16 (SDA) und 17 (SCL).</strong> GPIO 9 ist der Reset
-des W5500 — was dort als Taktleitung läge, hielte den Ethernet-Controller im
-Reset, und das Symptom wäre „kein Netz".</p>
+<p>ESP32-DevKit (ESP32-D0WD-V3, CP2102). Kein GPIO ist mit dem Objektiv verbunden —
+alles läuft über I²C, die einzige Verbindung ist die gemeinsame Masse.</p>
+<table><thead><tr><th>Funktion</th><th>GPIO</th></tr></thead><tbody><tr class="warn"><td><strong>I²C SDA / SCL</strong> (MCP4728 0x60, ADS1115 0x48)</td><td class="n"><strong>21 · 22</strong></td></tr><tr><td>Versorgung der Module</td><td class="n">3V3 · GND</td></tr><tr><td>Reserviert (Gruppe B seriell, nicht verdrahten)</td><td class="n">16 · 4 · 17</td></tr><tr><td>Frei für später (Pin 8/4 per MOSFET, VTR/RET)</td><td class="n">25 · 26 · 32 · 33</td></tr><tr><td>Nicht verwenden: Strapping · Flash · Konsole · nur Eingang</td><td class="n">0 2 5 12 15 · 6–11 · 1 3 · 34–39</td></tr></tbody></table>
+<p>Netz: das Board öffnet das WLAN <strong>b4-lens</strong> (Passwort <code>b4-iris-bench</code>),
+Statusseite unter <strong>http://192.168.4.1</strong>. Vollständige Belegung:
+<code>docs/b4/pinout-esp32-devkit.md</code>.</p>
 
 <h2>Inbetriebnahme</h2>
 <p>Der Reihe nach. Jeder Schritt sagt, ob der nächste gefahrlos ist.</p>
-<table><thead><tr><th>#</th><th>Handlung</th><th>Erwartung</th></tr></thead><tbody><tr><td class="n">1</td><td>Optik nur an 12 V (Pin 6 / 3), sonst nichts</td><td>Optik läuft an, Servo hörbar</td></tr><tr><td class="n">2</td><td>Pin 7 messen, Blende von Hand durchfahren</td><td>Spannung ändert sich stetig, 2,5–6,2 V</td></tr><tr><td class="n">3</td><td>Pin 8 auf 5 V legen</td><td>Optik nimmt Fernsteuerung an</td></tr><tr class="warn"><td class="n">4</td><td>Verstärkerausgang messen — <strong>ohne Optik</strong> — und den DAC durchfahren</td><td>2,5–6,6 V, linear</td></tr><tr><td class="n">5</td><td>Erst jetzt Ausgang über 1 kΩ auf Pin 5</td><td>Blende folgt dem Sollwert</td></tr><tr><td class="n">6</td><td>Kennlinie aufnehmen</td><td>Tabelle im Gerät gespeichert</td></tr></tbody></table>
+<table><thead><tr><th>#</th><th>Handlung</th><th>Erwartung</th></tr></thead><tbody><tr><td class="n">1</td><td>Optik nur an 12 V (Pin 6 / 3), Netzteil auf 1,0 A begrenzt, Polarität doppelt geprüft</td><td>Optik läuft an, Servo hörbar; Strom notieren</td></tr><tr><td class="n">2</td><td>Schalter auf <strong>M</strong>, Pin 7 messen, Ring von Hand durchdrehen</td><td>Spannung ändert sich stetig; zu 1,5–2,9 V, F2,8 6,2 V</td></tr><tr><td class="n">3</td><td>Pin 8 über 1 kΩ auf 5 V legen (Schalter bleibt auf M)</td><td>Optik nimmt Fernsteuerung an</td></tr><tr class="warn"><td class="n">4</td><td>Verstärkerausgang messen — <strong>ohne Optik</strong> — beim Einschalten, dann DAC durchfahren, dann R1 abklemmen</td><td>≈ 2,54 V beim Einschalten · 2,5–6,6 V linear · ohne R1 ≤ 7,5 V</td></tr><tr><td class="n">5</td><td>Erst jetzt Ausgang über 1 kΩ auf Pin 5, dann Schalter auf A</td><td>Blende folgt dem Sollwert</td></tr><tr><td class="n">6</td><td>Kennlinie aufnehmen</td><td>Tabelle im Gerät gespeichert</td></tr></tbody></table>
 <p>Schritt 4 ist der, den man überspringt. Er ist auch der einzige, der einen
 falschen Widerstand findet, bevor die falsche Spannung an der Optik liegt.</p>
 
 <h2>Firmware</h2>
-<pre>cd ~/sony-camera-bridge/packages/firmware-b4
+<pre>cd ~/Projekte/lz-camera-bridge/packages/firmware-b4
+export PATH="$HOME/.venvs/pio/bin:$PATH"   # PlatformIO
 
-./tools/flash.sh              sicherer Bau: liest, treibt nichts
-./tools/flash.sh --monitor    dazu die Konsole
-./tools/flash.sh --armed      Antrieb einkompiliert, fragt vorher nach</pre>
+./tools/flash.sh --devkit             sicherer Bau: liest, treibt nichts
+./tools/flash.sh --devkit --monitor   dazu die Konsole
+./tools/flash.sh --devkit --armed     Antrieb einkompiliert, fragt vorher nach</pre>
 <p>Der Vorgabebau kann keine Blende bewegen. Das sind zwei Sperren — ein
 Compile-Flag und eine Scharfschaltung zur Laufzeit —, damit ein frisch
 geflashtes Board nicht in dem Moment etwas verstellt, in dem das Kabel einrastet.</p>
@@ -224,7 +237,7 @@ ein flaches Stück, ein Rückwärtssprung, und eine perfekt gerade Kurve — let
 heißt meist, dass der DAC-Monitor statt Pin 7 gemessen wurde.</p>
 
 <h2>Wenn etwas nicht geht</h2>
-<table><thead><tr><th>Beobachtung</th><th>Zuerst prüfen</th></tr></thead><tbody><tr><td>I²C-Scan meldet nichts</td><td>GPIO 16/17, Masse gemeinsam, Module an 3,3 V</td></tr><tr><td>Kein Netz</td><td>Kabel, Link-LED an der Buchse, dann die W5500-Pins</td></tr><tr><td>Blende rührt sich nicht</td><td>Schalter am Tubus auf A, Pin 8 auf 5 V, scharfgeschaltet, Kennlinie vorhanden</td></tr><tr><td>Blende pendelt</td><td>Masseverbindung zwischen Netzteil und ESP32</td></tr><tr><td>Kennlinie springt zurück</td><td>Wartezeit je Punkt erhöhen (<code>--settle</code>)</td></tr><tr><td>Messwert steht fest auf 0</td><td>Teiler falsch herum, oder der Kanal liegt auf Masse</td></tr></tbody></table>
+<table><thead><tr><th>Beobachtung</th><th>Zuerst prüfen</th></tr></thead><tbody><tr><td>I²C-Scan meldet nichts</td><td>GPIO 21/22, Masse gemeinsam, Module an 3,3 V</td></tr><tr><td>Kein Netz</td><td>WLAN <code>b4-lens</code> (Passwort <code>b4-iris-bench</code>), dann http://192.168.4.1</td></tr><tr><td>Blende rührt sich nicht</td><td>Schalter am Tubus auf A, Pin 8 auf 5 V, scharfgeschaltet, Kennlinie vorhanden</td></tr><tr><td>Blende pendelt</td><td>Masseverbindung zwischen Netzteil und ESP32, dann den Iris-Gain-Trimmer am Objektiv — nicht die Firmware</td></tr><tr><td>Kennlinie springt zurück</td><td>Wartezeit je Punkt erhöhen (<code>--settle</code>)</td></tr><tr><td>Messwert steht fest auf 0</td><td>Teiler falsch herum, oder der Kanal liegt auf Masse</td></tr></tbody></table>
 
 <h2>Ohne Hardware testen</h2>
 <p>Der Simulator liefert dieselbe Schnittstelle, dahinter ein Modell eines
@@ -234,7 +247,7 @@ python3 tools/record_calibration.py --host 127.0.0.1:8080 --points 9 --settle 0.
 <p>Er beweist etwas über die Software und nichts über eine Optik.</p>
 
 <div class="meta">
-  Lars Zumpe Medienproduktion &middot; B4 Objektivsteuerung &middot; Stand 27.09.2026<br>
+  Lars Zumpe Medienproduktion &middot; B4 Objektivsteuerung &middot; Stand 08.10.2026<br>
   Quellen und Firmware: <code>sony-camera-bridge</code>, <code>docs/b4/</code> und
   <code>packages/firmware-b4/</code>. Die elektrischen Angaben sind unverifiziert —
   Messungen gehören nach <code>docs/b4/measurements/</code>.

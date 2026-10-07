@@ -60,7 +60,7 @@ antwortet. Stand 08.10.: nichts (Module noch nicht gesteckt).
 
 ## ADS1115 `0x48` — Rücklesung
 
-Jeder Eingang über Teiler **10 kΩ (oben) / 6,8 kΩ (unten)**; 7,0 V am
+Jeder Eingang über Teiler **100 kΩ (oben) / 68 kΩ (unten)** (ARIB verlangt ≥ 20 kΩ Last an Pin 7; optional 10–100 nF am ADC-Eingang); 7,0 V am
 Objektiv → 2,83 V am ADC.
 
 | ADS-Eingang | Hirose-Pin | Signal |
@@ -80,7 +80,7 @@ Gemessene Widerstandswerte in `config.h` eintragen (`DIVIDER_R_TOP_OHM`,
 | A (`DAC_CH_IRIS 0`) | Rb 10 kΩ → +Eingang des Op-Amps |
 | B, C, D | frei |
 
-Op-Amp (LM358 oder TL072, Versorgung 12 V aus Hirose 6):
+Op-Amp **nur LM358, kein TL072** (Gleichtaktbereich), Versorgung über **9-V-Regler** aus Hirose 6, damit Pin 5 im Fehlerfall nicht über ≈ 7,5 V geht:
 Ra 16 kΩ von 3,3 V an +In · Rb 10 kΩ vom DAC an +In · R1 10 kΩ −In → GND ·
 R2 10 kΩ Ausgang → −In. Ergebnis `1,231 · Vdac + 2,54` → 2,54–6,60 V,
 dann **1 kΩ in Serie** zu Pin 5.
@@ -90,16 +90,23 @@ dann **1 kΩ in Serie** zu Pin 5.
 | Pin | Signal | Verbunden mit |
 |---|---|---|
 | 3 | GND | gemeinsame Masse (ESP32, Module, Netzteil) |
-| 4 | Iris-Servo-Enable | laut Objektivverhalten, vorerst offen bzw. fest |
+| 4 | Forced Iris Servo (Tastenfunktion, kein Enable) | **offen lassen** |
 | 5 | Iris-Sollwert | Op-Amp-Ausgang über 1 kΩ — **erst Schritt 5 der Inbetriebnahme** |
-| 6 | **+12 V** | Netzteil +12 V, Op-Amp-Versorgung. **Nie an ESP32 oder Module** |
+| 6 | **+12 V** (Norm: 10–17 V) | Labornetzteil 12 V, **Strombegrenzung 1,0 A**, Polarität doppelt prüfen; 9-V-Regler für den Op-Amp. **Nie an ESP32 oder Module** |
 | 7 | Iris-Position | Teiler → ADS1115 A0 |
-| 8 | Iris Remote/Auto | fest an 5 V (Remote) |
+| 8 | Iris Remote/Auto | 5 V über **1 kΩ** (Remote); offen = Auto |
 | 10 | Zoom-Position | Teiler → ADS1115 A1 |
 | 11 | Fokus-Position | Teiler → ADS1115 A2 |
 | 12 | seriell (Gruppe B) | nicht verbunden |
 
-Am Objektiv: Iris-Schalter auf **A**, sonst ignoriert es Pin 5.
+Am Objektiv: für die Steuerung Iris-Schalter auf **A**, sonst ignoriert es Pin 5.
+**Den Irisring nur in M von Hand drehen** — Canon warnt, dass Drehen in A das
+Objektiv beschädigen kann. Pin 5 nie offen lassen, solange A steht; Reihenfolge:
+Verstärker auf ≈ 2,54 V → Pin 5 verbinden → Pin 8 auf 5 V → erst dann A.
+
+Pegel laut ARIB TR-B37 (Norm, nicht an dieser Optik gemessen): Pin 5/7 bei
+F2,8 = 6,2 V, F16 = 3,4 V; „zu" ist ein Band (Sollwert 2,1–2,9 V, Rückmeldung
+1,5–2,9 V). Quellen: [`recherche-2026-10.md`](recherche-2026-10.md).
 
 ## Netz
 
