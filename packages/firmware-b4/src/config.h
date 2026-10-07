@@ -119,8 +119,20 @@
  * If the boot scan reports nothing on the bus, suspect the wiring and these
  * two numbers before suspecting the modules; the scan prints that hint itself.
  */
+#ifndef B4_BOARD_ESP32_DEVKIT
 #define PIN_I2C_SDA 16
 #define PIN_I2C_SCL 17
+#else
+/*
+ * Classic ESP32 DevKit (env:esp32-devkit). 21/22 are the core's default I²C
+ * pair and neither is a strapping pin. Avoided on this chip: 0, 2, 5, 12, 15
+ * (strapping — 12 at boot sets the flash voltage), 6–11 (SPI flash), 1/3
+ * (UART0 = the USB console), 34–39 (input only). Full map:
+ * docs/b4/pinout-esp32-devkit.md.
+ */
+#define PIN_I2C_SDA 21
+#define PIN_I2C_SCL 22
+#endif
 #define I2C_CLOCK_HZ 400000
 
 /*
@@ -238,13 +250,23 @@
  * jumper; the compile flag alone is not enough (issue #48).
  */
 #define LENS_BAUD 78400
+#ifndef B4_BOARD_ESP32_DEVKIT
 #define PIN_LENS_RX_FROM_LENS 44 // Hirose pin 11 (lens TXD) via divider → UART1 RX
 #define PIN_LENS_RX_FROM_CAM 8   // Hirose pin 12 (camera → lens) via divider → UART2 RX
 #define PIN_LENS_TX 43           // → level shifter → jumper → 1 kΩ → pin 12. TX builds only.
+#else
+#define PIN_LENS_RX_FROM_LENS 16 // Hirose pin 11 via divider → UART1 RX (not wired: group C)
+#define PIN_LENS_RX_FROM_CAM 4   // Hirose pin 12 via divider → UART2 RX (not wired: group C)
+#define PIN_LENS_TX 17           // TX builds only — none exists for this board
+#endif
 #define CAPTURE_BYTES 16384      // per direction; what does not fit is counted, not wrapped
 
 /* The board's WS2812 (GPIO 21, §2) shows red while a TX-capable build runs. */
+#ifndef B4_BOARD_ESP32_DEVKIT
 #define PIN_TX_INDICATOR 21
+#else
+#define PIN_TX_INDICATOR 2 // the DevKit's plain blue LED, not a WS2812
+#endif
 
 // 6. DEMANDS  (phase 4 — reading only, nothing here drives anything)
 // ───────────────────────────────────────────────────────────────────────────
@@ -306,6 +328,21 @@
 
 #define HTTP_PORT 80
 #define HOSTNAME "b4-lens"
+
+/*
+ * WLAN — classic ESP32 DevKit only (it has no Ethernet).
+ *
+ * The board always opens its own access point, so it is reachable on a bench
+ * with no network at all: join B4_AP_SSID, open http://192.168.4.1. If
+ * src/wifi_secrets.h exists (gitignored, copy wifi_secrets.example.h) it ALSO
+ * joins that network and prints its address on the console. The AP stays up
+ * either way — losing the house WLAN must not lose the device.
+ *
+ * Power save is off: modem sleep adds 100+ ms of latency to every request,
+ * which a control loop driven over HTTP would feel.
+ */
+#define B4_AP_SSID "b4-lens"
+#define B4_AP_PASSWORD "b4-iris-bench" // WPA2 needs >= 8 characters
 
 /* Serial console baud. The S3 uses native USB-CDC, which ignores this. */
 #define CONSOLE_BAUD 115200

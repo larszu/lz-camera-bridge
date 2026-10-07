@@ -161,6 +161,12 @@ jobs:
         working-directory: packages/firmware-b4
         run: pio run -e waveshare-esp32-s3-eth-armed
 
+      # Der klassische ESP32-DevKit-Aufbau (WLAN statt W5500), der auf der
+      # Werkbank an der Canon haengt -- docs/b4/pinout-esp32-devkit.md.
+      - name: Bau (ESP32-DevKit, sicher und scharf)
+        working-directory: packages/firmware-b4
+        run: pio run -e esp32-devkit -e esp32-devkit-armed
+
       # Die serielle Leitung (Gruppe B): Mitlesen UND Sendepfad einkompiliert.
       # Gebaut, damit der Sendepfad nicht verrottet -- und damit der naechste
       # Schritt pruefen kann, dass er im Vorgabebau FEHLT (#48).
