@@ -14,3 +14,6 @@ _site/
 
 # PlatformIO-Bauverzeichnis (packages/firmware-b4)
 .pio/
+
+# Fremd-PDFs der Recherche (urheberrechtlich geschuetzt, nur lokal)
+docs/b4/quellen/
