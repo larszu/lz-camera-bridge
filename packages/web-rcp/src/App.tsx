@@ -148,7 +148,7 @@ export default function App() {
   // BEDARF 102 — Zeitstempel je Feld und die fertigen Grenzen je Kamera.
   const shownConfirmations = selected !== null ? cameraConfirmations[selected] ?? {} : {};
   const neverReadsBack = cam?.neverReadsBack ?? false;
-  const capabilities = capabilitiesForMode(config.connectionMode);
+  const capabilities = capabilitiesForMode(config.connectionMode, config.cgiFamily);
 
   useEffect(() => {
     setPanelView(isPtzMode(config.connectionMode) ? 'ptz' : 'rcp');

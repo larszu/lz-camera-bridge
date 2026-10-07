@@ -85,6 +85,33 @@ function velocityToSpeed(value: number, max: number): number {
   return Math.max(1, Math.round((Math.abs(value) / 100) * max));
 }
 
+/**
+ * Sony `inquiry.cgi?inq=imaging` → the white balance gains, or null when absent.
+ *
+ * Measured on an SRG-A40 (firmware 4.00): the answer carries
+ * `WhiteBalanceCrGain` and `WhiteBalanceCbGain` (0..255) next to
+ * `WhiteBalanceMode`. Raising CrGain by 30 lifted the mean R′ of the picture
+ * from 0.52 to 0.90; raising CbGain by 30 lifted B′ from 0.51 to 0.75. So
+ * Cr = red, Cb = blue. Both act like colour-difference gains: G′ moves the
+ * other way. The camera has no G gain.
+ */
+export function parseSonyImaging(body: string | undefined): { whiteR: number; whiteB: number } | null {
+  if (!body) return null;
+  const r = /(?:^|&|\s)WhiteBalanceCrGain=(\d+)/.exec(body);
+  const b = /(?:^|&|\s)WhiteBalanceCbGain=(\d+)/.exec(body);
+  if (!r || !b) return null;
+  return { whiteR: Number(r[1]), whiteB: Number(b[1]) };
+}
+
+/**
+ * Sony manual white balance: the bus triple {r, g, b} (0..255) → imaging.cgi.
+ * Only R and B exist on the camera; `g` is not sent. Switching to manual is
+ * part of the command, because the gains are only valid in manual mode.
+ */
+export function sonyWhiteBalancePath(r: number, b: number): string {
+  return `/command/imaging.cgi?WhiteBalanceMode=manual&WhiteBalanceCrGain=${clamp(r, 0, 255)}&WhiteBalanceCbGain=${clamp(b, 0, 255)}`;
+}
+
 /** Power reply of either family → on/standby, or null when unreadable. */
 export function parsePowerReply(family: CgiFamily, body: string | undefined): boolean | null {
   if (!body) return null;
@@ -154,8 +181,9 @@ export class HttpCgiClient extends EventEmitter {
     this.connected = true;
     this.emit('connected', { host: this.host, family: this.family });
     void this.readPower();
+    void this.readImaging();
     if (this.powerPollMs > 0) {
-      this.powerTimer = setInterval(() => void this.readPower(), this.powerPollMs);
+      this.powerTimer = setInterval(() => { void this.readPower(); void this.readImaging(); }, this.powerPollMs);
       this.powerTimer.unref?.();
     }
   }
@@ -259,8 +287,18 @@ export class HttpCgiClient extends EventEmitter {
         }
         return true;
       }
+      case 'setWhiteBalance': {
+        // Sony only: manual white balance over imaging.cgi (R/B gain, no G).
+        if (this.family !== 'sony') return false;
+        const r = num('r', 128), b = num('b', 128);
+        await this.enqueue('other', async () => {
+          await this.request(sonyWhiteBalancePath(r, b));
+          await this.readImaging();
+        });
+        return true;
+      }
       default:
-        // Iris/paint and white balance have no PTZ-CGI equivalent.
+        // Iris and the rest of the paint have no PTZ-CGI equivalent.
         console.log(`[HTTP-CGI] Unbekanntes oder nicht unterstütztes Kommando: ${cmd}`);
         return false;
     }
@@ -280,6 +318,19 @@ export class HttpCgiClient extends EventEmitter {
       zoom = parseViscaZoom(Buffer.from(await viscaTcp(this.host, this.viscaPort, hex(VISCA_INQ_ZOOM), 3000), 'hex')) ?? undefined;
     } catch { /* pose without zoom */ }
     return { ...pt, ...(zoom !== undefined ? { zoom } : {}) };
+  }
+
+  /** Sony: read the white balance gains back. Emits `stateChanged` only with an answer. */
+  async readImaging(): Promise<void> {
+    if (!this.connected || this.family !== 'sony') return;
+    try {
+      const wb = parseSonyImaging(await this.request('/command/inquiry.cgi?inq=imaging'));
+      if (!wb) return;
+      Object.assign(this._state, wb);
+      this.emit('stateChanged', wb);
+    } catch {
+      // standby or unreachable: no value, no guess
+    }
   }
 
   /** Ask the head whether it is on. Emits `stateChanged` only with an answer — never guesses. */

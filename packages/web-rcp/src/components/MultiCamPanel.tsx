@@ -55,7 +55,7 @@ export function MultiCamPanel(p: Props) {
           const mode = cam.config.connectionMode ?? 'tcp';
           const connected = cam.connected;
           const state = p.cameraStates[num] ?? {};
-          const caps = capabilitiesForMode(mode);
+          const caps = capabilitiesForMode(mode, cam.config.cgiFamily);
           const ptz = isPtzMode(mode);
 
           return (

@@ -99,8 +99,25 @@ export const PTZ_MODES: ConnectionMode[] = [
   'panasonic-ptz', 'visca', 'visca-serial', 'birddog', 'jvc', 'dji-osmo', 'dji-ronin', 'http-cgi',
 ];
 
-export function capabilitiesForMode(mode: ConnectionMode | undefined): CameraCapabilities {
-  return { ...NONE, ...(mode ? MODE_CAPS[mode] ?? {} : {}) };
+/**
+ * Capabilities that depend on the firmware family inside one mode. HTTP-CGI
+ * covers two families with one client; only the Sony family has an imaging
+ * CGI. Measured on an SRG-A40: `imaging.cgi` takes WhiteBalanceMode=manual
+ * plus WhiteBalanceCrGain/CbGain (R/B gain, no G), and `inquiry.cgi?inq=imaging`
+ * reads them back (HttpCgiClient `setWhiteBalance`, `readImaging`).
+ * Without a family the mode answers for its weakest member, so a plan that
+ * does not know the firmware never promises a regulator.
+ */
+const FAMILY_CAPS: Partial<Record<ConnectionMode, Record<string, Partial<CameraCapabilities>>>> = {
+  'http-cgi': { sony: { whiteBalance: true } },
+};
+
+export function capabilitiesForMode(mode: ConnectionMode | undefined, family?: string): CameraCapabilities {
+  return {
+    ...NONE,
+    ...(mode ? MODE_CAPS[mode] ?? {} : {}),
+    ...(mode && family ? FAMILY_CAPS[mode]?.[family] ?? {} : {}),
+  };
 }
 
 export function isPtzMode(mode: ConnectionMode | undefined): boolean {

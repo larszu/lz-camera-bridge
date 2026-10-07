@@ -344,7 +344,10 @@ Switcher views need. A room that already exists as a site file goes in under
 - **Sony BRC/SRG PTZ:** choose the *VISCA over IP* tab and set port **52381** —
   the Sony transport header is applied automatically. Where the room blocks
   the VISCA ports, the *HTTP-CGI PTZ* tab drives the same head over its web
-  CGI (family *Sony*, login required; power is read back).
+  CGI (family *Sony*, login required; power is read back). Over this CGI the
+  Sony also takes manual white balance: R and B gain (`imaging.cgi`
+  `WhiteBalanceCrGain`/`CbGain`, read back from `inquiry.cgi?inq=imaging`).
+  It has no G gain and, over the CGI, no hue, saturation, black or gamma.
 - **Vissonic / PTZOptics PTZ:** *HTTP-CGI PTZ*, family *Vissonic*. No login
   for control; power on/standby goes over VISCA TCP 5678 and is read back.
   Stream address `rtsp://<ip>:554/1`.
