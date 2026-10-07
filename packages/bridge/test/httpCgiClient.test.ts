@@ -19,7 +19,7 @@ import { AddressInfo } from 'node:net';
 
 import { createServer as createTcpServer, type Server as TcpServer } from 'node:net';
 import {
-  HttpCgiClient, sonyDirection, vissonicDirection, parsePowerReply, isViscaDone,
+  HttpCgiClient, sonyDirection, vissonicDirection, parsePowerReply, isViscaDone, parseSonyImaging,
   VISCA_POWER_ON, VISCA_POWER_STANDBY, VISCA_POWER_INQUIRY,
 } from '../src/cameras/HttpCgiClient.js';
 import { MODE_READBACK, MODE_CADENCE } from '../src/protocol/valueOrigin.js';
@@ -263,12 +263,64 @@ test('direction helpers map diagonals per family', () => {
   assert.equal(sonyDirection(0, 0), 'stop');
 });
 
-test('http-cgi reads back power and nothing else in the value-origin model', () => {
-  assert.deepEqual(MODE_READBACK['http-cgi'], ['cameraPower']);
+test('http-cgi reads back power and (Sony) the white balance gains', () => {
+  assert.deepEqual(MODE_READBACK['http-cgi'], ['cameraPower', 'whiteR', 'whiteB']);
   assert.deepEqual(MODE_CADENCE['http-cgi'], { kind: 'poll', everyMs: 10000 });
   // It is a PTZ mode and offers focus but no paint.
   assert.equal(isPtzMode('http-cgi'), true);
   const caps = capabilitiesForMode('http-cgi');
   assert.equal(caps.focus, true);
   assert.equal(caps.iris, false);
+  // without a family: the weakest member (Vissonic) – no white balance
+  assert.equal(caps.whiteBalance, false);
+  assert.equal(capabilitiesForMode('http-cgi', 'vissonic').whiteBalance, false);
+  assert.equal(capabilitiesForMode('http-cgi', 'sony').whiteBalance, true);
+  assert.equal(capabilitiesForMode('http-cgi', 'sony').blackBalance, false);
+});
+
+test('Sony: setWhiteBalance → imaging.cgi (manual, Cr = R, Cb = B, kein G) und Rueckmeldung', async () => {
+  // what an SRG-A40 (firmware 4.00) answers to inq=imaging, shortened
+  let imaging = 'WhiteBalanceCbGain=179&WhiteBalanceCrGain=203&WhiteBalanceMode=auto&WhiteBalanceOffset=7';
+  const hits: string[] = [];
+  const server = createServer((req, res) => {
+    hits.push(req.url ?? '');
+    const u = new URL(req.url ?? '/', 'http://x');
+    if (u.pathname === '/command/imaging.cgi') {
+      imaging = `WhiteBalanceCbGain=${u.searchParams.get('WhiteBalanceCbGain')}&WhiteBalanceCrGain=${u.searchParams.get('WhiteBalanceCrGain')}&WhiteBalanceMode=${u.searchParams.get('WhiteBalanceMode')}`;
+      res.writeHead(204); res.end(); return;
+    }
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end(u.searchParams.get('inq') === 'imaging' ? imaging : 'Power=on');
+  });
+  const port = await listen(server);
+  const cam = new HttpCgiClient({ host: '127.0.0.1', port, family: 'sony', powerPollMs: 0 });
+  const seen: Record<string, unknown>[] = [];
+  cam.on('stateChanged', (s) => seen.push(s));
+  await cam.connect();
+  await new Promise((r) => setTimeout(r, 100));
+  assert.ok(seen.some((s) => s.whiteR === 203 && s.whiteB === 179), 'reads the gains on connect');
+
+  assert.equal(await cam.handleRcpCommand('setWhiteBalance', { r: 215, g: 128, b: 170 }), true);
+  assert.ok(hits.includes('/command/imaging.cgi?WhiteBalanceMode=manual&WhiteBalanceCrGain=215&WhiteBalanceCbGain=170'));
+  assert.deepEqual(seen.at(-1), { whiteR: 215, whiteB: 170 });
+  // out of range is clamped, never wrapped
+  await cam.handleRcpCommand('setWhiteBalance', { r: 300, b: -4 });
+  assert.ok(hits.includes('/command/imaging.cgi?WhiteBalanceMode=manual&WhiteBalanceCrGain=255&WhiteBalanceCbGain=0'));
+  cam.disconnect();
+  shut(server);
+});
+
+test('parseSonyImaging liest nur, was da ist', () => {
+  assert.deepEqual(parseSonyImaging('WhiteBalanceCbGain=179&WhiteBalanceCrGain=203'), { whiteR: 203, whiteB: 179 });
+  assert.equal(parseSonyImaging('WhiteBalanceMode=auto'), null);
+  assert.equal(parseSonyImaging(undefined), null);
+});
+
+test('Vissonic kennt keinen Weissabgleich ueber die CGI', async () => {
+  const { server, hits } = fakeCamera();
+  const port = await listen(server);
+  const cam = new HttpCgiClient({ host: '127.0.0.1', port, family: 'vissonic' });
+  assert.equal(await cam.handleRcpCommand('setWhiteBalance', { r: 140, g: 128, b: 120 }), false);
+  assert.equal(hits.length, 0);
+  shut(server);
 });
