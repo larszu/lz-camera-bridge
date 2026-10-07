@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { BridgeConfig } from '../types.ts';
+import { Icon } from './Icon.tsx';
 
 const WIZARD_KEY = 'scb.wizardDone';
 
@@ -102,7 +103,6 @@ export function FirstStartWizard({ onComplete }: Props) {
         {/* Header */}
         <div className="wizard-header">
           <div className="wizard-logo">
-            <span className="wizard-logo-icon">◎</span>
             <span className="wizard-logo-text">LZ Camera Bridge</span>
           </div>
           <div className="wizard-steps">
@@ -112,7 +112,7 @@ export function FirstStartWizard({ onComplete }: Props) {
                 className={`wizard-step-dot ${i === step ? 'active' : i < step ? 'done' : ''}`}
                 title={s}
               >
-                {i < step ? '✓' : i + 1}
+                {i < step ? <Icon name="check" size={14} label="Done" /> : i + 1}
               </div>
             ))}
           </div>
@@ -181,23 +181,23 @@ function StepWelcome() {
       </p>
       <div className="wizard-feature-list">
         <div className="wizard-feature">
-          <span className="wizard-feature__icon">🎥</span>
+          <span className="wizard-feature__icon"><Icon name="video" size={22} /></span>
           <div>
             <div className="wizard-feature__name">Broadcast & Cinema</div>
             <div className="wizard-feature__desc">Sony CCU (700PTP/RS-422), Sony FX/Alpha (USB), Canon CCAPI, Blackmagic REST, Lumix</div>
           </div>
         </div>
         <div className="wizard-feature">
-          <span className="wizard-feature__icon">🕹️</span>
+          <span className="wizard-feature__icon"><Icon name="gamepad" size={22} /></span>
           <div>
-            <div className="wizard-feature__name">PTZ-Steuerung (Touch)</div>
+            <div className="wizard-feature__name">PTZ control (touch)</div>
             <div className="wizard-feature__desc">AW-RP150 panel for VISCA/Sony BRC-SRG, Panasonic AW, BirdDog, JVC</div>
           </div>
         </div>
         <div className="wizard-feature">
-          <span className="wizard-feature__icon">🎛️</span>
+          <span className="wizard-feature__icon"><Icon name="sliders" size={22} /></span>
           <div>
-            <div className="wizard-feature__name">Companion & USB-Pult</div>
+            <div className="wizard-feature__name">Companion & USB panel</div>
             <div className="wizard-feature__desc">Streamdeck API + HID control panel drive any connected camera</div>
           </div>
         </div>
@@ -538,7 +538,7 @@ function StepDone({ cameraType, config }: { cameraType: CameraType; config: Part
 
   return (
     <div className="wizard-step wizard-step--done">
-      <div className="wizard-done-icon">✓</div>
+      <div className="wizard-done-icon"><Icon name="check" size={28} /></div>
       <h2 className="wizard-step__title">All set!</h2>
       <p className="wizard-step__desc">
         The connection is configured. Click <strong>Start</strong> to open the app

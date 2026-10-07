@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { WiznetDevice } from '../types.ts';
+import { Icon } from './Icon.tsx';
 
 interface WiznetDeviceConfig {
   ip: string;
@@ -104,7 +105,7 @@ export function WiznetConfigWizard({ device, onClose, onConfigure }: Props) {
               key={s}
               className={`wizard__step ${i === stepIndex ? 'wizard__step--active' : ''} ${i < stepIndex ? 'wizard__step--done' : ''}`}
             >
-              <div className="wizard__step-dot">{i < stepIndex ? '✓' : i + 1}</div>
+              <div className="wizard__step-dot">{i < stepIndex ? <Icon name="check" size={14} label="Done" /> : i + 1}</div>
               <span className="wizard__step-label">{STEP_TITLES[s]}</span>
             </div>
           ))}
@@ -123,7 +124,7 @@ export function WiznetConfigWizard({ device, onClose, onConfigure }: Props) {
                   className={`wizard__mode-btn ${config.mode === 'server' ? 'wizard__mode-btn--active' : ''}`}
                   onClick={() => updateConfig('mode', 'server')}
                 >
-                  <span className="wizard__mode-icon">📹</span>
+                  <span className="wizard__mode-icon"><Icon name="video" size={28} /></span>
                   <span className="wizard__mode-title">Camera (server)</span>
                   <span className="wizard__mode-desc">Receives commands</span>
                 </button>
@@ -131,9 +132,9 @@ export function WiznetConfigWizard({ device, onClose, onConfigure }: Props) {
                   className={`wizard__mode-btn ${config.mode === 'client' ? 'wizard__mode-btn--active' : ''}`}
                   onClick={() => updateConfig('mode', 'client')}
                 >
-                  <span className="wizard__mode-icon">🎛️</span>
-                  <span className="wizard__mode-title">RCP (Client)</span>
-                  <span className="wizard__mode-desc">Sendet Befehle</span>
+                  <span className="wizard__mode-icon"><Icon name="sliders" size={28} /></span>
+                  <span className="wizard__mode-title">RCP (client)</span>
+                  <span className="wizard__mode-desc">Sends commands</span>
                 </button>
               </div>
             </div>

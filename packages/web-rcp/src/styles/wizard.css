@@ -1,11 +1,13 @@
 /* ═══════════════════════════════════════════════════════════════════════════
   FIRST START WIZARD – LZ Camera Bridge
+  Brand tokens only (lzm-web, tool mode): no raw hex, no radius, no shadow.
+  `brand:check` scans this file.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 .wizard-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.85);
+  background: var(--scrim);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -17,10 +19,8 @@
   width: 580px;
   max-width: 95vw;
   max-height: 90vh;
-  background: #1c1c1e;
-  border: 1px solid #333;
-  border-radius: 0;
-  box-shadow: none;
+  background: var(--surface-4);
+  border: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -32,8 +32,8 @@
   align-items: center;
   justify-content: space-between;
   padding: 20px 24px 16px;
-  border-bottom: 1px solid #2a2a2a;
-  background: #161618;
+  border-bottom: 1px solid var(--surface-2);
+  background: var(--surface-3);
 }
 
 .wizard-logo {
@@ -42,16 +42,11 @@
   gap: 10px;
 }
 
-.wizard-logo-icon {
-  font-size: 22px;
-  color: var(--rcp-blue, #0088ff);
-}
-
 .wizard-logo-text {
   font-size: 15px;
   font-weight: 600;
-  color: #ddd;
-  letter-spacing: 0.5px;
+  font-weight: 800;
+  color: var(--text-strong);
 }
 
 .wizard-steps {
@@ -63,28 +58,27 @@
 .wizard-step-dot {
   width: 28px;
   height: 28px;
-  border-radius: 0;
-  background: #2a2a2a;
-  border: 1px solid #444;
-  color: #666;
+  background: var(--surface-2);
+  border: 1px solid var(--line-3);
+  color: var(--text-muted);
   font-size: 11px;
   font-weight: 600;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.2s, color 0.2s, border-color 0.2s;
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
 }
 
 .wizard-step-dot.active {
-  background: var(--rcp-blue, #0088ff);
-  border-color: var(--rcp-blue, #0088ff);
-  color: #fff;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
 }
 
 .wizard-step-dot.done {
-  background: #1a3a1a;
-  border-color: var(--rcp-green, #00cc44);
-  color: var(--rcp-green, #00cc44);
+  background: transparent;
+  border-color: var(--success);
+  color: var(--text-strong);
 }
 
 /* ── Body ──────────────────────────────────────────────────────────────── */
@@ -98,7 +92,7 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
-  animation: wizardFadeIn 0.18s ease;
+  animation: wizardFadeIn var(--dur-2) var(--ease);
 }
 
 @keyframes wizardFadeIn {
@@ -107,35 +101,33 @@
 }
 
 .wizard-step__title {
-  font-size: 20px;
-  font-weight: 600;
-  color: #eee;
+  font-size: clamp(20px, 1vw + 16px, 26px);
+  font-weight: 800;
+  color: var(--text-strong);
   margin: 0;
 }
 
 .wizard-step__desc {
   font-size: 14px;
-  color: #999;
+  color: var(--text);
   line-height: 1.6;
   margin: 0;
 }
 
 .wizard-step__hint {
   font-size: 12px;
-  color: #666;
+  color: var(--text-muted);
   line-height: 1.6;
-  background: #1a1a1a;
-  border-left: 3px solid #333;
+  background: var(--surface-2);
+  border-left: 2px solid var(--line-3);
   padding: 10px 14px;
-  border-radius: 0;
   margin: 0;
 }
 
 .wizard-step__hint code {
-  background: #2a2a2a;
+  background: var(--surface-2);
   padding: 1px 5px;
-  border-radius: 0;
-  color: var(--rcp-blue, #0088ff);
+  color: var(--accent);
   font-size: 12px;
 }
 
@@ -150,27 +142,25 @@
   display: flex;
   align-items: flex-start;
   gap: 14px;
-  background: #222;
-  border: 1px solid #2e2e2e;
-  border-radius: 0;
+  background: var(--surface-3);
+  border: 1px solid var(--border);
   padding: 12px 14px;
 }
 
 .wizard-feature__icon {
-  font-size: 22px;
-  line-height: 1;
   flex-shrink: 0;
+  color: var(--text-strong);
 }
 
 .wizard-feature__name {
   font-size: 13px;
   font-weight: 600;
-  color: #ccc;
+  color: var(--text-strong);
 }
 
 .wizard-feature__desc {
   font-size: 12px;
-  color: #666;
+  color: var(--text-muted);
   margin-top: 2px;
 }
 
@@ -185,24 +175,26 @@
   display: flex;
   align-items: flex-start;
   gap: 14px;
-  background: #222;
-  border: 1px solid #333;
-  border-radius: 0;
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  border-left: 2px solid transparent;
   padding: 14px 16px;
   cursor: pointer;
   text-align: left;
+  font-family: inherit;
+  color: inherit;
   transition: border-color 0.15s, background 0.15s;
   width: 100%;
 }
 
 .wizard-camera-card:hover {
-  background: #282828;
-  border-color: #444;
+  background: color-mix(in oklab, var(--surface-3), var(--state) var(--state-hover));
+  border-color: var(--line-3);
 }
 
 .wizard-camera-card.selected {
-  border-color: var(--rcp-blue, #0088ff);
-  background: #131d2b;
+  border-left-color: var(--text-strong);
+  background: var(--surface-2);
 }
 
 .wizard-camera-card__radio {
@@ -213,22 +205,20 @@
 .wizard-radio {
   width: 16px;
   height: 16px;
-  border-radius: 0;
-  border: 2px solid #555;
-  transition: border-color 0.15s;
+  border: 1px solid var(--line-3);
+  transition: border-color var(--dur-1) var(--ease);
   position: relative;
 }
 
 .wizard-radio.active {
-  border-color: var(--rcp-blue, #0088ff);
+  border-color: var(--accent);
 }
 
 .wizard-radio.active::after {
   content: '';
   position: absolute;
   inset: 3px;
-  background: var(--rcp-blue, #0088ff);
-  border-radius: 0;
+  background: var(--accent);
 }
 
 .wizard-camera-card__body {
@@ -238,7 +228,7 @@
 .wizard-camera-card__label {
   font-size: 13px;
   font-weight: 600;
-  color: #ccc;
+  color: var(--text-strong);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -246,20 +236,19 @@
 
 .wizard-camera-card__sub {
   font-size: 12px;
-  color: #666;
+  color: var(--text-muted);
   margin-top: 3px;
 }
 
 .wizard-badge {
   font-size: 10px;
   font-weight: 600;
-  background: #0088ff22;
-  color: var(--rcp-blue, #0088ff);
-  border: 1px solid #0088ff44;
-  border-radius: 0;
+  background: var(--surface-2);
+  color: var(--accent);
+  border: 1px solid var(--line-3);
   padding: 1px 7px;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: var(--track-kicker);
 }
 
 /* ── Connection Form (Step 2) ────────────────────────────────────────────── */
@@ -274,7 +263,7 @@
   flex-direction: column;
   gap: 6px;
   font-size: 12px;
-  color: #888;
+  color: var(--text-muted);
   flex: 1;
   min-width: 160px;
 }
@@ -285,20 +274,19 @@
 }
 
 .wizard-input {
-  background: #2a2a2a;
-  border: 1px solid #3a3a3a;
-  border-radius: 0;
-  color: #ddd;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-strong);
   font-size: 13px;
   padding: 8px 10px;
-  outline: none;
+  font-family: inherit;
   width: 100%;
   box-sizing: border-box;
-  transition: border-color 0.15s;
+  transition: border-color var(--dur-1) var(--ease);
 }
 
 .wizard-input:focus {
-  border-color: var(--rcp-blue, #0088ff);
+  border-color: var(--accent);
 }
 
 select.wizard-input {
@@ -315,20 +303,17 @@ select.wizard-input {
 .wizard-done-icon {
   width: 64px;
   height: 64px;
-  border-radius: 0;
-  background: #1a3a1a;
-  border: 2px solid var(--rcp-green, #00cc44);
-  color: var(--rcp-green, #00cc44);
-  font-size: 26px;
+  background: transparent;
+  border: 1px solid var(--success);
+  color: var(--text-strong);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .wizard-summary {
-  background: #222;
-  border: 1px solid #2e2e2e;
-  border-radius: 0;
+  background: var(--surface-3);
+  border: 1px solid var(--border);
   padding: 12px 16px;
   width: 100%;
   box-sizing: border-box;
@@ -339,7 +324,7 @@ select.wizard-input {
   justify-content: space-between;
   padding: 6px 0;
   font-size: 13px;
-  border-bottom: 1px solid #2a2a2a;
+  border-bottom: 1px solid var(--surface-2);
 }
 
 .wizard-summary__row:last-child {
@@ -347,11 +332,11 @@ select.wizard-input {
 }
 
 .wizard-summary__key {
-  color: #666;
+  color: var(--text-muted);
 }
 
 .wizard-summary__val {
-  color: #ccc;
+  color: var(--text-strong);
   font-weight: 500;
 }
 
@@ -360,46 +345,44 @@ select.wizard-input {
   display: flex;
   align-items: center;
   padding: 16px 24px;
-  border-top: 1px solid #2a2a2a;
-  background: #161618;
+  border-top: 1px solid var(--surface-2);
+  background: var(--surface-3);
   gap: 10px;
 }
 
 .wizard-btn {
   padding: 9px 22px;
-  border-radius: 0;
   font-size: 13px;
   font-weight: 600;
-  border: none;
+  border: 1px solid transparent;
   cursor: pointer;
-  transition: background 0.15s, opacity 0.15s;
+  font-family: inherit;
+  transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
 }
 
-.wizard-btn--primary {
-  background: var(--rcp-blue, #0088ff);
-  color: #fff;
+.wizard-btn--primary,
+.wizard-btn--success {
+  background: var(--accent);
+  color: var(--accent-text);
 }
 
-.wizard-btn--primary:hover {
-  background: #0077ee;
+.wizard-btn--primary:hover,
+.wizard-btn--success:hover {
+  background: color-mix(in oklab, var(--accent), var(--bg) 10%);
 }
 
 .wizard-btn--secondary {
-  background: #2e2e2e;
-  color: #aaa;
-  border: 1px solid #3a3a3a;
+  background: transparent;
+  color: var(--text-strong);
+  border: 1px solid var(--line-3);
 }
 
 .wizard-btn--secondary:hover {
-  background: #383838;
-  color: #ccc;
+  border-color: var(--accent);
+  background: color-mix(in oklab, var(--state) var(--state-hover), transparent);
 }
 
-.wizard-btn--success {
-  background: var(--rcp-green, #00cc44);
-  color: #fff;
-}
 
-.wizard-btn--success:hover {
-  background: #00b33c;
+@media (prefers-reduced-motion: reduce) {
+  .wizard-step { animation: none; }
 }

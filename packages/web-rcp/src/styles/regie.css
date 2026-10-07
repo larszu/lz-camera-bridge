@@ -23,21 +23,20 @@
   padding: 0 14px;
   min-height: var(--ziel);
   border: 0;
+  border-bottom: 2px solid transparent;
   background: transparent;
   color: var(--text-muted);
   font: inherit;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  font-size: var(--fs-ui-sm);
+  font-weight: 600;
   cursor: pointer;
   border-right: 1px solid var(--border);
-  transition: color var(--dur, 0.2s), background var(--dur, 0.2s);
+  transition: color var(--dur-1) var(--ease), background var(--dur-1) var(--ease);
 }
 .nav__tab:last-child { border-right: 0; }
-.nav__tab:hover { color: var(--text); }
-.nav__tab--active { background: var(--accent); color: var(--accent-text); }
-.nav__tab--active:hover { color: var(--accent-text); }
+.nav__tab:hover { color: var(--text-strong); background: color-mix(in oklab, var(--state) var(--state-hover), transparent); }
+/* Ausgewaehlt ist nie eine Akzentflaeche: Stufe 2 + Haarlinie. */
+.nav__tab--active { background: var(--surface-2); color: var(--text-strong); border-bottom-color: var(--text-strong); }
 .nav__count {
   margin-left: 6px;
   font-weight: 400;
@@ -48,7 +47,6 @@
 .app__site {
   color: var(--text-muted);
   font-size: 12px;
-  letter-spacing: 0.06em;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -60,35 +58,28 @@
 .headline {
   display: flex;
   align-items: baseline;
+  flex-wrap: wrap;
   gap: 12px;
   padding-bottom: 8px;
   border-bottom: 1px solid var(--text-muted);
   margin-bottom: 16px;
 }
+/* Werkzeug-Modus: Kicker ohne Tally-Punkt -- im Werkzeug spricht die Arbeit,
+   Rot bleibt dem Fokus und dem echten Sendezustand. */
 .headline__kicker {
-  font-size: 12px;
+  font-size: var(--fs-kicker);
   font-weight: 700;
-  letter-spacing: 0.18em;
+  letter-spacing: var(--track-kicker);
   text-transform: uppercase;
   color: var(--text-muted);
 }
-.headline__kicker::before {
-  content: '';
-  display: inline-block;
-  width: 0.55em;
-  height: 0.55em;
-  background: var(--signal);
-  transform: skewX(-11deg);
-  margin-right: 0.7em;
-  vertical-align: baseline;
-}
-.headline__title { font-size: 18px; font-weight: 800; letter-spacing: -0.01em; }
+.headline__title { font-size: clamp(18px, 1vw + 14px, 24px); font-weight: 800; letter-spacing: -0.01em; color: var(--text-strong); }
 .headline__meta { margin-left: auto; color: var(--text-muted); font-size: 12px; display: flex; gap: 12px; align-items: center; }
 
 /* ─── Generic view frame ─────────────────────────────────────────────────── */
 
 .view {
-  padding: 16px 24px 32px;
+  padding: 16px clamp(16px, 3vw, 24px) 32px;
   max-width: 1400px;
   margin: 0 auto;
   width: 100%;
@@ -129,17 +120,19 @@
   cursor: pointer;
   font: inherit;
   display: flex; flex-direction: column; justify-content: center; gap: 2px;
-  transition: border-color var(--dur, 0.2s), background var(--dur, 0.2s);
+  transition: border-color var(--dur-1) var(--ease), background var(--dur-1) var(--ease);
 }
-.src:hover { border-color: var(--text-muted); }
-.src:disabled { opacity: 0.4; cursor: default; }
+.src:hover { border-color: var(--text-muted); background: color-mix(in oklab, var(--surface), var(--state) var(--state-hover)); }
+.src:active { background: color-mix(in oklab, var(--surface), var(--state) var(--state-press)); }
+.src:disabled { opacity: 0.4; cursor: not-allowed; }
 .src__num { font-size: 11px; letter-spacing: 0.16em; color: var(--text-muted); font-weight: 700; }
-.src__name { font-size: 14px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.src__name { font-size: 14px; font-weight: 700; color: var(--text-strong); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .src__signal { position: absolute; right: 8px; top: 8px; width: 6px; height: 6px; background: var(--border); }
 .src__signal--on { background: var(--success); }
 /* Programme: the accent surface with the brand dot; preview: the ice outline. */
 .src--program { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
-.src--program .src__num { color: var(--accent-text); }
+.src--program .src__num, .src--program .src__name { color: var(--accent-text); }
+.src--program:hover { background: color-mix(in oklab, var(--accent), var(--bg) 10%); }
 .src--program::before {
   content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--signal);
 }
@@ -159,6 +152,7 @@
 
 .layouts { display: grid; grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 8px; }
 .layout {
+  transition: border-color var(--dur-1) var(--ease);
   border: 1px solid var(--border);
   background: var(--surface);
   padding: 6px;
@@ -169,7 +163,7 @@
   display: flex; flex-direction: column; gap: 4px; align-items: stretch;
 }
 .layout:hover { border-color: var(--text-muted); }
-.layout--active { border-color: var(--accent); color: var(--text); }
+.layout--active { border-color: var(--accent); background: var(--surface-2); color: var(--text-strong); }
 .layout__thumb { display: block; width: 100%; aspect-ratio: 16 / 9; }
 .layout__win { fill: var(--surface2); stroke: var(--text-muted); stroke-width: 1; vector-effect: non-scaling-stroke; }
 .layout--active .layout__win { stroke: var(--accent); }
@@ -226,17 +220,16 @@
   padding: 8px 12px; background: var(--surface); border: 1px solid var(--border);
 }
 .site-item__num { font-weight: 800; letter-spacing: 0.1em; color: var(--text-muted); }
-.site-item__name { font-weight: 700; }
+.site-item__name { font-weight: 700; color: var(--text-strong); }
 .site-item__meta { color: var(--text-muted); font-size: 12px; }
 .file-btn { position: relative; overflow: hidden; }
 .file-btn input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 
 /* ─── Small things ────────────────────────────────────────────────────── */
 
-/* A selected option among equals: the accent surface WITHOUT the dot. The
-   dot marks the one primary action of a view; a chosen audio channel is not
-   an action, and a second red element in the same view is forbidden. */
-.btn--on { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+/* A selected option among equals (lzm-web): level-2 surface plus a 2 px
+   line on the left -- never the accent surface, never red. */
+.btn.btn--on { background: var(--surface-2); color: var(--text-strong); border-color: var(--line-3); border-left: 2px solid var(--text-strong); }
 
 .chip {
   display: inline-flex; align-items: center; gap: 6px;
@@ -247,9 +240,11 @@
 .chip--warn { border-color: var(--warning); color: var(--text); }
 .kbd {
   font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
   font-size: 11px; padding: 1px 5px; border: 1px solid var(--border); color: var(--text-muted);
 }
-.armed { background: var(--warning); color: var(--accent-text); }
+.btn.armed { border-color: var(--warning); color: var(--text-strong); }
+.btn.armed::before { content: ''; width: 6px; height: 6px; background: var(--warning); flex: none; }
 .error-line {
   display: flex; align-items: center; gap: 12px;
   padding: 8px 16px; background: var(--surface); border-left: 4px solid var(--danger); font-size: 12px;
@@ -268,8 +263,8 @@
   background: transparent; color: var(--text-muted); border: 1px solid var(--border);
   cursor: pointer;
 }
-.tile__scopes:hover { color: var(--text); border-color: var(--text-muted); }
-.tile__scopes[aria-pressed="true"] { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+.tile__scopes:hover { color: var(--text-strong); border-color: var(--text-muted); }
+.tile__scopes[aria-pressed="true"] { background: var(--surface-2); color: var(--text-strong); border-color: var(--line-3); border-left: 2px solid var(--text-strong); }
 .scopes { display: flex; flex-direction: column; background: var(--bg); border: 1px solid var(--border); min-width: 0; }
 .scopes__bar { display: flex; align-items: center; gap: 8px; padding: 4px 8px; font-size: 12px; }
 .scopes__title { font-weight: 800; letter-spacing: 0.1em; white-space: nowrap; }
