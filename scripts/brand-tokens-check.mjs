@@ -79,3 +79,44 @@ assert.ok(!/box-shadow/.test(ohneKommentare), 'regie.css: Schatten gefunden');
 assert.ok(!/gradient\(/.test(ohneKommentare), 'regie.css: Verlauf gefunden');
 assert.ok(/var\(--signal\)/.test(ohneKommentare), 'regie.css: das Tally-Rot kommt aus --signal');
 console.log('brand:check ok — regie.css nur aus Tokens, ohne Rundung, Schatten, Verlauf');
+
+// ─── lzm-web 2026: Assistent und Dashboard-Rahmen, Hell, Schrift, Icons ────
+//
+// `styles/wizard.css` (Ersteinrichtung) und `styles/dashboard.css` (Kopf,
+// Kameraliste, Multiview-Karten, Kamera-Plan) trugen bis Oktober 2026 eigenes
+// Grau, Sony-Blau und Rundungen. Sie sind Dashboard, kein Nachbau -- also
+// dieselbe Regel wie regie.css.
+for (const datei of ['wizard.css', 'dashboard.css']) {
+  const roh = readFileSync(resolve(hier, '..', 'packages/web-rcp/src/styles', datei), 'utf8');
+  const ohne = roh.replace(/\/\*[\s\S]*?\*\//g, '');
+  assert.ok(!/#[0-9a-fA-F]{3,8}\b/.test(ohne), `${datei}: rohes Hex gefunden -- Tokens benutzen`);
+  assert.ok(!/rgba?\(/.test(ohne), `${datei}: rgba gefunden -- Tokens benutzen`);
+  assert.ok(!/border-radius/.test(ohne), `${datei}: Rundung gefunden`);
+  assert.ok(!/box-shadow/.test(ohne), `${datei}: Schatten gefunden`);
+  assert.ok(!/gradient\(/.test(ohne), `${datei}: Verlauf gefunden`);
+  assert.ok(!/var\(--signal\)/.test(ohne), `${datei}: Tally-Rot hat im Werkzeug ausser dem Fokus nichts verloren`);
+}
+
+// Hell gibt es -- per Systemvorgabe und per Wahl im Kopf -- und dort steht
+// Navy auf Off-White, Stahlblau nie als Text.
+assert.ok(css.includes(":root[data-theme='light']"), 'Hell-Modus fehlt');
+assert.ok(/prefers-color-scheme:\s*light/.test(css), 'Systemvorgabe Hell fehlt');
+const hell = css.slice(css.indexOf(":root[data-theme='light']"));
+assert.ok(/--text-muted:\s*var\(--schiefer\)/.test(hell), 'Hell: Sekundaertext ist Schiefer, nicht Stahlblau');
+
+// Public Sans kommt aus dem Paket, nicht aus dem Netz (DSGVO, Electron offline).
+const main = readFileSync(resolve(hier, '..', 'packages/web-rcp/src/main.tsx'), 'utf8');
+assert.ok(main.includes("@fontsource-variable/public-sans"), 'Public Sans wird nicht lokal geladen');
+const html = readFileSync(resolve(hier, '..', 'packages/web-rcp/index.html'), 'utf8');
+assert.ok(!/fonts\.(googleapis|gstatic)\.com/.test(html + css), 'Schrift-Abruf von Google gefunden');
+
+// Keine Emoji als Bedienzeichen in den Marken-Ansichten (Nachbauten ausgenommen).
+const { readdirSync } = await import('node:fs');
+const komp = resolve(hier, '..', 'packages/web-rcp/src/components');
+const emoji = /[\u{1F300}-\u{1FAFF}\u{2699}\u{25CE}]/u;
+for (const f of readdirSync(komp)) {
+  if (/^(Sony|PtzPanel|RotaryKnob)/.test(f)) continue;
+  assert.ok(!emoji.test(readFileSync(resolve(komp, f), 'utf8')), `${f}: Emoji als Icon -- components/Icon.tsx benutzen`);
+}
+
+console.log('brand:check ok — lzm-web: Assistent, Dashboard-Rahmen, Hell, lokale Schrift, Linien-Icons');

@@ -5,6 +5,7 @@ import { capabilitiesForMode, isPtzMode } from '../capabilities.ts';
 import type { CameraStatesByNumber, CameraTally, TallyState } from '../types.ts';
 import type { CameraSlot } from '../hooks/useBridge.ts';
 import { MODE_LABEL, ptzExtrasFor } from '../App.tsx';
+import { Icon } from './Icon.tsx';
 
 interface Props {
   cameras: Record<number, CameraSlot>;
@@ -84,13 +85,13 @@ export function MultiCamPanel(p: Props) {
                   <span className={`tile__tally tile__tally--${p.cameraTally[num]}`}>{p.cameraTally[num] === 'program' ? 'PGM' : 'PVW'}</span>
                 )}
                 <div className="multicam__card-actions">
-                  <button className="btn btn--sm" onClick={() => p.onEdit(num)} title="Set up">⚙</button>
+                  <button className="btn btn--sm" onClick={() => p.onEdit(num)} title="Set up" aria-label="Set up"><Icon name="settings" size={16} /></button>
                   {connected ? (
                     <button className="btn btn--sm btn--danger" onClick={() => p.onDisconnect(num)}>Disconnect</button>
                   ) : (
                     <button className="btn btn--sm btn--primary" onClick={() => p.onConnect(num)}>Connect</button>
                   )}
-                  <button className="camera-list__remove" title="Remove" onClick={() => p.onRemove(num)}>✕</button>
+                  <button className="camera-list__remove" title="Remove" aria-label="Remove" onClick={() => p.onRemove(num)}><Icon name="x" size={14} /></button>
                 </div>
               </div>
 
