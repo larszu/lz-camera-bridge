@@ -1,5 +1,10 @@
 # Zoom and focus demands as an input (phase 4)
 
+> **Do not plug in a demand with the divider below.** An analog Fujinon focus
+> demand puts +12 V on Detect (Fujinon manual, see
+> [`recherche-2026-10.md`](recherche-2026-10.md)); through 10k/6k8 that is
+> 4.9 V at the ADS1115, whose absolute maximum is 3.6 V. Redesign first.
+
 A demand is the hand control of a broadcast lens: a thumb rocker for zoom, a
 knob for focus. Phase 4 reads one and puts it where this repository already
 routes commands. This file describes what is built, which of two ways is used

@@ -14,7 +14,7 @@ unexpected.
 | Check | Result |
 |---|---|
 | Amplifier stage formula against the resistor placement | **Error found and fixed.** `wiring.md` and the workshop sheet had 10k from 3.3 V and 16k from the DAC under a formula that only holds the other way round. As drawn, the stage gives 4.06–6.60 V instead of 2.54–6.60 V. Now: **Ra = 16k from 3.3 V, Rb = 10k from the DAC**. Issue #39's text still shows the old placement. |
-| Readback divider 10k / 6k8 | 7.00 V at the pin → 2.83 V at the ADC; below the ADS1115's absolute maximum VDD + 0.3 V (TI datasheet) at 3.3 V supply |
+| Readback divider 100k / 68k (was 10k / 6k8 — below the ARIB ≥ 20 kΩ load) | 7.00 V at the pin → 2.83 V at the ADC; below the ADS1115's absolute maximum VDD + 0.3 V (TI datasheet) at 3.3 V supply |
 | I²C pins | GPIO 16/17; the earlier 8/9 collided with the W5500 reset (GPIO 9) — fixed in `config.h` |
 | Default firmware drives nothing | `B4_ENABLE_IRIS_DRIVE` 0; CI proves the drive build differs and the safe build refuses `POST /api/iris` with 409 |
 | Serial TX | not in any default build; CI proves `B4 TX:` is absent from the safe and the iris build (after the serial PR is merged) |

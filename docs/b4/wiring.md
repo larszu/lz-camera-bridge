@@ -52,9 +52,9 @@ Three dividers, six resistors. This is the whole of phase 1a and it is where
 you should spend the first evening.
 
 ```
-lens pin ──[ 10k ]──┬── ADS1115 Ax
+lens pin ──[ 100k ]──┬── ADS1115 Ax
                     │
-                 [ 6k8 ]
+                 [ 68k ]
                     │
                    GND  ── common with ESP32 GND and the 12 V supply
 ```
@@ -127,15 +127,27 @@ The range only has to be approximately right. The exact voltage-to-aperture
 relationship is calibrated in software, which is why no voltage appears
 anywhere in the firmware's control path.
 
-An **LM358** or **TL072** in DIP-8 is enough — the output only has to reach
-6.6 V from a 12 V supply, so rail-to-rail is not needed. Both have the same
-pinout, so you can swap them in the same breadboard holes and compare.
+Use an **LM358**, **not a TL072.** The + input sits at 1.27 V at the bottom of
+the range; the TL072's common-mode range does not reach that close to V− on a
+single supply (TI datasheet), and outside it the output is unspecified — up to
+jumping to the top rail.
+
+**Limit the output.** With R1 open, an LM358 on 12 V puts about 10.5 V on pin 5.
+No source gives a maximum for pin 5; the highest a product is documented to
+apply is 7.5 V. Feed the amplifier from a **9 V regulator** off pin 6 (swing
+then ≈ ≤ 7.5 V), and check the fault case on the bench: disconnect R1, the
+output must stay below that.
+
+Source for these and the ARIB levels: [`recherche-2026-10.md`](recherche-2026-10.md).
 
 ### Two things on the lens itself
 
 - The **iris switch on the barrel must be at A**. In M the aperture follows the
   manual ring and ignores pin 5 completely.
-- **Pin 8 must be at 5 V** or the lens will not accept remote control at all.
+- **Pin 8 must be at 5 V** (5.0 ± 0.5 V, fed through **1 kΩ**) for remote.
+- **Pin 4 is "forced iris servo"**, not an enable (ARIB TR-B37). Leave it open.
+- **Never leave pin 5 open while the switch is at A.** Order: amplifier output
+  at ≈ 2.54 V → connect pin 5 → pin 8 to 5 V → only then switch to A.
 
 ---
 
@@ -146,7 +158,7 @@ Do not skip ahead. Each step tells you whether the next one is safe.
 | Step | Action | Expected |
 |---|---|---|
 | 1 | Lens on 12 V only (pins 6/3), nothing else | Lens starts, servo audible |
-| 2 | Measure pin 7 with a multimeter, work the aperture by hand | Voltage changes smoothly, 2.5–6.2 V |
+| 2 | Iris switch on the barrel to **M** first, then measure pin 7 and turn the ring by hand. **Never turn the ring in A** — Canon warns this can damage the lens | Voltage changes smoothly; closed 1.5–2.9 V, F2.8 6.2 V (ARIB TR-B37) |
 | 3 | Put pin 8 at 5 V | Lens accepts remote control |
 | 4 | Measure the amplifier output **with the lens disconnected**, sweep the DAC | 2.5–6.6 V, linear |
 | 5 | Only now, amplifier output through 1 kΩ to pin 5 | Aperture follows the setpoint |

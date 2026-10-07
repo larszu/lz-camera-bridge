@@ -169,13 +169,14 @@
  *                         │
  *                        GND
  *
- * With 10k/6k8: 7.00 V at the pin becomes 2.83 V at the ADC. Measure the two
+ * With 100k/68k (ARIB TR-B37 asks >= 20 kΩ load on pin 7; 10k/6k8 was
+ * 16.8 kΩ — docs/b4/recherche-2026-10.md): 7.00 V at the pin becomes 2.83 V at the ADC. Measure the two
  * resistors you actually fitted and put the real values here — this ratio sits
  * directly in every voltage the firmware reports, and a 5 % resistor is a 5 %
  * lie about the iris.
  */
-#define DIVIDER_R_TOP_OHM 10000.0f
-#define DIVIDER_R_BOTTOM_OHM 6800.0f
+#define DIVIDER_R_TOP_OHM 100000.0f
+#define DIVIDER_R_BOTTOM_OHM 68000.0f
 
 /*
  * ADS1115 full-scale range. GAIN_ONE is ±4.096 V, which comfortably covers the
