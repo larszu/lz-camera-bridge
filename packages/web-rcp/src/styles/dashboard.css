@@ -1,0 +1,137 @@
+/* ─── Dashboard around the instruments ──────────────────────────────────────
+ *
+ * Header, camera switcher, camera list, multiview cards and the camera plan.
+ * These used to sit in sony-rcp.css with their own blue and rounded corners;
+ * they are dashboard, not replica, so they follow the brand tokens
+ * (lzm-web, tool mode). `brand:check` scans this file: tokens only, no
+ * radius, no shadow, no gradient.
+ */
+
+.app__title { font-weight: 800; font-size: 15px; color: var(--text-strong); }
+
+.panel-view-tabs { display: flex; gap: 6px; margin-bottom: 10px; }
+
+/* ── Camera switcher ── */
+.cam-switch { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
+.cam-switch__label {
+  font-size: var(--fs-kicker); font-weight: 700; letter-spacing: var(--track-kicker);
+  text-transform: uppercase; color: var(--text-muted); margin-right: 4px;
+}
+.cam-switch__btn {
+  min-width: 40px; min-height: 38px;
+  font: inherit; font-weight: 600; font-variant-numeric: tabular-nums;
+  color: var(--text-strong); background: var(--surface);
+  border: 1px solid var(--border); border-bottom: 2px solid transparent;
+  cursor: pointer; touch-action: manipulation;
+  transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
+}
+.cam-switch__btn:hover { background: color-mix(in oklab, var(--surface), var(--state) var(--state-hover)); }
+.cam-switch__btn--active { background: var(--surface-2); border-bottom-color: var(--text-strong); }
+
+/* ── Header + camera list ── */
+.app__header { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.app__ws { margin-left: 2px; }
+
+.camera-list { margin-bottom: 12px; }
+.camera-list__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.camera-list__empty { color: var(--text-muted); font-size: 13px; margin: 4px 0; }
+.camera-list__item {
+  display: flex; align-items: center; gap: 8px;
+  min-height: var(--ziel); padding: 6px 10px 6px 8px; cursor: pointer;
+  border-bottom: 1px solid var(--line-1); border-left: 2px solid transparent;
+  transition: background var(--dur-1) var(--ease);
+}
+.camera-list__item:hover { background: color-mix(in oklab, var(--state) var(--state-hover), transparent); }
+.camera-list__item--active { background: var(--surface-2); border-left-color: var(--text-strong); }
+.camera-list__num { font-weight: 700; font-variant-numeric: tabular-nums; min-width: 1.4em; text-align: center; color: var(--text-strong); }
+.camera-list__mode { flex: 1; color: var(--text-muted); font-size: 13px; }
+.camera-list__remove {
+  display: inline-flex; align-items: center; justify-content: center;
+  background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 4px;
+  transition: color var(--dur-1) var(--ease), background var(--dur-1) var(--ease);
+}
+.camera-list__remove:hover {
+  color: color-mix(in oklab, var(--danger), var(--text-strong) 35%);
+  background: color-mix(in oklab, var(--state) var(--state-hover), transparent);
+}
+
+.app__empty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+  min-height: 200px; color: var(--text-muted); font-size: 14px;
+  border: 1px dashed var(--border); padding: 32px; text-align: center;
+}
+
+/* ── Multiview (multi-camera control wall) ── */
+.app__viewtabs { margin-left: auto; display: flex; gap: 6px; }
+.multicam { padding: 12px 16px 32px; }
+.multicam__bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.multicam__title { font-weight: 800; color: var(--text-strong); }
+.multicam__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(460px, 100%), 1fr));
+  gap: 16px;
+  align-items: start;
+}
+.multicam__card { background: var(--surface); border-top: 3px solid var(--border); overflow: hidden; }
+.multicam__card--on { border-top-color: var(--success); }
+/* PTZ panels are much wider than a paint RCP — let them span two grid cells
+   on roomy screens so the joystick + preset pad aren't clipped. */
+@media (min-width: 1000px) {
+  .multicam__card--ptz { grid-column: span 2; }
+}
+.multicam__card-head {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 8px 10px; background: var(--surface-2); border-bottom: 1px solid var(--border);
+}
+.multicam__card-num { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text-strong); }
+.multicam__card-mode { color: var(--text-muted); font-size: 13px; }
+.multicam__card-actions { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+.multicam__card-body { padding: 10px; overflow-x: auto; }
+/* Let the RCP/PTZ panels fill the card width in the grid. */
+.multicam__card-body .rcp-panel,
+.multicam__card-body .ptz-panel { max-width: 100%; }
+
+/* ── Camera plan (B-41.1) ──────────────────────────────────────────────────
+   The match is the content, not the button: what belongs together and WHAT
+   proves it must be readable before anyone accepts it. A mere suggestion is
+   drawn weaker than a measured finding -- otherwise it looks like one. */
+.plan { background: var(--surface); border-top: 1px solid var(--border); padding: 12px 14px; margin: 0 0 12px; }
+.plan__bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.plan__title { font-weight: 800; font-size: 15px; color: var(--text-strong); }
+.plan__file { color: var(--text-muted); font-size: 12px; }
+.plan__hint { color: var(--text-muted); font-size: 13px; line-height: 1.45; margin: 8px 0 0; max-width: 72ch; }
+.plan__cols { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 12px; }
+.plan__h {
+  font-size: var(--fs-kicker); font-weight: 700; text-transform: uppercase;
+  letter-spacing: var(--track-kicker); color: var(--text-muted); margin: 0 0 6px;
+}
+.plan__count {
+  display: inline-block; margin-left: 6px; padding: 0 6px;
+  background: var(--surface-2); font-size: 11px; font-variant-numeric: tabular-nums; letter-spacing: 0;
+}
+.plan__list { list-style: none; margin: 0; padding: 0; }
+.plan__list li {
+  display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+  padding: 4px 0; font-size: 13px; border-bottom: 1px solid var(--line-1);
+}
+.plan__slot { font-variant-numeric: tabular-nums; color: var(--text-muted); min-width: 5.5em; }
+.plan__label { font-weight: 600; color: var(--text-strong); }
+.plan__reason { color: var(--text-muted); font-size: 12px; }
+/* Status as a small sign plus text, never as colour alone. */
+.plan__badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11px; padding: 1px 6px; border: 1px solid var(--border); color: var(--text);
+}
+.plan__badge::before { content: ''; width: 6px; height: 6px; background: var(--text-muted); flex: none; }
+.plan__badge--ok::before { background: var(--success); }
+.plan__badge--weak::before { background: var(--warning); }
+.plan__badge--manual::before { background: var(--text-strong); }
+
+/* The plan label on the card. Question mark and weaker colour when it was
+   only suggested from the number in the name. */
+.multicam__card-plan { font-weight: 600; font-size: 13px; color: var(--text-strong); }
+.multicam__card-plan--weak { color: var(--text-muted); font-weight: 500; }
+
+@media (max-width: 900px) {
+  .plan__cols { grid-template-columns: 1fr; }
+}
