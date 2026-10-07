@@ -121,6 +121,11 @@ export const MODE_READBACK: Readonly<Record<ConnectionMode, readonly PaintField[
   // `SonyPtpUsbClient`: alle fuenf `emitState()` stehen unmittelbar hinter
   // `this.state.X = <kommandierter Wert>`. Es wird nichts gelesen.
   'sony-usb': [],
+  // `SonyPtpIpClient` erbt von `SonyPtpClient` wie der USB-Weg: jede
+  // Schreibung wartet zwar, bis die Kamera den Wert zeigt (FX3: ~250 ms),
+  // aber `emitState()` meldet danach den KOMMANDIERTEN Wert. Gelesen wird
+  // nichts in den Zustand -- also leer, wie bei USB.
+  'sony-ptpip': [],
   // `SonyMncClient.getState` pollt; `mapMncState` bildet daraus zwei Felder ab.
   'sony-mnc': ['iris', 'ndFilter'],
   // `BMDeviceClient.getState` HOLT sehr viel — /colorCorrection/lift, /gamma,
@@ -321,6 +326,7 @@ export const MODE_CADENCE: Readonly<Record<ConnectionMode, ConfirmCadence>> = {
   // Die uebrigen stehen in `MODE_READBACK` mit leerer Liste: sie lesen nichts
   // zurueck, also gibt es auch nichts, das altern koennte.
   'sony-usb': { kind: 'none' },
+  'sony-ptpip': { kind: 'none' },
   zcam: { kind: 'none' },
   'panasonic-ptz': { kind: 'none' },
   visca: { kind: 'none' },

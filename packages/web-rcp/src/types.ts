@@ -22,6 +22,7 @@ export type CameraStatesByNumber = Record<number, CameraState>;
 
 export type ConnectionMode =
   | 'tcp' | 'serial' | 'lumix-http' | 'sony-usb' | 'blackmagic' | 'sony-mnc' | 'canon-ccapi'
+  | 'sony-ptpip'
   | 'zcam' | 'panasonic-ptz' | 'visca' | 'visca-serial' | 'jvc' | 'birddog'
   // HTTP-CGI PTZ: alternative Steuerung ueber die Web-CGI der Kamera
   // (Vissonic/PTZOptics ptzctrl.cgi, Sony SRG/BRC /command/) statt VISCA.
@@ -59,6 +60,8 @@ export interface BridgeConfig {
   camPort?: number;
   camUser?: string;
   camPass?: string;
+  /** sony-ptpip: confirmed SSH host-key fingerprint of the camera. */
+  sshFingerprint?: string;
   /** HTTP-CGI: Firmware-Familie und Preset-Versatz. */
   cgiFamily?: 'vissonic' | 'sony';
   cgiPresetOffset?: number;
@@ -98,6 +101,20 @@ export interface SonyUsbDevice {
   vendorId: number;
   productId: number;
   supported: boolean;
+}
+
+/** A Sony camera found by SSDP (DigitalImaging service), for sony-ptpip. */
+export interface SonyNetDevice {
+  ip: string;
+  name: string;
+  model: string;
+  serial: string;
+  firmware: string;
+  mac: string;
+  /** Access Authentication on: user/password and SSH. */
+  ssh: boolean;
+  /** Access Authentication off: confirm pairing once on the camera. */
+  pairing: boolean;
 }
 
 export interface SonyMncDevice {

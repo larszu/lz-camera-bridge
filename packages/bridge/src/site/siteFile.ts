@@ -165,6 +165,18 @@ function numberOr(v: unknown, fallback: number): number {
   return Number.isFinite(n) && n > 0 ? n : fallback;
 }
 
+/**
+ * The SSH password of a sony-ptpip camera never goes to disk: site.json is
+ * plain text, and that password opens the camera to anyone on the network.
+ * User and confirmed fingerprint stay; after a restart the password is
+ * entered again.
+ */
 export function serialiseSite(site: SiteFile): string {
-  return JSON.stringify(site, null, 2) + '\n';
+  const safe: SiteFile = {
+    ...site,
+    cameras: site.cameras.map((c) =>
+      c.config.connectionMode === 'sony-ptpip' && c.config.camPass ? { ...c, config: { ...c.config, camPass: undefined } } : c,
+    ),
+  };
+  return JSON.stringify(safe, null, 2) + '\n';
 }
