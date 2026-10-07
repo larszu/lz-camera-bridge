@@ -44,6 +44,9 @@ const MODE_CAPS: Record<ConnectionMode, Partial<CameraCapabilities>> = {
   },
   // Sony Alpha/Cinema über USB-PTP.
   'sony-usb': { iris: true, masterGain: true, iso: true, shutter: true, colorTemp: true, awb: true, record: true },
+  // Sony Alpha/Cinema ueber PTP/IP (WLAN/LAN, optional SSH): dieselben
+  // Befehle wie USB, nur ein anderer Draht.
+  'sony-ptpip': { iris: true, masterGain: true, iso: true, shutter: true, colorTemp: true, awb: true, record: true },
   // Sony Monitor & Control (WiFi).
   'sony-mnc': { iris: true, masterGain: true, iso: true, colorTemp: true, awb: true, ndFilter: true },
   // Panasonic Lumix HTTP CGI.

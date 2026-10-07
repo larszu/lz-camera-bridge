@@ -62,8 +62,9 @@ while operating no camera. The running program comes from the installer below.
 | Family | Mode | Transport | Status |
 |---|---|---|---|
 | Sony CCU (HXC/HDC, BRC) | `tcp` / `serial` | 700PTP over TCP :7700 / RS‑422 | paint verified; AWB/ABB deliberately disabled¹ |
-| Sony FX / Alpha (FX3, FX6, A7 …) | `sony-usb` | PTP vendor extension over USB (libusb) | **verified** (codes from libgphoto2) |
-| Sony Monitor & Control (FX WiFi) | `sony-mnc` | HTTP :10000 + SSDP discovery | unverified (undocumented app protocol) |
+| Sony FX / Alpha (FX3, FX6, A7 …) | `sony-usb` | PTP vendor extension over USB (libusb) | **verified** (codes from libgphoto2); handshake 3.00 and confirmed writes ported³ |
+| Sony FX / Alpha over Wi-Fi/LAN | `sony-ptpip` | PTP/IP TCP 15740, SSDP discovery; Access Authentication through SSH (port 22, aes128-ctr, host-key fingerprint) | protocol **verified on an FX3 (fw 7.00)**³; this bridge path read-only on that FX3 |
+| Sony Monitor & Control (FX WiFi) | `sony-mnc` | HTTP :10000 + SSDP discovery | unverified (undocumented app protocol) — for FX3/A7 prefer `sony-ptpip` |
 | Canon EOS (R5/R6/R7/R8/R10 …) | `canon-ccapi` | CCAPI HTTP REST :8080 | **verified** (official CCAPI) |
 | Panasonic Lumix (S1/S5/GH5/GH6 …) | `lumix-http` | `cam.cgi` HTTP | verified |
 | Blackmagic (Pocket/Studio/URSA, FW 8.6+) | `blackmagic` | `/control/api/v1` REST + WS | **verified** |
@@ -76,6 +77,19 @@ while operating no camera. The running program comes from the installer below.
 | VISCA on a serial line (same heads, RS‑232/422 wiring) | `visca-serial` | RS‑232 8N1, 9600 default, daisy‑chain address 1–7 | framing unit‑tested; *not yet on a camera* |
 | DJI Ronin RS 2 / RS 3 Pro | `dji-ronin` | DJI R SDK over CAN 1 Mbit/s via USB SLCAN adapter | framing unit‑tested; *not yet on a gimbal*² |
 | DJI Osmo Pocket 3 / 4 | `dji-osmo` | DUML over a serial (CDC) device | framing unit‑tested; *not yet on a gimbal*³ |
+
+³ Sony PTP, shared by `sony-usb` and `sony-ptpip` (`SonyPtpClient`), follows
+Sony's *Camera Control PTP 3 Reference*: handshake with protocol 3.00 and
+retry while the camera has no version yet; every write waits until the camera
+reports the value (a real FX3 shows it ~250 ms late); 500 ms after an
+exposure-mode change; the clock (0xD223) as an ISO 8601 string. The protocol
+code is the one [lz-camera-sync](https://github.com/larszu/lz-camera-sync)
+runs against an FX3 (fw 7.00) since 2026-10-07 — reading 369 properties,
+writing and restoring values, setting the clock, over Wi-Fi with SSH. In this
+bridge the `sony-ptpip` path was checked read-only against that FX3 (SSDP
+found it and an A7 IV; SSH with fingerprint, handshake, 369 properties). The
+SSH password is never written to `site.json`; after a bridge restart it is
+entered again.
 
 ¹ Sony's 700 protocol is NDA-only; no public source documents the auto‑setup
 command codes, so those buttons stay disabled rather than guessing at a

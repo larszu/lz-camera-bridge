@@ -9,7 +9,7 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import type {
   CameraState, CameraStatesByNumber, BridgeConfig, WiznetDevice,
-  SonyUsbDevice, SonyMncDevice, HidDevice, TallyState,
+  SonyUsbDevice, SonyMncDevice, SonyNetDevice, HidDevice, TallyState,
   SwitcherSlot, SwitcherState, SwitcherConfig, CameraTally, SiteInfo,
 } from '../types.ts';
 import type {
@@ -122,6 +122,7 @@ export function useBridge() {
   const [wiznetDevices, setWiznetDevices] = useState<WiznetDevice[]>([]);
   const [sonyUsbDevices, setSonyUsbDevices] = useState<SonyUsbDevice[]>([]);
   const [sonyMncDevices, setSonyMncDevices] = useState<SonyMncDevice[]>([]);
+  const [sonyNetDevices, setSonyNetDevices] = useState<SonyNetDevice[]>([]);
   const [hidDevices, setHidDevices] = useState<HidDevice[]>([]);
   const [controlSurfaceActive, setControlSurfaceActive] = useState(false);
   const [tally, setTallyState] = useState<TallyState>({ program: false, preview: false, isoRec: false });
@@ -228,6 +229,9 @@ export function useBridge() {
             setSonyUsbDevices(msg.devices as SonyUsbDevice[]);
             if ((msg.devices as SonyUsbDevice[]).length === 0 && msg.reason) setErrorMsg(msg.reason as string);
             break;
+          case 'sonyNetDevices':
+            setSonyNetDevices(msg.devices as SonyNetDevice[]);
+            break;
           case 'sonyMncDevices':
             setSonyMncDevices(msg.devices as SonyMncDevice[]);
             break;
@@ -324,6 +328,7 @@ export function useBridge() {
     send('configureWiznet', { deviceIp, deviceConfig }), [send]);
   const discoverSonyUsb = useCallback(() => send('discoverSonyUsb'), [send]);
   const discoverSonyMnc = useCallback(() => send('discoverSonyMnc'), [send]);
+  const discoverSonyNet = useCallback(() => send('discoverSonyNet'), [send]);
   const listHidDevices = useCallback(() => send('listHidDevices'), [send]);
   const enableControlSurface = useCallback((surface: Record<string, unknown>) => send('enableControlSurface', { surface }), [send]);
   const disableControlSurface = useCallback(() => send('disableControlSurface'), [send]);
@@ -363,11 +368,11 @@ export function useBridge() {
   const setPoseOffset = useCallback((cameraNumber: number, offset: { pan: number; tilt: number } | null) => send('setPoseOffset', { cameraNumber, offset }), [send]);
 
   return {
-    status, cameras, cameraStates, cameraOrigins, cameraConfirmations, ports, wiznetDevices, sonyUsbDevices, sonyMncDevices,
+    status, cameras, cameraStates, cameraOrigins, cameraConfirmations, ports, wiznetDevices, sonyUsbDevices, sonyMncDevices, sonyNetDevices,
     hidDevices, controlSurfaceActive, tally, errorMsg, planMatch,
     switchers, cameraTally, site,
     send, setCameraConfig, connectCamera, disconnectCamera, removeCamera, sendCommand,
-    listPorts, discoverWiznet, configureWiznet, discoverSonyUsb, discoverSonyMnc,
+    listPorts, discoverWiznet, configureWiznet, discoverSonyUsb, discoverSonyMnc, discoverSonyNet,
     listHidDevices, enableControlSurface, disableControlSurface, setTally,
     matchCameraPlan, applyCameraPlan, assignPlanCamera,
     setSwitcherConfig, connectSwitcher, disconnectSwitcher, removeSwitcher, switcherCommand,
