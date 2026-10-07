@@ -34,7 +34,7 @@ const VIEWS: { id: ViewMode; label: string }[] = [
 ];
 
 export const MODE_LABEL: Record<string, string> = {
-  tcp: 'Sony CCU', serial: 'Sony RS-422', 'sony-usb': 'Sony USB', 'sony-mnc': 'Sony WiFi',
+  tcp: 'Sony CCU', serial: 'Sony RS-422', 'sony-usb': 'Sony USB', 'sony-ptpip': 'Sony Wi-Fi/LAN', 'sony-mnc': 'Sony WiFi',
   'lumix-http': 'Lumix', 'canon-ccapi': 'Canon', blackmagic: 'Blackmagic', zcam: 'Z CAM',
   'panasonic-ptz': 'Pana PTZ', visca: 'VISCA', 'visca-serial': 'VISCA RS-232', jvc: 'JVC', birddog: 'BirdDog',
   'http-cgi': 'HTTP-CGI', 'dji-osmo': 'DJI Osmo', 'dji-ronin': 'DJI Ronin', 'b4-lens': 'B4 lens', demo: 'Demo',
@@ -75,11 +75,11 @@ export default function App() {
 
   const bridge = useBridge();
   const {
-    status, cameras, cameraStates, cameraOrigins, cameraConfirmations, ports, wiznetDevices, sonyUsbDevices, sonyMncDevices,
+    status, cameras, cameraStates, cameraOrigins, cameraConfirmations, ports, wiznetDevices, sonyUsbDevices, sonyMncDevices, sonyNetDevices,
     hidDevices, controlSurfaceActive, tally, errorMsg, planMatch,
     switchers, cameraTally, site,
     setCameraConfig, connectCamera, disconnectCamera, removeCamera, sendCommand,
-    listPorts, discoverWiznet, configureWiznet, discoverSonyUsb, discoverSonyMnc,
+    listPorts, discoverWiznet, configureWiznet, discoverSonyUsb, discoverSonyMnc, discoverSonyNet,
     listHidDevices, enableControlSurface, disableControlSurface, setTally,
     matchCameraPlan, applyCameraPlan,
     setSwitcherConfig, connectSwitcher, disconnectSwitcher, removeSwitcher, switcherCommand,
@@ -375,6 +375,9 @@ export default function App() {
               ports={ports}
               sonyUsbDevices={sonyUsbDevices}
               sonyMncDevices={sonyMncDevices}
+              sonyNetDevices={sonyNetDevices}
+              onDiscoverSonyNet={discoverSonyNet}
+              errorMsg={errorMsg}
               hidDevices={hidDevices}
               controlSurfaceActive={controlSurfaceActive}
               onSetConfig={(cfg) => setCameraConfig(selected, cfg)}

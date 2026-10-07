@@ -13,6 +13,7 @@ import { LumixClient } from '../protocol/LumixClient.js';
 import { SonyPtpUsbClient, SonyPtpState } from './SonyPtpUsbClient.js';
 import { BMDeviceClient, BMCameraState } from './BMDeviceClient.js';
 import { SonyMncClient, MncCameraState } from './SonyMncClient.js';
+import { SonyPtpIpClient } from './SonyPtpIpClient.js';
 import { CanonCcapiClient } from './CanonCcapiClient.js';
 import { ZCamClient } from './ZCamClient.js';
 import { PanasonicPtzClient } from './PanasonicPtzClient.js';
@@ -27,6 +28,10 @@ import { DjiRoninClient } from './DjiRoninClient.js';
 
 export type ConnectionMode =
   | 'tcp' | 'serial' | 'lumix-http' | 'sony-usb' | 'blackmagic' | 'sony-mnc' | 'canon-ccapi'
+  // Sony Alpha/Cinema ueber WLAN/LAN: PTP/IP (TCP 15740), mit
+  // Zugriffsauthentifizierung durch einen SSH-Tunnel. Dieselben Befehle wie
+  // sony-usb, anderer Draht (`SonyPtpIpClient`).
+  | 'sony-ptpip'
   | 'zcam' | 'panasonic-ptz' | 'visca' | 'visca-serial' | 'jvc' | 'birddog' | 'http-cgi'
   // Gimbals. Sie tragen kein Bild, sie bewegen nur den Kopf -- Blende und
   // Gain gehoeren der Kamera darauf.
@@ -57,6 +62,12 @@ export interface CameraConfig {
   mncHost?: string; mncPort?: number;
   canonHost?: string; canonPort?: number;
   camHost?: string; camPort?: number; camUser?: string; camPass?: string;
+  /**
+   * sony-ptpip with Access Authentication: the camera's host-key fingerprint
+   * as confirmed against its Access Authen. Info ("SHA256:…"). `camPass` is
+   * never written to site.json for this mode (see siteFile.ts).
+   */
+  sshFingerprint?: string;
   /** HTTP-CGI: welche Firmware-Familie (Vissonic/PTZOptics oder Sony SRG/BRC). */
   cgiFamily?: CgiFamily; cgiPresetOffset?: number;
   /** A name for the panel: "Stage left" instead of a bare number. The plan label wins when a plan is matched. */
@@ -184,6 +195,17 @@ export function makeBackend(cfg: CameraConfig): BuiltBackend {
       if (!cfg.bmHost) throw new Error('Keine Blackmagic-Kamera-IP konfiguriert');
       return { backend: new BMDeviceClient(cfg.bmHost, cfg.bmHttps ?? false), mapState: (s) => mapBmState(s as Partial<BMCameraState>) };
     }
+    case 'sony-ptpip':
+      if (!cfg.camHost) throw new Error('Keine Sony-Kamera-IP konfiguriert');
+      return {
+        backend: new SonyPtpIpClient({
+          host: cfg.camHost,
+          user: cfg.camUser || undefined,
+          password: cfg.camPass || undefined,
+          fingerprint: cfg.sshFingerprint || undefined,
+        }),
+        mapState: (s) => mapSonyUsbState(s as SonyPtpState),
+      };
     case 'sony-mnc':
       if (!cfg.mncHost) throw new Error('Keine Sony-WiFi-Kamera-IP konfiguriert');
       return { backend: new SonyMncClient(cfg.mncHost, cfg.mncPort ?? 10000), mapState: (s) => mapMncState(s as MncCameraState) };

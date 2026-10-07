@@ -17,7 +17,7 @@
  *       protocol/paintNudge.ts. Wird zu einem absoluten Kommando
  *       aufgeloest, bevor irgendein Backend es sieht.
  *   { type: 'listPorts' | 'discoverWiznet' | 'configureWiznet'
- *          | 'discoverSonyUsb' | 'discoverSonyMnc'
+ *          | 'discoverSonyUsb' | 'discoverSonyMnc' | 'discoverSonyNet'
  *          | 'listHidDevices' | 'enableControlSurface' | 'disableControlSurface'
  *          | 'setTally' | 'getTally' }
  *   { type: 'enableDemand', demand } | { type: 'disableDemand' }
@@ -162,7 +162,7 @@ interface ClientMessage {
   type:
     | 'listCameras' | 'setCameraConfig' | 'connectCamera' | 'disconnectCamera' | 'removeCamera'
     | 'command' | 'listPorts' | 'discoverWiznet' | 'configureWiznet' | 'discoverSonyUsb'
-    | 'discoverSonyMnc' | 'listHidDevices' | 'enableControlSurface' | 'disableControlSurface'
+    | 'discoverSonyMnc' | 'discoverSonyNet' | 'listHidDevices' | 'enableControlSurface' | 'disableControlSurface'
     | 'setTally' | 'getTally' | 'enableDemand' | 'disableDemand'
     | 'matchCameraPlan' | 'applyCameraPlan' | 'assignPlanCamera'
     | 'getMultiview'
@@ -549,6 +549,13 @@ export class BridgeServer {
         const { discoverSonyUsbCameras } = await import('./discovery/SonyUsbDiscovery.js');
         const { devices, reason } = await discoverSonyUsbCameras();
         ws.send(JSON.stringify({ type: 'sonyUsbDevices', devices, reason }));
+        break;
+      }
+
+      case 'discoverSonyNet': {
+        const { discoverSonyNetCameras } = await import('./discovery/SonyNetDiscovery.js');
+        const devices = await discoverSonyNetCameras();
+        ws.send(JSON.stringify({ type: 'sonyNetDevices', devices }));
         break;
       }
 

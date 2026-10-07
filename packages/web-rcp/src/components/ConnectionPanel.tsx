@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import type { BridgeConfig, ConnectionMode, SonyUsbDevice, SonyMncDevice, HidDevice } from '../types.ts';
+import type { BridgeConfig, ConnectionMode, SonyUsbDevice, SonyMncDevice, SonyNetDevice, HidDevice } from '../types.ts';
 
 type ConnMode = ConnectionMode;
 
@@ -18,12 +18,16 @@ interface Props {
   ports: string[];
   sonyUsbDevices: SonyUsbDevice[];
   sonyMncDevices: SonyMncDevice[];
+  sonyNetDevices: SonyNetDevice[];
+  /** The bridge's last error — read here for the SSH fingerprint question. */
+  errorMsg: string | null;
   hidDevices: HidDevice[];
   controlSurfaceActive: boolean;
   onSetConfig: (cfg: Partial<BridgeConfig>) => void;
   onListPorts: () => void;
   onDiscoverSonyUsb: () => void;
   onDiscoverSonyMnc: () => void;
+  onDiscoverSonyNet: () => void;
   onListHidDevices: () => void;
   onEnableControlSurface: (surface: Record<string, unknown>) => void;
   onDisableControlSurface: () => void;
@@ -33,7 +37,7 @@ interface Props {
   wsStatus: string;
 }
 
-export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices, hidDevices, controlSurfaceActive, onSetConfig, onListPorts, onDiscoverSonyUsb, onDiscoverSonyMnc, onListHidDevices, onEnableControlSurface, onDisableControlSurface, onConnect, onDisconnect, cameraConnected, wsStatus }: Props) {
+export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices, sonyNetDevices, errorMsg, onDiscoverSonyNet, hidDevices, controlSurfaceActive, onSetConfig, onListPorts, onDiscoverSonyUsb, onDiscoverSonyMnc, onListHidDevices, onEnableControlSurface, onDisableControlSurface, onConnect, onDisconnect, cameraConnected, wsStatus }: Props) {
   const [mode, setMode] = useState<ConnMode>(config.connectionMode ?? 'tcp');
   const [host, setHost] = useState(config.tcpHost ?? '192.168.1.10');
   const [port, setPort] = useState(String(config.tcpPort ?? 7700));
@@ -52,6 +56,7 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices,
   const [camPort, setCamPort] = useState(String(config.camPort ?? 80));
   const [camUser, setCamUser] = useState(config.camUser ?? '');
   const [camPass, setCamPass] = useState(config.camPass ?? '');
+  const [sshFingerprint, setSshFingerprint] = useState(config.sshFingerprint ?? '');
   const [cgiFamily, setCgiFamily] = useState<'vissonic' | 'sony'>(config.cgiFamily ?? 'vissonic');
   const [cgiPresetOffset, setCgiPresetOffset] = useState(String(config.cgiPresetOffset ?? (config.cgiFamily === 'sony' ? 0 : -1)));
   // Picture and tally: for every camera, whatever drives it.
@@ -75,7 +80,8 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices,
     if (mode === 'serial' || mode === 'visca-serial' || mode === 'dji-osmo' || mode === 'dji-ronin') onListPorts();
     if (mode === 'sony-usb') onDiscoverSonyUsb();
     if (mode === 'sony-mnc') onDiscoverSonyMnc();
-  }, [mode, onListPorts, onDiscoverSonyUsb, onDiscoverSonyMnc]);
+    if (mode === 'sony-ptpip') onDiscoverSonyNet();
+  }, [mode, onListPorts, onDiscoverSonyUsb, onDiscoverSonyMnc, onDiscoverSonyNet]);
 
   useEffect(() => {
     if (config.connectionMode) setMode(config.connectionMode);
@@ -99,6 +105,8 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices,
     if (config.canonPort) setCanonPort(String(config.canonPort));
     if (config.camHost) setCamHost(config.camHost);
     if (config.camPort) setCamPort(String(config.camPort));
+    if (config.camUser) setCamUser(config.camUser);
+    if (config.sshFingerprint) setSshFingerprint(config.sshFingerprint);
   }, [config]);
 
   // Auto-select the first discovered camera when none is chosen yet.
@@ -114,7 +122,7 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
 
-  const applyAndConnect = () => {
+  const applyAndConnect = (fingerprintOverride?: string) => {
     const cfg: Partial<BridgeConfig> = { connectionMode: mode };
     if (mode === 'tcp') {
       cfg.tcpHost = host;
@@ -129,6 +137,12 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices,
       cfg.ccuId = Number(ccuId);
     } else if (mode === 'blackmagic') {
       cfg.bmHost = bmHost;
+      cfg.ccuId = Number(ccuId);
+    } else if (mode === 'sony-ptpip') {
+      cfg.camHost = camHost;
+      cfg.camUser = camUser.trim();
+      cfg.camPass = camPass;
+      cfg.sshFingerprint = (fingerprintOverride ?? sshFingerprint).trim();
       cfg.ccuId = Number(ccuId);
     } else if (mode === 'sony-mnc') {
       cfg.mncHost = mncHost;
@@ -208,6 +222,9 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices,
         </button>
         <button className={`mode-tab ${mode === 'blackmagic' ? 'mode-tab--active' : ''}`} onClick={() => setMode('blackmagic')}>
           Blackmagic (REST)
+        </button>
+        <button className={`mode-tab ${mode === 'sony-ptpip' ? 'mode-tab--active' : ''}`} onClick={() => setMode('sony-ptpip')}>
+          Sony Wi-Fi/LAN (FX3/A7)
         </button>
         <button className={`mode-tab ${mode === 'sony-mnc' ? 'mode-tab--active' : ''}`} onClick={() => setMode('sony-mnc')}>
           Sony WiFi (M&C)
@@ -442,6 +459,26 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices,
         </div>
       )}
 
+      {mode === 'sony-ptpip' && (
+        <SonyPtpIpForm
+          devices={sonyNetDevices}
+          onDiscover={onDiscoverSonyNet}
+          host={camHost}
+          setHost={setCamHost}
+          user={camUser}
+          setUser={setCamUser}
+          pass={camPass}
+          setPass={setCamPass}
+          fingerprint={sshFingerprint}
+          setFingerprint={setSshFingerprint}
+          errorMsg={errorMsg}
+          onConfirmFingerprint={(fp) => {
+            setSshFingerprint(fp);
+            applyAndConnect(fp);
+          }}
+        />
+      )}
+
       {mode === 'sony-mnc' && (
         <div className="connection-row">
           <div className="field">
@@ -560,7 +597,7 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices,
         {cameraConnected ? (
           <button className="btn btn--danger" onClick={onDisconnect}>Disconnect</button>
         ) : (
-          <button className="btn btn--primary" onClick={applyAndConnect}>Connect</button>
+          <button className="btn btn--primary" onClick={() => applyAndConnect()}>Connect</button>
         )}
       </div>
 
@@ -621,6 +658,86 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices,
           <span className="ml-16" style={{ color: 'var(--text-muted)' }}>({lumixHost})</span>
         )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Sony Alpha/Cinema over Wi-Fi/LAN. The bridge finds cameras by SSDP; with
+ * Access Authentication on (factory default) it needs user and password from
+ * the camera's Access Authen. Info once, and the host-key fingerprint is
+ * compared with the one the camera shows before anything else is sent.
+ */
+function SonyPtpIpForm(p: {
+  devices: SonyNetDevice[];
+  onDiscover: () => void;
+  host: string;
+  setHost: (v: string) => void;
+  user: string;
+  setUser: (v: string) => void;
+  pass: string;
+  setPass: (v: string) => void;
+  fingerprint: string;
+  setFingerprint: (v: string) => void;
+  errorMsg: string | null;
+  onConfirmFingerprint: (fp: string) => void;
+}) {
+  const picked = p.devices.find((d) => d.ip === p.host);
+  const ask = /ssh-fingerprint-(unknown|mismatch) (\S+) (\S+)/.exec(p.errorMsg ?? '');
+  return (
+    <div className="connection-row">
+      <div className="field">
+        <label>Sony camera (Wi-Fi/LAN)</label>
+        <div className="serial-port-row">
+          <input value={p.host} onChange={(e) => p.setHost(e.target.value)} placeholder="192.168.0.225" />
+          <button className="btn btn--sm" onClick={p.onDiscover} title="Search the network (SSDP)">⟳</button>
+        </div>
+        {p.devices.length > 0 && (
+          <select className="select-group__select" style={{ marginTop: 4 }} value={p.host} onChange={(e) => p.setHost(e.target.value)}>
+            <option value="">Found on the network…</option>
+            {p.devices.map((d) => (
+              <option key={d.ip} value={d.ip}>
+                {d.model.replace(/^ILME-|^ILCE-/, '')} {d.name} ({d.ip}){d.ssh ? '' : ' · pairing'}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
+      {(!picked || picked.ssh) && (
+        <>
+          <div className="field">
+            <label>User (Access Authen. Info)</label>
+            <input value={p.user} onChange={(e) => p.setUser(e.target.value)} autoComplete="username" />
+          </div>
+          <div className="field">
+            <label>Password</label>
+            <input value={p.pass} onChange={(e) => p.setPass(e.target.value)} type="password" autoComplete="current-password" />
+          </div>
+        </>
+      )}
+      <div className="field">
+        <label>Confirmed fingerprint</label>
+        <input value={p.fingerprint} onChange={(e) => p.setFingerprint(e.target.value)} placeholder="filled in on first connect" />
+      </div>
+      <div className="field" style={{ alignSelf: 'flex-end', paddingBottom: '0.25rem' }}>
+        <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+          On the camera: Network → Cnct./Remote Sht. → Remote Shoot Function → Remote Shooting → On.
+          {picked && !picked.ssh && ' Access Authentication is off: confirm pairing on the camera when asked.'}
+          {' '}The password is never written to disk; after a bridge restart enter it again.
+        </span>
+      </div>
+      {ask && (
+        <div className="field" role="alert">
+          <span>
+            {ask[1] === 'mismatch' ? 'The camera key has CHANGED. ' : ''}
+            Compare with Network → Network Option → Access Authen. Info on the camera:
+            {' '}<code>{ask[2]}</code> (MD5 <code>{ask[3]}</code>)
+          </span>
+          <button className="btn btn--sm" onClick={() => p.onConfirmFingerprint(ask[2])}>
+            Matches — connect
+          </button>
+        </div>
+      )}
     </div>
   );
 }
