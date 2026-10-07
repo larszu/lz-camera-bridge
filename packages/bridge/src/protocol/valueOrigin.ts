@@ -168,10 +168,13 @@ export const MODE_READBACK: Readonly<Record<ConnectionMode, readonly PaintField[
   // Paint-Felder, die niemand kommandieren kann, waeren zwei tote Regler.
   'b4-lens': ['iris'],
   // HTTP-CGI: pan/tilt/zoom/fokus/preset gehen hinaus, das Geraet gibt
-  // darueber keinen Bildzustand zurueck. Nur Power wird GEFRAGT (Sony
+  // darueber keinen Bildzustand zurueck. Power wird GEFRAGT (Sony
   // `inquiry.cgi?inq=sysinfo`, Vissonic VISCA-Inquiry ueber TCP 5678) --
-  // siehe `HttpCgiClient.readPower`.
-  'http-cgi': ['cameraPower'],
+  // siehe `HttpCgiClient.readPower`. Die Sony-Familie liest ausserdem den
+  // Weissabgleich zurueck (`inquiry.cgi?inq=imaging`, WhiteBalanceCrGain/
+  // CbGain → whiteR/whiteB, `HttpCgiClient.readImaging`); Vissonic meldet
+  // diese Felder nie, also kommen sie dort auch nie als bestaetigt an.
+  'http-cgi': ['cameraPower', 'whiteR', 'whiteB'],
 };
 
 /** Liest dieser Weg dieses Feld ueberhaupt vom Geraet? */
