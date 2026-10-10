@@ -267,7 +267,7 @@ Vout = Vp * (1 + R2/R1)
 die Blende schließt nie. Alles Weitere regelt die Kennlinie.</p>
 <p><strong>Nur LM358, kein TL072:</strong> am +Eingang liegen unten 1,27 V, außerhalb
 des Gleichtaktbereichs des TL072 — sein Ausgang kann dann nach oben springen.
-<strong>Der LM358 hängt an 8,6 V</strong> aus dem Teiler 470 Ω / 1,2 kΩ, nicht direkt an 12 V: fällt R1 ab,
+<strong>Der LM358 hängt an 8,6 V</strong> aus dem Teiler 470 Ω / 1,2 kΩ, nicht direkt an 12 V: fällt R1 (10 kΩ) ab,
 gäbe er sonst etwa 10,5 V auf Pin 5; so bleibt es unter etwa 7,1 V. Ein einzelner Vorwiderstand
 reicht nicht — der Strom des LM358 schwankt, die Spannung wandert mit. Ein Regler 7809 geht
 ebenso (9 V, Grenze ≈ 7,5 V).</p>
@@ -338,7 +338,7 @@ Sie kommt erst in Schritt 5 der Inbetriebnahme dazu.</p>
 <p class="cap">Fünf Widerstände, sonst keine: Ra 16 kΩ, Rb 10 kΩ, R1 10 kΩ, R2 10 kΩ und der
 1 kΩ am Ausgang. <strong>Vout</strong> ist kein Anschluss, den man irgendwo holt: es ist die
 Spannung, die der LM358 selbst an seinem <strong>Pin 1</strong> erzeugt. <strong>Vp</strong>
-ist Pin 3, <strong>Vn</strong> ist Pin 2. Die 3,3 V für Ra kommen vom 3V3-Pin des ESP32, dieselbe
+ist Pin 3, <strong>Vn</strong> ist Pin 2. Die 3,3 V für Ra (16 kΩ) kommen vom 3V3-Pin des ESP32, dieselbe
 Leitung, an der ADS1115 und MCP4728 hängen.</p>
 </div>
 
@@ -396,13 +396,13 @@ Brettoberkante: dann liegen Pin 1–4 in vier Reihen links, Pin 8–5 in vier Re
 und die Reihen von Pin 1, 2 und 3 <em>sind</em> die Netze Vout, Vn und Vp.</p>
 <table><thead><tr><th>Netz</th><th>Wo</th><th>Hinein gehört</th></tr></thead><tbody>
 <tr class="warn"><td><strong>12 V</strong></td><td>Plus-Leiste</td><td>Hirose 6 (rot), Netzteil +, 470-Ω-Bein</td></tr>
-<tr><td><strong>GND</strong></td><td>Minus-Leiste</td><td>Hirose 3 (schwarz), Netzteil −, ESP32 GND, ADS1115 GND, MCP4728 GND + LDAC, 1,2-kΩ-Bein, R1, LM358 Pin 4 und Pin 5, die drei 68-kΩ-Teiler</td></tr>
+<tr><td><strong>GND</strong></td><td>Minus-Leiste</td><td>Hirose 3 (schwarz), Netzteil −, ESP32 GND, ADS1115 GND, MCP4728 GND + LDAC, 1,2-kΩ-Bein, R1 (10 kΩ), LM358 Pin 4 und Pin 5, die drei 68-kΩ-Teiler</td></tr>
 <tr><td><strong>8,6 V</strong></td><td>eigene Reihe</td><td>470 Ω (von 12 V), 1,2 kΩ (nach GND), Draht zu LM358 Pin 8</td></tr>
-<tr><td><strong>3V3</strong></td><td>eigene Reihe</td><td>ESP32 3V3, ADS1115 VDD, MCP4728 VCC, <strong>Ra-Bein 1</strong></td></tr>
-<tr><td><strong>VA</strong></td><td>eigene Reihe</td><td>MCP4728 VA, <strong>Rb-Bein 1</strong></td></tr>
-<tr><td><strong>Vp</strong></td><td>Reihe von Pin 3</td><td><strong>Ra-Bein 2</strong>, <strong>Rb-Bein 2</strong></td></tr>
-<tr><td><strong>Vn</strong></td><td>Reihe von Pin 2</td><td><strong>R1-Bein 1</strong> (Bein 2 an GND), <strong>R2-Bein 1</strong></td></tr>
-<tr><td><strong>Vout</strong></td><td>Reihe von Pin 1</td><td><strong>R2-Bein 2</strong>, <strong>1-kΩ-Bein 1</strong></td></tr>
+<tr><td><strong>3V3</strong></td><td>eigene Reihe</td><td>ESP32 3V3, ADS1115 VDD, MCP4728 VCC, <strong>Ra (16 kΩ)-Bein 1</strong></td></tr>
+<tr><td><strong>VA</strong></td><td>eigene Reihe</td><td>MCP4728 VA, <strong>Rb (10 kΩ)-Bein 1</strong></td></tr>
+<tr><td><strong>Vp</strong></td><td>Reihe von Pin 3</td><td><strong>Ra (16 kΩ)-Bein 2</strong>, <strong>Rb (10 kΩ)-Bein 2</strong></td></tr>
+<tr><td><strong>Vn</strong></td><td>Reihe von Pin 2</td><td><strong>R1 (10 kΩ)-Bein 1</strong> (Bein 2 an GND), <strong>R2 (10 kΩ)-Bein 1</strong></td></tr>
+<tr><td><strong>Vout</strong></td><td>Reihe von Pin 1</td><td><strong>R2 (10 kΩ)-Bein 2</strong>, <strong>1-kΩ-Bein 1</strong></td></tr>
 <tr><td><strong>Iris-Soll</strong></td><td>eigene Reihe</td><td><strong>1-kΩ-Bein 2</strong>; später der Draht zu Hirose Pin 5</td></tr>
 <tr><td>Hälfte B</td><td>Reihen von Pin 6 und 7</td><td>kurze Brücke Pin 6 ↔ Pin 7</td></tr>
 </tbody></table>
@@ -748,12 +748,12 @@ Ohne die GND-Verbindung stimmt keine Spannung.</p>
 <circle cx="174" cy="266" r="3.4" fill="#1D324F"/>
 <line x1="196" y1="266" x2="196" y2="290" stroke="#5C6B85" stroke-width="1.4"/>
 <rect x="191.0" y="267.0" width="10" height="22" fill="#9EC5E8" stroke="#1D324F" stroke-width="1"/>
-<text x="188.0" y="281.0" font-family="Public Sans,Arial,sans-serif" font-size="8.5" font-weight="700" text-anchor="end" fill="#1D324F">R2</text>
+<text x="188.0" y="281.0" font-family="Public Sans,Arial,sans-serif" font-size="8.5" font-weight="700" text-anchor="end" fill="#1D324F">R2 10k</text>
 <circle cx="196" cy="266" r="3.4" fill="#1D324F"/>
 <circle cx="196" cy="290" r="3.4" fill="#1D324F"/>
 <line x1="130" y1="290" x2="82" y2="290" stroke="#5C6B85" stroke-width="1.4"/>
 <rect x="95.0" y="285.0" width="22" height="10" fill="#9EC5E8" stroke="#1D324F" stroke-width="1"/>
-<text x="106.0" y="282.0" font-family="Public Sans,Arial,sans-serif" font-size="8.5" font-weight="700" text-anchor="middle" fill="#1D324F">R1</text>
+<text x="106.0" y="282.0" font-family="Public Sans,Arial,sans-serif" font-size="8.5" font-weight="700" text-anchor="middle" fill="#1D324F">R1 10k</text>
 <circle cx="130" cy="290" r="3.4" fill="#1D324F"/>
 <line x1="174" y1="386" x2="174" y2="314" stroke="#5C6B85" stroke-width="1.4"/>
 <rect x="169.0" y="339.0" width="10" height="22" fill="#9EC5E8" stroke="#1D324F" stroke-width="1"/>
@@ -820,7 +820,7 @@ Statusseite unter <strong>http://192.168.4.1</strong>. Vollständige Belegung:
 
 <h2>Inbetriebnahme</h2>
 <p>Der Reihe nach. Jeder Schritt sagt, ob der nächste gefahrlos ist.</p>
-<table><thead><tr><th>#</th><th>Handlung</th><th>Erwartung</th></tr></thead><tbody><tr><td class="n">1</td><td>Optik nur an 12 V (Pin 6 / 3), Netzteil auf 1,0 A begrenzt, Polarität doppelt geprüft</td><td>Optik läuft an, Servo hörbar; Strom notieren</td></tr><tr><td class="n">2</td><td>Schalter auf <strong>M</strong>, Pin 7 messen, Ring von Hand durchdrehen</td><td>Spannung ändert sich stetig; zu 1,5–2,9 V, F2,8 6,2 V</td></tr><tr><td class="n">3</td><td>Pin 8 über 1 kΩ auf 5 V legen (Schalter bleibt auf M)</td><td>Optik nimmt Fernsteuerung an</td></tr><tr class="warn"><td class="n">4</td><td>Verstärkerausgang messen — <strong>ohne Optik</strong> — beim Einschalten, dann DAC durchfahren, dann R1 abklemmen</td><td>≈ 2,54 V beim Einschalten · 2,5–6,6 V linear · ohne R1 ≤ 7,5 V</td></tr><tr><td class="n">5</td><td>Erst jetzt Ausgang über 1 kΩ auf Pin 5, dann Schalter auf A</td><td>Blende folgt dem Sollwert</td></tr><tr><td class="n">6</td><td>Kennlinie aufnehmen</td><td>Tabelle im Gerät gespeichert</td></tr></tbody></table>
+<table><thead><tr><th>#</th><th>Handlung</th><th>Erwartung</th></tr></thead><tbody><tr><td class="n">1</td><td>Optik nur an 12 V (Pin 6 / 3), Netzteil auf 1,0 A begrenzt, Polarität doppelt geprüft</td><td>Optik läuft an, Servo hörbar; Strom notieren</td></tr><tr><td class="n">2</td><td>Schalter auf <strong>M</strong>, Pin 7 messen, Ring von Hand durchdrehen</td><td>Spannung ändert sich stetig; zu 1,5–2,9 V, F2,8 6,2 V</td></tr><tr><td class="n">3</td><td>Pin 8 über 1 kΩ auf 5 V legen (Schalter bleibt auf M)</td><td>Optik nimmt Fernsteuerung an</td></tr><tr class="warn"><td class="n">4</td><td>Verstärkerausgang messen — <strong>ohne Optik</strong> — beim Einschalten, dann DAC durchfahren, dann R1 (10 kΩ) abklemmen</td><td>≈ 2,54 V beim Einschalten · 2,5–6,6 V linear · ohne R1 (10 kΩ) ≤ 7,1 V</td></tr><tr><td class="n">5</td><td>Erst jetzt Ausgang über 1 kΩ auf Pin 5, dann Schalter auf A</td><td>Blende folgt dem Sollwert</td></tr><tr><td class="n">6</td><td>Kennlinie aufnehmen</td><td>Tabelle im Gerät gespeichert</td></tr></tbody></table>
 <p>Schritt 4 ist der, den man überspringt. Er ist auch der einzige, der einen
 falschen Widerstand findet, bevor die falsche Spannung an der Optik liegt.</p>
 
