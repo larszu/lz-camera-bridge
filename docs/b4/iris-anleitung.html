@@ -687,6 +687,7 @@ der 12-V-Leiste und Pin 1–4 rechts bei den Widerständen.</p>
 <tr><td class="n">13c</td><td>56 kΩ (oder 68 kΩ)</td><td>Reihe 15 rechts</td><td>GND-Leiste, über die Mittelrinne — Teiler unten</td><td class="n">f15 → Leiste</td></tr>
 <tr><td class="n">13d</td><td>Draht</td><td>Reihe 15 rechts</td><td>ADS1115 A3 auf Brett 1 — Firmware meldet die Spannung als <code>ampVolts</code></td><td class="n">j15 →</td></tr>
 <tr class="warn"><td class="n">14</td><td>Draht, später</td><td>Reihe „Iris-Soll“</td><td>Hirose Pin 5 (Iris-Sollwert) — erst nach dem Prüfen</td><td class="n">j14 →</td></tr>
+<tr><td class="n">15</td><td>1 kΩ + Draht</td><td>ESP32-Pin VIN (5 V vom USB)</td><td>Hirose Pin 8 — Remote statt Eigenautomatik; erst nach Pin 5</td><td class="n">—</td></tr>
 </tbody></table>
 <p><strong>Prüfen ohne Optik</strong> (12 V ein, Multimeter schwarz an GND): Pin 8 (d13) ≈ 8,6–9,0 V ·
 Pin 3 / Vp (h11) ≈ 1,29 V · Pin 1 / Vout (g13) ≈ 2,58 V · Iris-Soll (h14) ≈ 2,58 V · A3-Messpunkt (h15) ≈ 0,95 V (bei 56 kΩ).
@@ -732,10 +733,17 @@ geflashtes Board nicht in dem Moment etwas verstellt, in dem das Kabel einrastet
 Modulpins oder die Verdrahtung dran, nicht die Module.</p>
 
 <h2>Bedienen</h2>
-<p>Sobald das Netzwerkkabel steckt, meldet die Konsole die Adresse. Die Seite
-kommt vom Gerät selbst — sie braucht kein Internet und läuft auf dem Telefon,
-während man an der Optik steht.</p>
-<table><thead><tr><th>Zugriff</th><th>Wofür</th></tr></thead><tbody><tr><td><code>http://&lt;adresse&gt;/</code></td><td>Statusseite mit Blendenregler</td></tr><tr><td><code>GET /api/status</code></td><td>Vollständiger Zustand. Was nicht gemessen wurde, fehlt — es ist nie 0</td></tr><tr><td><code>POST /api/iris</code></td><td><code>{"value": 0..255}</code></td></tr><tr><td><code>GET /api/calibration.csv</code></td><td>Die aufgenommene Kennlinie</td></tr></tbody></table>
+<p>Das DevKit öffnet sein eigenes WLAN <code>b4-lens</code> (Passwort <code>b4-iris-bench</code>).
+Die Seite <code>http://192.168.4.1</code> kommt vom Gerät selbst — sie braucht kein Internet und
+läuft auf dem Telefon, während man an der Optik steht.</p>
+<table><thead><tr><th>Zugriff</th><th>Wofür</th></tr></thead><tbody>
+<tr><td class="n">Webseite</td><td>Messwerte, Kacheln <strong>Iris ≈ F</strong> und <strong>Zoom ≈ mm</strong> (aus den Kennlinien dieser Optik), Blendenregler (kalibriert)</td></tr>
+<tr><td class="n">Bench-Schieberegler</td><td>DAC 0–4095 direkt, ohne Kennlinie. Nur im Antriebsbau und nur unscharf. Die Blende folgt nur auf <strong>A</strong></td></tr>
+<tr><td class="n">USB <code>s</code></td><td>Zustand als eine JSON-Zeile, ohne WLAN</td></tr>
+<tr><td class="n">USB <code>d&lt;Code&gt;</code></td><td>DAC direkt setzen, gleiche Sperren wie der Schieberegler</td></tr>
+<tr><td class="n">GET /api/status</td><td>Vollständiger Zustand. Was nicht gemessen wurde, fehlt — es ist nie 0</td></tr>
+<tr><td class="n">POST /api/iris</td><td><code>{"value": 0..255}</code>, nur scharf und kalibriert</td></tr>
+</tbody></table>
 
 <h2>Kennlinie aufnehmen</h2>
 <pre>python3 tools/record_calibration.py --host &lt;adresse&gt;
@@ -750,8 +758,32 @@ das Neuflashen.</p>
 ein flaches Stück, ein Rückwärtssprung, und eine perfekt gerade Kurve — letztere
 heißt meist, dass der DAC-Monitor statt Pin 7 gemessen wurde.</p>
 
+<h2>Messwerte dieser Optik</h2>
+<p>Canon J15ax8B4 IRS SX12, gemessen am 10.10.2026 (Ring von Hand auf die Marke, Pin 7 bzw.
+Pin 10 abgelesen). Eine andere Optik hat eine andere Kurve.</p>
+<div class="two"><div>
+<table><thead><tr><th>Blende</th><th>Pin 7 / Pin 5</th></tr></thead><tbody>
+<tr><td>Anschlag zu</td><td class="n">1,87 V</td></tr><tr><td>C</td><td class="n">2,11 V</td></tr>
+<tr><td>16</td><td class="n">2,98 V</td></tr><tr><td>11</td><td class="n">3,51 V</td></tr>
+<tr><td>8</td><td class="n">4,09 V</td></tr><tr><td>5,6</td><td class="n">4,75 V</td></tr>
+<tr><td>4</td><td class="n">5,20 V</td></tr><tr><td>2,8</td><td class="n">5,75 V</td></tr>
+<tr><td>1,7</td><td class="n">≈ 6,46 V</td></tr><tr><td>Anschlag offen</td><td class="n">6,93 V</td></tr>
+</tbody></table></div><div>
+<table><thead><tr><th>Brennweite</th><th>Pin 10</th></tr></thead><tbody>
+<tr><td>8 mm</td><td class="n">1,69 V</td></tr><tr><td>15 mm</td><td class="n">3,32 V</td></tr>
+<tr><td>30 mm</td><td class="n">4,67 V</td></tr><tr><td>60 mm</td><td class="n">5,69 V</td></tr>
+<tr><td>120 mm</td><td class="n">6,77 V</td></tr>
+</tbody></table></div></div>
+<p>Auf <strong>A</strong> folgt die Blende der Spannung an Pin 5 eins zu eins. Mit dem Aufbau dieser
+Anleitung reicht der Verstärker von 2,5 bis 6,6 V, also etwa F22 bis F1,7 — C und die beiden
+Anschläge erreicht er nicht. Für den vollen Bereich (≈ 1,8–7,0 V): Ra = 22 kΩ + 6,8 kΩ und
+100 kΩ parallel zu R1 (10 kΩ). <strong>Diese Änderung ist berechnet, noch nicht gemessen.</strong></p>
+
 <h2>Wenn etwas nicht geht</h2>
-<table><thead><tr><th>Beobachtung</th><th>Zuerst prüfen</th></tr></thead><tbody><tr><td>I²C-Scan meldet nichts</td><td>GPIO 21/22, Masse gemeinsam, Module an 3,3 V</td></tr><tr><td>Kein Netz</td><td>WLAN <code>b4-lens</code> (Passwort <code>b4-iris-bench</code>), dann http://192.168.4.1</td></tr><tr><td>Blende rührt sich nicht</td><td>Schalter am Tubus auf A, Pin 8 auf 5 V, scharfgeschaltet, Kennlinie vorhanden</td></tr><tr><td>Blende pendelt</td><td>Masseverbindung zwischen Netzteil und ESP32, dann den Iris-Gain-Trimmer am Objektiv — nicht die Firmware</td></tr><tr><td>Kennlinie springt zurück</td><td>Wartezeit je Punkt erhöhen (<code>--settle</code>)</td></tr><tr><td>Messwert steht fest auf 0</td><td>Teiler falsch herum, oder der Kanal liegt auf Masse</td></tr></tbody></table>
+<table><thead><tr><th>Beobachtung</th><th>Zuerst prüfen</th></tr></thead><tbody><tr><td>I²C-Scan meldet nichts</td><td>GPIO 21/22, Masse gemeinsam, Module an 3,3 V</td></tr><tr><td>Kein Netz</td><td>WLAN <code>b4-lens</code> (Passwort <code>b4-iris-bench</code>), dann http://192.168.4.1</td></tr><tr><td>Blende rührt sich nicht</td><td>Schalter am Tubus auf A, Pin 8 auf 5 V, scharfgeschaltet, Kennlinie vorhanden</td></tr><tr><td>Blende pendelt</td><td>Masseverbindung zwischen Netzteil und ESP32, dann den Iris-Gain-Trimmer am Objektiv — nicht die Firmware</td></tr><tr><td>Kennlinie springt zurück</td><td>Wartezeit je Punkt erhöhen (<code>--settle</code>)</td></tr><tr><td>Alle Spannungen etwa ein Zehntel zu klein</td><td>Ein Bein ohne Kontakt im Steckbrett: von Reihe zu Reihe messen, nicht am Bein</td></tr>
+<tr><td>Verstärkerausgang ≈ 0,6 V</td><td>LM358 verdreht (Pin 4 und 8 vertauscht): 12 V aus, Kerbe prüfen, neuen Chip nehmen</td></tr>
+<tr><td>A3 klebt bei ≈ 9,6 V</td><td>Oberer A3-Widerstand an 12 V statt an Iris-Soll, oder unterer fehlt</td></tr>
+<tr><td>Messwert steht fest auf 0</td><td>Teiler falsch herum, oder der Kanal liegt auf Masse</td></tr></tbody></table>
 
 <h2>Ohne Hardware testen</h2>
 <p>Der Simulator liefert dieselbe Schnittstelle, dahinter ein Modell eines

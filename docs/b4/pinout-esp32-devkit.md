@@ -68,7 +68,7 @@ Objektiv → 2,83 V am ADC.
 | A0 | 7 | Iris-Position | grün |
 | A1 | 10 | Zoom-Position | weiß |
 | A2 | 11 | Fokus-Position (Gruppe C) — an der J15ax8B4 IRS SX12 ohne Signal, kein Fokusgeber | blau |
-| A3 | — | Op-Amp-Ausgang (Kontrolle, optional) | — |
+| A3 | — | Verstärkerausgang hinter dem 1 kΩ, Teiler 100 kΩ / 56 kΩ (Bank; Firmware rechnet mit 68 kΩ) → `ampVolts` | lila |
 
 Gemessene Widerstandswerte in `config.h` eintragen (`DIVIDER_R_TOP_OHM`,
 `DIVIDER_R_BOTTOM_OHM`).
@@ -109,10 +109,10 @@ Durchgang gegen das Gehäuse bestätigen.
 |---|---|---|---|
 | 3 | GND | gemeinsame Masse (ESP32, Module, Netzteil) | schwarz → Breadboard − |
 | 4 | Forced Iris Servo (Tastenfunktion, kein Enable) | **offen lassen** | — |
-| 5 | Iris-Sollwert | Op-Amp-Ausgang über 1 kΩ — **erst Schritt 5 der Inbetriebnahme** | — |
+| 5 | Iris-Sollwert | Op-Amp-Ausgang über 1 kΩ — verbunden seit 10.10.2026 | — |
 | 6 | **+12 V** (Norm: 10–17 V) | Labornetzteil 12 V, **Strombegrenzung 1,0 A**, Polarität doppelt prüfen; Teiler 330 Ω / 1 kΩ für den Op-Amp. **Nie an ESP32 oder Module** | rot → Breadboard + |
 | 7 | Iris-Position | Teiler → ADS1115 A0 | grün |
-| 8 | Iris Remote/Auto | 5 V über **1 kΩ** (Remote); offen = Auto | — |
+| 8 | Iris Remote/Auto | **1 kΩ** vom ESP32-Pin VIN (USB-5 V) = Remote; offen = Auto | — |
 | 10 | Zoom-Position | Teiler → ADS1115 A1 | weiß |
 | 11 | Fokus-Position | Teiler → ADS1115 A2 | blau |
 | 12 | seriell (Gruppe B) | nicht verbunden | — |
