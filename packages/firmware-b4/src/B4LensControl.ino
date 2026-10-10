@@ -87,6 +87,14 @@ Adafruit_MCP4728 dac;
 static uint16_t zoomNull = ZOOM_NULL_DEFAULT;
 static uint16_t zoomCode = ZOOM_NULL_DEFAULT;
 static uint32_t zoomLastCmdMs = 0;
+static float zoomTrim = 0;          // position-hold correction on top of zoomNull
+static float zoomTarget = NAN;      // pin-10 volts to hold, NAN = not captured
+static float zoomLastPos = NAN;
+static uint32_t zoomHoldPausedUntil = 0, zoomLastHoldMs = 0;
+static inline uint16_t zoomStop() {
+  const long v = lroundf(zoomNull + zoomTrim);
+  return static_cast<uint16_t>(v < 0 ? 0 : v > 4095 ? 4095 : v);
+}
 Calibration cal;
 
 AnalogFilter fIris(ADC_EMA_ALPHA, ADC_DEADBAND_COUNTS);
@@ -341,7 +349,9 @@ static String statusJson() {
   if (drive.fault) j += ",\"fault\":\"" + String(drive.fault) + "\"";
   j += "}";
 
-  j += ",\"zoom\":{\"code\":" + String(zoomCode) + ",\"null\":" + String(zoomNull) + "}";
+  j += ",\"zoom\":{\"code\":" + String(zoomCode) + ",\"null\":" + String(zoomStop()) +
+       ",\"stored\":" + String(zoomNull) + ",\"trim\":" + String(zoomTrim, 1) +
+       ",\"holding\":" + String(isnan(zoomTarget) ? "false" : "true") + "}";
   j += ",\"serial\":{\"rxCompiledIn\":" + String(B4_ENABLE_SERIAL_RX ? "true" : "false") +
        ",\"txCompiledIn\":" + String(B4_ENABLE_SERIAL_TX ? "true" : "false");
 #if B4_ENABLE_SERIAL_RX
@@ -377,6 +387,8 @@ static const char *zoomSetNull(long code) {
   if (!health.dacPresent) return "no DAC";
   if (code < 0 || code > 4095) return "0..4095";
   zoomNull = static_cast<uint16_t>(code);
+  zoomTrim = 0;
+  zoomTarget = NAN;
   Preferences zp;
   zp.begin("b4zoom", false);
   zp.putUShort("null", zoomNull);
@@ -391,11 +403,44 @@ static const char *zoomSetNull(long code) {
 }
 
 static void serviceZoomDeadman() {
-  if (zoomCode != zoomNull && millis() - zoomLastCmdMs > ZOOM_DEADMAN_MS) {
-    zoomCode = zoomNull;
+  const bool moving = millis() - zoomLastCmdMs <= ZOOM_DEADMAN_MS;
+  if (!moving && zoomCode != zoomStop()) {
+    zoomCode = zoomStop();
     if (health.dacPresent)
-      dac.setChannelValue(static_cast<MCP4728_channel_t>(DAC_CH_ZOOM), zoomNull);
+      dac.setChannelValue(static_cast<MCP4728_channel_t>(DAC_CH_ZOOM), zoomCode);
   }
+}
+
+/** Trim the stop code so the zoom does not creep while nobody commands it. */
+static void serviceZoomHold(bool havePos, float posVolts) {
+#if !B4_ENABLE_IRIS_DRIVE || !ZOOM_HOLD_ENABLE
+  (void)havePos; (void)posVolts;
+#else
+  const uint32_t now = millis();
+  if (!health.dacPresent || !havePos) { zoomTarget = NAN; return; }
+  if (now - zoomLastCmdMs < ZOOM_HOLD_SETTLE_MS) { zoomTarget = NAN; zoomLastPos = posVolts; return; }
+  if (now - zoomLastHoldMs < ZOOM_HOLD_PERIOD_MS) return;
+  zoomLastHoldMs = now;
+  const float step = isnan(zoomLastPos) ? 0 : posVolts - zoomLastPos;
+  zoomLastPos = posVolts;
+  if (fabsf(step) > ZOOM_HOLD_MANUAL_V) {           // grip rocker: follow, don't fight
+    zoomTarget = NAN;
+    zoomHoldPausedUntil = now + 1000;
+    return;
+  }
+  if (now < zoomHoldPausedUntil) return;
+  if (isnan(zoomTarget)) { zoomTarget = posVolts; return; }
+  if (posVolts < ZOOM_HOLD_END_LOW_V || posVolts > ZOOM_HOLD_END_HIGH_V) return;
+  const float err = posVolts - zoomTarget;           // >0: crept towards tele
+  if (fabsf(err) < ZOOM_HOLD_DEADBAND_V) return;
+  // A higher code drives towards wide (lower pin-10 volts), so creep towards
+  // tele is answered with a higher code.
+  zoomTrim += ZOOM_HOLD_GAIN * err;
+  if (zoomTrim > ZOOM_HOLD_TRIM_MAX) zoomTrim = ZOOM_HOLD_TRIM_MAX;
+  if (zoomTrim < -ZOOM_HOLD_TRIM_MAX) zoomTrim = -ZOOM_HOLD_TRIM_MAX;
+  zoomCode = zoomStop();
+  dac.setChannelValue(static_cast<MCP4728_channel_t>(DAC_CH_ZOOM), zoomCode);
+#endif
 }
 
 static void handleZoom() {
@@ -760,6 +805,9 @@ void loop() {
   if (gIrisOk) fIris.push(c);
   gZoomOk = readChannel(ADS_CH_ZOOM_POSITION, c);
   if (gZoomOk) fZoom.push(c);
+  serviceZoomHold(gZoomOk && fZoom.primed(),
+                  adcCountsToLensVolts(fZoom.smoothed(), voltsPerCount,
+                                       DIVIDER_R_TOP_OHM, DIVIDER_R_BOTTOM_OHM));
   gFocusOk = readChannel(ADS_CH_FOCUS_POSITION, c);
   if (gFocusOk) fFocus.push(c);
 
