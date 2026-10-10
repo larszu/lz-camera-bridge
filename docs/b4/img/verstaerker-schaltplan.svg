@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-50 30 715 350" role="img" aria-label="Schaltplan Verstärkerstufe und 9-V-Regler">
+<rect x="-120" width="840" height="380" fill="#fff"/>
+<g stroke="#1D324F" stroke-width="1.4" fill="none">
+<polygon points="320,80 320,180 400,130" fill="#E1ECEF"/>
+<polyline points="70,150 260,150 320,150"/>
+<rect x="130" y="143" width="40" height="14" fill="#fff"/>
+<circle cx="260" cy="150" r="3" fill="#1D324F"/>
+<polyline points="70,215 260,215 260,150"/>
+<rect x="130" y="208" width="40" height="14" fill="#fff"/>
+<polyline points="320,110 280,110"/>
+<circle cx="280" cy="110" r="3" fill="#1D324F"/>
+<polyline points="280,110 280,100"/>
+<polyline points="280,110 200,110 200,118"/>
+<rect x="220" y="103" width="40" height="14" fill="#fff"/>
+<line x1="200" y1="118" x2="200" y2="126"/><line x1="191" y1="126" x2="209" y2="126"/><line x1="195" y1="130" x2="205" y2="130"/><line x1="198" y1="134" x2="202" y2="134"/>
+<polyline points="280,110 280,55 440,55 440,130"/>
+<rect x="340" y="48" width="40" height="14" fill="#fff"/>
+<polyline points="400,130 440,130 560,130"/>
+<circle cx="440" cy="130" r="3" fill="#1D324F"/>
+<rect x="470" y="123" width="40" height="14" fill="#fff"/>
+<polyline points="360,95 360,75"/>
+<polyline points="360,165 360,185"/>
+<line x1="360" y1="185" x2="360" y2="193"/><line x1="351" y1="193" x2="369" y2="193"/><line x1="355" y1="197" x2="365" y2="197"/><line x1="358" y1="201" x2="362" y2="201"/>
+<rect x="230" y="270" width="80" height="44" fill="#E1ECEF"/>
+<polyline points="70,285 230,285"/>
+<polyline points="310,285 470,285"/>
+<polyline points="270,314 270,330"/>
+<line x1="270" y1="330" x2="270" y2="338"/><line x1="261" y1="338" x2="279" y2="338"/><line x1="265" y1="342" x2="275" y2="342"/><line x1="268" y1="346" x2="272" y2="346"/>
+<polyline points="180,285 180,300"/>
+<line x1="170" y1="300" x2="190" y2="300"/><line x1="170" y1="306" x2="190" y2="306"/>
+<polyline points="180,306 180,318"/>
+<line x1="180" y1="318" x2="180" y2="326"/><line x1="171" y1="326" x2="189" y2="326"/><line x1="175" y1="330" x2="185" y2="330"/><line x1="178" y1="334" x2="182" y2="334"/>
+<circle cx="180" cy="285" r="3" fill="#1D324F"/>
+<polyline points="360,285 360,300"/>
+<line x1="350" y1="300" x2="370" y2="300"/><line x1="350" y1="306" x2="370" y2="306"/>
+<polyline points="360,306 360,318"/>
+<line x1="360" y1="318" x2="360" y2="326"/><line x1="351" y1="326" x2="369" y2="326"/><line x1="355" y1="330" x2="365" y2="330"/><line x1="358" y1="334" x2="362" y2="334"/>
+<circle cx="360" cy="285" r="3" fill="#1D324F"/>
+</g>
+<text x="66" y="154" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="800" text-anchor="end" fill="#1D324F">3V3 (ESP32)</text>
+<text x="66" y="219" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="800" text-anchor="end" fill="#1D324F">MCP4728 VA</text>
+<text x="150" y="140" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="700" text-anchor="middle" fill="#1D324F">Ra 16 kΩ</text>
+<text x="150" y="205" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="700" text-anchor="middle" fill="#1D324F">Rb 10 kΩ</text>
+<text x="240" y="100" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="700" text-anchor="middle" fill="#1D324F">R1 10 kΩ</text>
+<text x="360" y="45" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="700" text-anchor="middle" fill="#1D324F">R2 10 kΩ</text>
+<text x="490" y="120" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="700" text-anchor="middle" fill="#1D324F">1 kΩ</text>
+<text x="312" y="107" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="800" text-anchor="end" fill="#1D324F">2</text>
+<text x="312" y="163" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="800" text-anchor="end" fill="#1D324F">3</text>
+<text x="408" y="124" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="800" text-anchor="start" fill="#1D324F">1</text>
+<text x="338" y="134" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="800" text-anchor="middle" fill="#1D324F">+</text>
+<text x="338" y="114" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="800" text-anchor="middle" fill="#1D324F">−</text>
+<text x="366" y="80" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="700" text-anchor="start" fill="#1D324F">8 · +9 V</text>
+<text x="366" y="180" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="800" text-anchor="start" fill="#1D324F">4</text>
+<text x="565" y="134" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="800" text-anchor="start" fill="#1D324F">Hirose Pin 5</text>
+<text x="66" y="289" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="800" text-anchor="end" fill="#1D324F">Hirose Pin 6 · +12 V</text>
+<text x="270" y="297" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="800" text-anchor="middle" fill="#1D324F">7809</text>
+<text x="234" y="281" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="500" text-anchor="start" fill="#1D324F">IN</text>
+<text x="306" y="281" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="500" text-anchor="end" fill="#1D324F">OUT</text>
+<text x="274" y="326" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="500" text-anchor="start" fill="#1D324F">GND</text>
+<text x="196" y="304" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="600" text-anchor="start" fill="#1D324F">330 nF</text>
+<text x="376" y="304" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="600" text-anchor="start" fill="#1D324F">100 nF</text>
+<text x="475" y="289" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="800" text-anchor="start" fill="#1D324F">+9 V → LM358 Pin 8</text>
+<text x="260" y="166" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="600" text-anchor="end" fill="#1D324F">Vp</text>
+<text x="446" y="148" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="700" text-anchor="start" fill="#1D324F">Vout</text>
+<text x="276" y="126" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="600" text-anchor="end" fill="#1D324F">Vn</text>
+<text x="565" y="148" font-family="Public Sans,Arial,sans-serif" font-size="9" font-weight="600" text-anchor="start" fill="#D6402E">erst nach Schritt 4</text>
+<text x="300" y="372" font-family="Public Sans,Arial,sans-serif" font-size="9" font-weight="500" text-anchor="middle" fill="#5C6B85">Vout = 1,231 · Vdac + 2,54 V  →  0 V → 2,54 V (zu) · 3,3 V → 6,60 V (offen) · Hälfte B: Pin 5 an GND, Pin 6 an Pin 7</text>
+</svg>

@@ -75,6 +75,15 @@ Gemessene Widerstandswerte in `config.h` eintragen (`DIVIDER_R_TOP_OHM`,
 
 ## MCP4728 `0x60` → Op-Amp → Pin 5
 
+![Schaltplan Verstärkerstufe und 9-V-Regler](img/verstaerker-schaltplan.svg)
+
+![LM358 DIP-8, Draufsicht](img/lm358-dip8.svg)
+
+Vout ist die Spannung an **LM358 Pin 1**, Vp ist Pin 3, Vn ist Pin 2. Ra bekommt
+seine 3,3 V vom 3V3-Pin des ESP32. Schritt-für-Schritt-Steckplan mit allen Netzen:
+`iris-anleitung.html`, Abschnitt „Netze“.
+
+
 | DAC-Kanal | Ziel |
 |---|---|
 | A (`DAC_CH_IRIS 0`) | Rb 10 kΩ → +Eingang des Op-Amps |
