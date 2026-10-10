@@ -64,6 +64,9 @@ static void handleRoot() {
 <div class="card"><div class="k" id="benchk">Bench drive</div>
 <input type=range min=0 max=4095 value=0 id="bd" disabled>
 <div class="sub" id="benchn">Sets the DAC directly, no calibration. Drive build only, refused while armed.</div></div>
+<h2 style="font-size:15px">Potis</h2>
+<div class="card"><label><input type=checkbox id="potson"> Potis an GPIO 34 (Iris) · 35 (Zoom) · 36 (Fokus) benutzen</label>
+<div class="sub" id="potsv">Aus: ein offener Eingang würde die Blende bewegen.</div></div>
 <h2 style="font-size:15px">Zoom</h2>
 <div class="card"><div class="k" id="zoomk">Zoom speed</div>
 <input type=range min=-100 max=100 value=0 id="zs">
@@ -150,7 +153,7 @@ async function benchTick(){
  if(!s.driveCompiledIn) $('#benchn').textContent='Safe build: drive not compiled in.';
  else if(s.armed) $('#benchn').textContent='Armed: use the calibrated slider above.';
 }
-let zNull=1560, zHeld=false, zTimer=null;
+let zNull=1790, zHeld=false, zTimer=null;
 function zCode(p){ return Math.round(p<0? zNull+p/100*zNull : zNull+p/100*(4095-zNull)) }
 function zSend(){ fetch('/api/zoom',{method:'POST',body:JSON.stringify({code:zCode(+$('#zs').value)})}) }
 function zStart(){ zHeld=true; clearInterval(zTimer); zSend(); zTimer=setInterval(zSend,150) }
@@ -164,6 +167,14 @@ async function zoomTick(){
  const L=s.lens||{};
  $('#zoomk').textContent='Zoom speed'+(s.zoom?` \u2014 code ${s.zoom.code} (stop ${s.zoom.null}${s.zoom.holding?', hold':''})`:'')+(L.zoomVolts!==undefined?` \u2014 ${focal(L.zoomVolts)}`:'');
 }
+$('#potson').addEventListener('change',e=>fetch('/api/pots',{method:'POST',body:JSON.stringify({enabled:e.target.checked})}));
+async function potTick(){
+ let s; try{ s=await (await fetch('/api/status')).json() }catch(e){ return }
+ if(!s.pots) return;
+ $('#potson').checked=s.pots.enabled;
+ $('#potsv').textContent=`Iris ${s.pots.iris} \u00b7 Zoom ${s.pots.zoom} (Mitte 2048) \u00b7 Fokus ${s.pots.focus}`+(s.pots.enabled?'':' \u2014 aus');
+}
+potTick(); setInterval(potTick,500);
 tick(); setInterval(tick,500); benchTick(); setInterval(benchTick,500); zoomTick(); setInterval(zoomTick,500);
 </script>
 )HTML";
