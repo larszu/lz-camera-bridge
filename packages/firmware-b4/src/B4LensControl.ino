@@ -91,6 +91,13 @@ static float zoomTrim = 0;          // position-hold correction on top of zoomNu
 static float zoomTarget = NAN;      // pin-10 volts to hold, NAN = not captured
 static float zoomLastPos = NAN;
 static uint32_t zoomHoldPausedUntil = 0, zoomLastHoldMs = 0;
+static uint32_t zoomLastPersistMs = 0;
+static const char *benchSetDac(long code);
+static const char *zoomSet(long code);
+static bool potsEnabled = false;
+static float potIris = NAN, potZoom = NAN, potFocus = NAN;
+static int potIrisApplied = -1000;
+static bool potZoomActive = false;
 static inline uint16_t zoomStop() {
   const long v = lroundf(zoomNull + zoomTrim);
   return static_cast<uint16_t>(v < 0 ? 0 : v > 4095 ? 4095 : v);
@@ -352,6 +359,10 @@ static String statusJson() {
   j += ",\"zoom\":{\"code\":" + String(zoomCode) + ",\"null\":" + String(zoomStop()) +
        ",\"stored\":" + String(zoomNull) + ",\"trim\":" + String(zoomTrim, 1) +
        ",\"holding\":" + String(isnan(zoomTarget) ? "false" : "true") + "}";
+  j += ",\"pots\":{\"enabled\":" + String(potsEnabled ? "true" : "false") +
+       ",\"iris\":" + String(isnan(potIris) ? 0 : (int)potIris) +
+       ",\"zoom\":" + String(isnan(potZoom) ? 0 : (int)potZoom) +
+       ",\"focus\":" + String(isnan(potFocus) ? 0 : (int)potFocus) + "}";
   j += ",\"serial\":{\"rxCompiledIn\":" + String(B4_ENABLE_SERIAL_RX ? "true" : "false") +
        ",\"txCompiledIn\":" + String(B4_ENABLE_SERIAL_TX ? "true" : "false");
 #if B4_ENABLE_SERIAL_RX
@@ -443,6 +454,67 @@ static void serviceZoomHold(bool havePos, float posVolts) {
 #endif
 }
 
+/** Fold a settled hold correction into the stored stop, so a restart keeps it. */
+static void serviceZoomPersist() {
+  const uint32_t now = millis();
+  if (now - zoomLastPersistMs < ZOOM_HOLD_PERSIST_MS) return;
+  zoomLastPersistMs = now;
+  if (isnan(zoomTarget) || fabsf(zoomTrim) < 10) return;
+  const long n = lroundf(zoomNull + zoomTrim);
+  zoomNull = static_cast<uint16_t>(n < 0 ? 0 : n > 4095 ? 4095 : n);
+  zoomTrim = 0;
+  Preferences zp;
+  zp.begin("b4zoom", false);
+  zp.putUShort("null", zoomNull);
+  zp.end();
+}
+
+static void setPotsEnabled(bool on) {
+  potsEnabled = on;
+  potIrisApplied = -1000;
+  Preferences pp;
+  pp.begin("b4pots", false);
+  pp.putBool("on", on);
+  pp.end();
+}
+
+/** Read the three pots and act on iris and zoom. */
+static void servicePots() {
+  auto rd = [](int pin, float &f) {
+    const float v = analogRead(pin);
+    f = isnan(f) ? v : f + 0.25f * (v - f);
+  };
+  rd(POT_PIN_IRIS, potIris);
+  rd(POT_PIN_ZOOM, potZoom);
+  rd(POT_PIN_FOCUS, potFocus);
+  if (!potsEnabled) return;
+#if B4_ENABLE_IRIS_DRIVE
+  if (!drive.armed && fabsf(potIris - potIrisApplied) >= POT_IRIS_STEP) {
+    potIrisApplied = static_cast<int>(potIris);
+    benchSetDac(potIrisApplied);
+  }
+  const float off = potZoom - 2048.0f;
+  if (fabsf(off) > POT_ZOOM_DEADBAND) {
+    // Pot above centre -> tele (lower code), below -> wide (higher code).
+    const float k = (fabsf(off) - POT_ZOOM_DEADBAND) / (2048.0f - POT_ZOOM_DEADBAND);
+    const float kk = k > 1 ? 1 : k;
+    const uint16_t st = zoomStop();
+    const long code = off > 0 ? lroundf(st - kk * st) : lroundf(st + kk * (4095 - st));
+    zoomSet(code);
+    potZoomActive = true;
+  } else if (potZoomActive) {
+    potZoomActive = false;      // released: the dead-man returns to stop
+  }
+#endif
+}
+
+static void handlePots() {
+  bool on = false;
+  if (!jsonBool(server.arg("plain"), "enabled", on)) return refuse(400, "need enabled");
+  setPotsEnabled(on);
+  server.send(200, "application/json", String("{\"ok\":true,\"enabled\":") + (on ? "true" : "false") + "}");
+}
+
 static void handleZoom() {
   long code = 0;
   if (!jsonNumber(server.arg("plain"), "code", code)) return refuse(400, "need code");
@@ -498,6 +570,10 @@ static void serviceConsole() {
     if (len == 0 && (c == 's' || c == 'S')) { Serial.println(statusJson()); continue; }
     if (c == '\n' || c == '\r') {
       line[len] = 0;
+      if (len == 2 && (line[0] == 'p' || line[0] == 'P') && (line[1] == '0' || line[1] == '1')) {
+        setPotsEnabled(line[1] == '1');
+        Serial.printf("{\"pots\":%s}\n", potsEnabled ? "true" : "false");
+      }
       // Zoom: "z<code>" speed (dead-man, repeat to keep moving), "n<code>" store stop.
       if (len > 1 && (line[0] == 'z' || line[0] == 'Z')) {
         const char *why = zoomSet(atol(line + 1));
@@ -641,6 +717,7 @@ static void setupRoutes() {
   server.on("/api/bench/dac", HTTP_POST, handleBenchDac);
   server.on("/api/zoom", HTTP_POST, handleZoom);
   server.on("/api/zoom/null", HTTP_POST, handleZoomNull);
+  server.on("/api/pots", HTTP_POST, handlePots);
   server.on("/api/calibrate/point", HTTP_POST, handleCalPoint);
   server.on("/api/calibrate/finish", HTTP_POST, handleCalFinish);
   server.on("/api/calibrate/clear", HTTP_POST, handleCalClear);
@@ -727,6 +804,15 @@ void setup() {
       zp.end();
     }
     zoomCode = zoomNull;
+    {
+      Preferences pp;
+      pp.begin("b4pots", true);
+      potsEnabled = pp.getBool("on", false);
+      pp.end();
+    }
+    analogSetPinAttenuation(POT_PIN_IRIS, ADC_11db);
+    analogSetPinAttenuation(POT_PIN_ZOOM, ADC_11db);
+    analogSetPinAttenuation(POT_PIN_FOCUS, ADC_11db);
     dac.setChannelValue(static_cast<MCP4728_channel_t>(DAC_CH_ZOOM), zoomNull);
     Serial.printf("MCP4728 ready, iris parked at 0, zoom held at stop %u.\n", zoomNull);
   } else {
@@ -808,6 +894,8 @@ void loop() {
   serviceZoomHold(gZoomOk && fZoom.primed(),
                   adcCountsToLensVolts(fZoom.smoothed(), voltsPerCount,
                                        DIVIDER_R_TOP_OHM, DIVIDER_R_BOTTOM_OHM));
+  serviceZoomPersist();
+  servicePots();
   gFocusOk = readChannel(ADS_CH_FOCUS_POSITION, c);
   if (gFocusOk) fFocus.push(c);
 
