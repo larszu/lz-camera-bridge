@@ -150,7 +150,7 @@ async function benchTick(){
  if(!s.driveCompiledIn) $('#benchn').textContent='Safe build: drive not compiled in.';
  else if(s.armed) $('#benchn').textContent='Armed: use the calibrated slider above.';
 }
-let zNull=1270, zHeld=false, zTimer=null;
+let zNull=1560, zHeld=false, zTimer=null;
 function zCode(p){ return Math.round(p<0? zNull+p/100*zNull : zNull+p/100*(4095-zNull)) }
 function zSend(){ fetch('/api/zoom',{method:'POST',body:JSON.stringify({code:zCode(+$('#zs').value)})}) }
 function zStart(){ zHeld=true; clearInterval(zTimer); zSend(); zTimer=setInterval(zSend,150) }
@@ -162,7 +162,7 @@ async function zoomTick(){
  let s; try{ s=await (await fetch('/api/status')).json() }catch(e){ return }
  if(s.zoom){ zNull=s.zoom.null }
  const L=s.lens||{};
- $('#zoomk').textContent='Zoom speed'+(s.zoom?` \u2014 code ${s.zoom.code} (stop ${s.zoom.null})`:'')+(L.zoomVolts!==undefined?` \u2014 ${focal(L.zoomVolts)}`:'');
+ $('#zoomk').textContent='Zoom speed'+(s.zoom?` \u2014 code ${s.zoom.code} (stop ${s.zoom.null}${s.zoom.holding?', hold':''})`:'')+(L.zoomVolts!==undefined?` \u2014 ${focal(L.zoomVolts)}`:'');
 }
 tick(); setInterval(tick,500); benchTick(); setInterval(benchTick,500); zoomTick(); setInterval(zoomTick,500);
 </script>

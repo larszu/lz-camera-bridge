@@ -168,8 +168,23 @@
  * the stop measured on the bench build (Raz 56k, Rbz 10k, R1z 10k, R2z 6.8k, 1.2k into the socket). The design value was 2360 (5.0 V at the op-amp); the lens input loads the stage, so the real stop is lower.
  */
 #define DAC_CH_ZOOM 1
-#define ZOOM_NULL_DEFAULT 1270  // measured on the bench 2026-10-10 (design value was 2360)
+#define ZOOM_NULL_DEFAULT 1560  // bench 2026-10-10, found by hand (earlier 1270/1282; it wanders)
 #define ZOOM_DEADMAN_MS 400   // no command for this long -> back to stop
+/*
+ * Position hold: the stop code wanders (it hangs on the 9 V divider and the
+ * lens's own reference), so a fixed code lets the zoom creep. While nobody
+ * zooms, the firmware watches pin 10 and trims the stop code against drift.
+ * Grip-rocker moves are recognised by their speed and followed, not fought.
+ */
+#define ZOOM_HOLD_ENABLE 1
+#define ZOOM_HOLD_SETTLE_MS 600      // after the last command, before capturing the target
+#define ZOOM_HOLD_PERIOD_MS 200
+#define ZOOM_HOLD_DEADBAND_V 0.04f   // lens-side volts on pin 10
+#define ZOOM_HOLD_GAIN 25.0f         // DAC codes per volt of error, per period
+#define ZOOM_HOLD_TRIM_MAX 600       // codes either side of the stored stop
+#define ZOOM_HOLD_MANUAL_V 0.12f     // faster than this per period = someone zooms by hand
+#define ZOOM_HOLD_END_LOW_V 1.80f    // near the end stops nothing can be held
+#define ZOOM_HOLD_END_HIGH_V 6.65f
 
 /*
  * The readback divider, docs/b4/wiring.md §3.
