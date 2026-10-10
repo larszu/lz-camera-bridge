@@ -30,7 +30,7 @@ Ausgelesen am 08.10.2026 mit `esptool flash_id`.
 |---|---|---|---|
 | **21** | I²C SDA | MCP4728 SDA, ADS1115 SDA (beide) | belegt |
 | **22** | I²C SCL | MCP4728 SCL, ADS1115 SCL (beide) | belegt |
-| **3V3** | Versorgung | MCP4728 VCC, ADS1115 VDD, Op-Amp-Offset (Ra) | belegt |
+| **3V3** | Versorgung | MCP4728 VCC, ADS1115 VDD, Op-Amp-Offset (Ra 16 kΩ) | belegt |
 | **GND** | Masse | Module, Op-Amp, 12-V-Netzteil-Masse, Hirose Pin 3 | belegt |
 | 2 | Onboard-LED (blau) | — | nur Sendebau, den es für dieses Board nicht gibt |
 | 16 | UART1 RX ← Hirose 11 | — | reserviert Gruppe B, **nicht verdrahten** (Canon = Gruppe C) |
@@ -83,7 +83,7 @@ Gemessene Widerstandswerte in `config.h` eintragen (`DIVIDER_R_TOP_OHM`,
 
 Loch für Loch: `iris-anleitung.html`, Abschnitt „Steckplan mit Reihen“.
 
-Vout ist die Spannung an **LM358 Pin 1**, Vp ist Pin 3, Vn ist Pin 2. Ra bekommt
+Vout ist die Spannung an **LM358 Pin 1**, Vp ist Pin 3, Vn ist Pin 2. Ra (16 kΩ) bekommt
 seine 3,3 V vom 3V3-Pin des ESP32. Schritt-für-Schritt-Steckplan mit allen Netzen:
 `iris-anleitung.html`, Abschnitt „Netze“.
 
