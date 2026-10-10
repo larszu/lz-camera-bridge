@@ -165,10 +165,10 @@
  * channel B through LM358 half B into pin 6 of the zoom socket on the grip.
  * 5.0 V there is "stop"; the DAC code that produces it depends on the resistors,
  * so it is stored (NVS + DAC EEPROM) rather than computed. ZOOM_NULL_DEFAULT is
- * the design value for Raz 56k / Rbz 10k / R1z 10k / R2z 6.8k.
+ * the stop measured on the bench build (Raz 56k, Rbz 10k, R1z 10k, R2z 6.8k, 1.2k into the socket). The design value was 2360 (5.0 V at the op-amp); the lens input loads the stage, so the real stop is lower.
  */
 #define DAC_CH_ZOOM 1
-#define ZOOM_NULL_DEFAULT 2360
+#define ZOOM_NULL_DEFAULT 1270  // measured on the bench 2026-10-10 (design value was 2360)
 #define ZOOM_DEADMAN_MS 400   // no command for this long -> back to stop
 
 /*
