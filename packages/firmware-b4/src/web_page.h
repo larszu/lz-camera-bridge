@@ -65,8 +65,11 @@ static void handleRoot() {
 <input type=range min=0 max=4095 value=0 id="bd" disabled>
 <div class="sub" id="benchn">Sets the DAC directly, no calibration. Drive build only, refused while armed.</div></div>
 <h2 style="font-size:15px">Potis</h2>
-<div class="card"><label><input type=checkbox id="potson"> Potis an GPIO 34 (Iris) · 35 (Zoom) · 36 (Fokus) benutzen</label>
-<div class="sub" id="potsv">Aus: ein offener Eingang würde die Blende bewegen.</div></div>
+<div class="card">
+<label><input type=checkbox id="pi"> Iris-Poti (GPIO 34)</label><br>
+<label><input type=checkbox id="pz"> Zoom-Poti (GPIO 35, Mitte = Stopp)</label><br>
+<label><input type=checkbox id="pf"> Fokus-Poti (GPIO 36, nur Anzeige)</label>
+<div class="sub" id="potsv">Nur einschalten, wenn das Poti steckt: ein offener Eingang bewegt sonst Blende oder Zoom.</div></div>
 <h2 style="font-size:15px">Zoom</h2>
 <div class="card"><div class="k" id="zoomk">Zoom speed</div>
 <input type=range min=-100 max=100 value=0 id="zs">
@@ -167,12 +170,12 @@ async function zoomTick(){
  const L=s.lens||{};
  $('#zoomk').textContent='Zoom speed'+(s.zoom?` \u2014 code ${s.zoom.code} (stop ${s.zoom.null}${s.zoom.holding?', hold':''})`:'')+(L.zoomVolts!==undefined?` \u2014 ${focal(L.zoomVolts)}`:'');
 }
-$('#potson').addEventListener('change',e=>fetch('/api/pots',{method:'POST',body:JSON.stringify({enabled:e.target.checked})}));
+[['pi','iris'],['pz','zoom'],['pf','focus']].forEach(([id,k])=>$('#'+id).addEventListener('change',e=>fetch('/api/pots',{method:'POST',body:JSON.stringify({[k]:e.target.checked})})));
 async function potTick(){
  let s; try{ s=await (await fetch('/api/status')).json() }catch(e){ return }
  if(!s.pots) return;
- $('#potson').checked=s.pots.enabled;
- $('#potsv').textContent=`Iris ${s.pots.iris} \u00b7 Zoom ${s.pots.zoom} (Mitte 2048) \u00b7 Fokus ${s.pots.focus}`+(s.pots.enabled?'':' \u2014 aus');
+ $('#pi').checked=s.pots.irisOn; $('#pz').checked=s.pots.zoomOn; $('#pf').checked=s.pots.focusOn;
+ $('#potsv').textContent=`Iris ${s.pots.iris} \u00b7 Zoom ${s.pots.zoom} (Mitte 2048) \u00b7 Fokus ${s.pots.focus}`;
 }
 potTick(); setInterval(potTick,500);
 tick(); setInterval(tick,500); benchTick(); setInterval(benchTick,500); zoomTick(); setInterval(zoomTick,500);
