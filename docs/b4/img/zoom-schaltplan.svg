@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-60 20 800 260" role="img" aria-label="Schaltplan Zoomstufe">
+<rect x="-60" y="20" width="800" height="260" fill="#fff"/>
+<g stroke="#1D324F" stroke-width="1.4" fill="none">
+<polygon points="320,80 320,180 400,130" fill="#E1ECEF"/>
+<polyline points="70,150 260,150 320,150"/>
+<rect x="130" y="143" width="40" height="14" fill="#fff"/>
+<circle cx="260" cy="150" r="3" fill="#1D324F"/>
+<polyline points="70,215 260,215 260,150"/>
+<rect x="130" y="208" width="40" height="14" fill="#fff"/>
+<polyline points="320,110 280,110"/>
+<circle cx="280" cy="110" r="3" fill="#1D324F"/>
+<polyline points="280,110 200,110 200,118"/>
+<rect x="220" y="103" width="40" height="14" fill="#fff"/>
+<line x1="200" y1="118" x2="200" y2="126"/><line x1="191" y1="126" x2="209" y2="126"/><line x1="195" y1="130" x2="205" y2="130"/><line x1="198" y1="134" x2="202" y2="134"/>
+<polyline points="280,110 280,55 440,55 440,130"/>
+<rect x="340" y="48" width="40" height="14" fill="#fff"/>
+<polyline points="400,130 440,130 560,130"/>
+<circle cx="440" cy="130" r="3" fill="#1D324F"/>
+<rect x="470" y="123" width="40" height="14" fill="#fff"/>
+<polyline points="360,95 360,75"/>
+<polyline points="360,165 360,185"/>
+<line x1="360" y1="185" x2="360" y2="193"/><line x1="351" y1="193" x2="369" y2="193"/><line x1="355" y1="197" x2="365" y2="197"/><line x1="358" y1="201" x2="362" y2="201"/>
+</g>
+<text x="66" y="154" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="700" text-anchor="end" fill="#1D324F">9 V (LM358 Pin 8)</text>
+<text x="66" y="219" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="700" text-anchor="end" fill="#1D324F">MCP4728 VB</text>
+<text x="150" y="140" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="700" text-anchor="middle" fill="#1D324F">Raz 56 kΩ</text>
+<text x="150" y="205" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="700" text-anchor="middle" fill="#1D324F">Rbz 10 kΩ</text>
+<text x="240" y="100" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="700" text-anchor="middle" fill="#1D324F">R1z 10 kΩ</text>
+<text x="360" y="45" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="700" text-anchor="middle" fill="#1D324F">R2z 6,8 kΩ</text>
+<text x="490" y="120" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="700" text-anchor="middle" fill="#1D324F">1 kΩ</text>
+<text x="312" y="107" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="700" text-anchor="end" fill="#1D324F">6</text>
+<text x="312" y="163" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="700" text-anchor="end" fill="#1D324F">5</text>
+<text x="408" y="124" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="700" text-anchor="start" fill="#1D324F">7</text>
+<text x="366" y="80" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="700" text-anchor="start" fill="#1D324F">8 · +9 V</text>
+<text x="366" y="180" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="700" text-anchor="start" fill="#1D324F">4</text>
+<text x="565" y="134" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="700" text-anchor="start" fill="#1D324F">Zoombuchse Pin 6</text>
+<text x="338" y="114" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="800" text-anchor="middle" fill="#1D324F">−</text><text x="338" y="134" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="800" text-anchor="middle" fill="#1D324F">+</text>
+<text x="565" y="150" font-family="Public Sans,Arial,sans-serif" font-size="9" font-weight="600" text-anchor="start" fill="#5C6B85">5,0 V = Stopp · Richtung 8 V / 2 V = zoomen</text>
+<text x="300" y="268" font-family="Public Sans,Arial,sans-serif" font-size="9" font-weight="500" text-anchor="middle" fill="#5C6B85">Vout = 1,68 · (0,848 · Vdac + 1,364) → DAC 0: 2,3 V · Stopp 5,0 V bei ≈ DAC 2350 · DAC 4095: 7,0 V · Stopp sucht die Firmware</text>
+</svg>
