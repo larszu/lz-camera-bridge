@@ -348,6 +348,33 @@ static String statusJson() {
 static void handleStatus() { server.send(200, "application/json", statusJson()); }
 
 /**
+ * Bench: write the DAC directly, bypassing the calibration table. Only in a
+ * drive build and only while disarmed, so it never competes with the loop.
+ * Returns nullptr on success, otherwise why it refused.
+ */
+static const char *benchSetDac(long code) {
+#if !B4_ENABLE_IRIS_DRIVE
+  (void)code;
+  return "drive not compiled in";
+#else
+  if (drive.armed) return "armed";
+  if (!health.dacPresent) return "no DAC";
+  if (code < 0 || code > 4095) return "0..4095";
+  drive.dacCode = static_cast<uint16_t>(code);
+  dac.setChannelValue(static_cast<MCP4728_channel_t>(DAC_CH_IRIS), drive.dacCode);
+  return nullptr;
+#endif
+}
+
+static void handleBenchDac() {
+  long code = 0;
+  if (!jsonNumber(server.arg("plain"), "code", code)) return refuse(400, "need code");
+  const char *why = benchSetDac(code);
+  if (why) return refuse(409, why);
+  server.send(200, "application/json", String("{\"ok\":true,\"dacCode\":") + drive.dacCode + "}");
+}
+
+/**
  * USB console: "s" prints the status document as one line, the same JSON as
  * /api/status. Lets a bench host read the lens without joining the AP.
  */
@@ -359,22 +386,12 @@ static void serviceConsole() {
     if (len == 0 && (c == 's' || c == 'S')) { Serial.println(statusJson()); continue; }
     if (c == '\n' || c == '\r') {
       line[len] = 0;
-#if B4_ENABLE_IRIS_DRIVE
-      // Bench only: "d<code>" writes the DAC directly so the amplifier can be
-      // swept with the lens OFF pin 5. Refused while armed, so the control
-      // loop and this command never fight over the DAC.
+      // Bench only: "d<code>" writes the DAC directly (see benchSetDac).
       if (len > 1 && (line[0] == 'd' || line[0] == 'D')) {
-        const long code = atol(line + 1);
-        if (drive.armed) Serial.println(F("{\"bench\":\"refused: armed\"}"));
-        else if (!health.dacPresent) Serial.println(F("{\"bench\":\"refused: no DAC\"}"));
-        else if (code < 0 || code > 4095) Serial.println(F("{\"bench\":\"refused: 0..4095\"}"));
-        else {
-          drive.dacCode = static_cast<uint16_t>(code);
-          dac.setChannelValue(static_cast<MCP4728_channel_t>(DAC_CH_IRIS), drive.dacCode);
-          Serial.printf("{\"bench\":\"ok\",\"dacCode\":%u}\n", drive.dacCode);
-        }
+        const char *why = benchSetDac(atol(line + 1));
+        if (why) Serial.printf("{\"bench\":\"refused: %s\"}\n", why);
+        else Serial.printf("{\"bench\":\"ok\",\"dacCode\":%u}\n", drive.dacCode);
       }
-#endif
       len = 0;
       continue;
     }
@@ -498,6 +515,7 @@ static void setupRoutes() {
   server.on("/api/status", HTTP_GET, handleStatus);
   server.on("/api/iris", HTTP_POST, handleSetIris);
   server.on("/api/arm", HTTP_POST, handleArm);
+  server.on("/api/bench/dac", HTTP_POST, handleBenchDac);
   server.on("/api/calibrate/point", HTTP_POST, handleCalPoint);
   server.on("/api/calibrate/finish", HTTP_POST, handleCalFinish);
   server.on("/api/calibrate/clear", HTTP_POST, handleCalClear);
