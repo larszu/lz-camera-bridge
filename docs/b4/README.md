@@ -3,13 +3,18 @@
 Working material for controlling 2/3" B4 broadcast lenses over the Hirose 12-pin
 connector, and for reading zoom/focus demands as input devices.
 
-> ## ⚠️ Nothing here is verified against hardware
+> ## Status 2026-10-10: measured on the Canon J15ax8B4 IRS SX12
 >
-> Every voltage, pin assignment, baud rate and command code in this folder comes
-> from third-party reverse engineering or from a 2010 product sheet. The upstream
-> authors state their findings may be wrong. **Measure on the actual lens before
-> connecting or driving anything.** A broadcast lens costs four to five figures;
-> one mis-assigned control pin destroys the servo electronics.
+> **Verified on our lens:** the 12-pin pinout (and the trap that the socket is
+> numbered mirror-image to the plug), iris and zoom readback, the bench
+> amplifier, **iris drive over pin 5** (the lens follows the setpoint 1:1), and
+> the voltage per F-stop and per focal length. See [`measurements/`](measurements/).
+>
+> **Still unverified:** serial (group B), focus position (this lens has no focus
+> sensor), demands, and the zoom socket on the grip. Everything not listed as
+> measured is third-party material — **measure on the actual lens before
+> connecting or driving anything.** One mis-assigned control pin destroys the
+> servo electronics.
 
 | File | What it is |
 |---|---|
@@ -30,7 +35,7 @@ connector, and for reading zoom/focus demands as input devices.
 | [`demand.md`](demand.md) | Phase 4: zoom/focus demands read by the firmware, as `setZoom`/`setFocus` on the bus (#51) or as a USB HID gamepad (#52), which of the two runs when, and what #49 still has to measure. |
 | [`safety-review.md`](safety-review.md) | #41 as a form for the bench: what was checked on paper (and the amplifier error it found), what must be measured on the built board with the lens disconnected, and the release line only Lars signs. |
 | [`unreal-livelink.md`](unreal-livelink.md) | #56: the interop test against Unreal Live Link FreeD, runnable by someone without this repo's history, with `tools/b4FreeD.ts` as the sender and Epic's documentation as the source. |
-| [`measurements/`](measurements/) | Real readings, including the ones that failed. Empty until 2026-09-23. |
+| [`measurements/`](measurements/) | Real readings, including the ones that failed. First readings on the Canon 2026-10-10: readback, amplifier sweep, first drive, F-stop and zoom scales. |
 | [`freed-output.md`](freed-output.md) | FreeD D1 output: the split between encoder and sender, what the byte table is verified against, and why address, port and rate have no defaults. |
 | [`axis.md`](axis.md) | The axis state machine: setpoint, feedback, limits, homing, status — and the order in which a stop engages the brake and cuts torque. |
 | [`device-profiles.md`](device-profiles.md) | Profile format for retro-fitted foreign heads: what a profile holds, what is rejected outright, and why an unstated figure costs capability instead of getting a default. |

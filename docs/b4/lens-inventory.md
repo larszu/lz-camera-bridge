@@ -8,7 +8,7 @@ stays **unklar**.
 
 | Manufacturer | Type | Serial no. | Group | How determined | Date |
 |---|---|---|---|---|---|
-| Canon | J15ax8B4 IRS SX12 | *(read off the barrel)* | **unklar — expected C** | Desk research only ([`research-canon.md`](research-canon.md)): IRS is a non-digital R-type; Canon ties iris/zoom/focus follow signals to IASD/IASE. **Not measured.** | 2026-09-27 |
+| Canon | J15ax8B4 IRS SX12 | *(read off the barrel)* | **C (analog) — probable** | Pin 11 stays at ground level while focus is turned (no focus sensor on this IRS SX12, so pin 11 cannot settle it); iris drives over the analog pin 5 and reports on pin 7 1:1 ([`20261010-canon-j15ax8b4-first-drive.md`](measurements/20261010-canon-j15ax8b4-first-drive.md)). Pin 12 and a logic analyser on 11/12 not yet done. | 2026-10-10 |
 
 ## Measuring procedure (passive, drives nothing)
 
