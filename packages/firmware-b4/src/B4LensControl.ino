@@ -398,12 +398,18 @@ static const char *zoomSet(long code) {
 }
 
 /** Store a new stop code: NVS for the firmware, DAC EEPROM for power-up. */
-static const char *zoomSetNull(long code) {
+static const char *zoomSetNull(long code, bool save = true);
+static const char *zoomSetNull(long code, bool save) {
   if (!health.dacPresent) return "no DAC";
   if (code < 0 || code > 4095) return "0..4095";
   zoomNull = static_cast<uint16_t>(code);
   zoomTrim = 0;
   zoomTarget = NAN;
+  if (!save) {                      // try a value live, store later
+    zoomCode = zoomNull;
+    dac.setChannelValue(static_cast<MCP4728_channel_t>(DAC_CH_ZOOM), zoomNull);
+    return nullptr;
+  }
   Preferences zp;
   zp.begin("b4zoom", false);
   zp.putUShort("null", zoomNull);
@@ -532,8 +538,11 @@ static void handleZoom() {
 
 static void handleZoomNull() {
   long code = 0;
-  if (!jsonNumber(server.arg("plain"), "code", code)) return refuse(400, "need code");
-  const char *why = zoomSetNull(code);
+  bool save = true;
+  const String b = server.arg("plain");
+  if (!jsonNumber(b, "code", code)) return refuse(400, "need code");
+  jsonBool(b, "save", save);
+  const char *why = zoomSetNull(code, save);
   if (why) return refuse(409, why);
   server.send(200, "application/json", String("{\"ok\":true,\"zoomNull\":") + zoomNull + "}");
 }

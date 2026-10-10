@@ -73,6 +73,14 @@ static void handleRoot() {
 <h2 style="font-size:15px">Zoom</h2>
 <div class="card"><div class="k" id="zoomk">Zoom speed</div>
 <input type=range min=-100 max=100 value=0 id="zs">
+<div class="row" style="margin-top:8px;gap:6px;align-items:center">
+ <span class="k">Stopp-Punkt</span>
+ <button data-d="-20">−20</button><button data-d="-5">−5</button>
+ <input id="znull" type=number min=0 max=4095 style="width:80px">
+ <button data-d="5">+5</button><button data-d="20">+20</button>
+ <button id="zsave">Speichern</button>
+</div>
+<div class="sub" id="zns">Kriecht der Zoom Richtung Tele: Wert erhöhen. Richtung Weit: verringern. Änderungen wirken sofort, „Speichern“ legt sie dauerhaft ab.</div>
 <div class="sub">Hold to zoom, let go to stop. Left = one direction, right = the other. Stops by itself 0.4 s after the last command.</div></div>
 <div class="warn">Every electrical figure this device reports rests on a divider
 ratio you entered in <code>config.h</code>. It is measuring, not certifying.</div>
@@ -178,6 +186,15 @@ async function potTick(){
  $('#potsv').textContent=`Iris ${s.pots.iris} \u00b7 Zoom ${s.pots.zoom} (Mitte 2048) \u00b7 Fokus ${s.pots.focus}`;
 }
 potTick(); setInterval(potTick,500);
+let zEditing=false;
+function zTry(v){ v=Math.max(0,Math.min(4095,v|0)); $('#znull').value=v; zNull=v;
+ fetch('/api/zoom/null',{method:'POST',body:JSON.stringify({code:v,save:false})}); $('#zns').textContent='Probiert: '+v+' (noch nicht gespeichert)'; }
+document.querySelectorAll('button[data-d]').forEach(b=>b.addEventListener('click',()=>{ zEditing=true; zTry((+$('#znull').value||zNull)+(+b.dataset.d)) }));
+$('#znull').addEventListener('focus',()=>zEditing=true);
+$('#znull').addEventListener('change',e=>zTry(+e.target.value));
+$('#zsave').addEventListener('click',async()=>{ const v=+$('#znull').value;
+ await fetch('/api/zoom/null',{method:'POST',body:JSON.stringify({code:v,save:true})}); zEditing=false; $('#zns').textContent='Gespeichert: '+v; });
+setInterval(async()=>{ if(zEditing) return; try{ const s=await (await fetch('/api/status')).json(); if(s.zoom) $('#znull').value=s.zoom.stored }catch(e){} },1500);
 tick(); setInterval(tick,500); benchTick(); setInterval(benchTick,500); zoomTick(); setInterval(zoomTick,500);
 </script>
 )HTML";
