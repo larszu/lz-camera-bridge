@@ -247,9 +247,9 @@
 <rect x="165.0" y="245.0" width="22" height="10" fill="#9EC5E8" stroke="#1D324F" stroke-width="1"/>
 <text x="176.0" y="242.0" font-family="Public Sans,Arial,sans-serif" font-size="8.5" font-weight="700" text-anchor="middle" fill="#1D324F" stroke="#fff" stroke-width="3" paint-order="stroke">56k</text>
 <circle cx="270" cy="238" r="3.4" fill="#1D324F"/>
-<polyline points="508,44 292,44 292,94" fill="none" stroke="#D6402E" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
-<circle cx="292" cy="94" r="3.4" fill="#1D324F"/>
-<text x="512" y="47" font-family="Public Sans,Arial,sans-serif" font-size="8" font-weight="800" text-anchor="start" fill="#D6402E" stroke="#fff" stroke-width="3" paint-order="stroke">3V3 vom ESP32</text>
+<polyline points="508,85 323,85 314,94" fill="none" stroke="#D6402E" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
+<circle cx="314" cy="94" r="3.4" fill="#1D324F"/>
+<text x="512" y="88" font-family="Public Sans,Arial,sans-serif" font-size="8" font-weight="800" text-anchor="start" fill="#D6402E" stroke="#fff" stroke-width="3" paint-order="stroke">3V3 vom ESP32</text>
 <polyline points="508,262 358,262" fill="none" stroke="#8B5A2B" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
 <circle cx="358" cy="262" r="3.4" fill="#1D324F"/>
 <text x="512" y="265" font-family="Public Sans,Arial,sans-serif" font-size="8" font-weight="800" text-anchor="start" fill="#8B5A2B" stroke="#fff" stroke-width="3" paint-order="stroke">MCP4728 VA</text>
