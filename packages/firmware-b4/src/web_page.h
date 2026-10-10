@@ -60,6 +60,10 @@ static void handleRoot() {
 <div class="row" id="pills"></div>
 <div class="grid" id="vals"></div>
 <div id="drive"></div>
+<h2 style="font-size:15px">Bench</h2>
+<div class="card"><div class="k" id="benchk">Bench drive</div>
+<input type=range min=0 max=4095 value=0 id="bd" disabled>
+<div class="sub" id="benchn">Sets the DAC directly, no calibration. Drive build only, refused while armed.</div></div>
 <div class="warn">Every electrical figure this device reports rests on a divider
 ratio you entered in <code>config.h</code>. It is measuring, not certifying.</div>
 <h2 style="font-size:15px">Calibration</h2>
@@ -81,7 +85,8 @@ async function tick(){
   cell('Iris',L.iris,' / 255')+
   cell('Iris volts',L.irisVolts,' V')+
   cell('Zoom volts',L.zoomVolts,' V')+
-  cell('Focus volts',L.focusVolts,' V');
+  cell('Focus volts',L.focusVolts,' V')+
+  cell('Amp out (A3)',s.ampVolts,' V');
  const d=s.drive;
  $('#drive').innerHTML=`<div class="card"><div class="k">Setpoint ${d.setpoint} &mdash; DAC ${d.dacCode}`+
   (d.fault?` &mdash; <span style="color:var(--bad)">${d.fault}</span>`:(d.holding?' &mdash; holding':''))+`</div>`+
@@ -90,7 +95,27 @@ async function tick(){
  $('#cal').innerHTML=s.calPoints? '<a href="/api/calibration.csv">download calibration.csv</a>'
   : 'No table recorded. Run <code>packages/firmware-b4/tools/record_calibration.py</code>; the device refuses to drive until then.';
 }
-tick(); setInterval(tick,500);
+let dragging=false, lastSent=0, pend=null;
+function sendBench(v){ fetch('/api/bench/dac',{method:'POST',body:JSON.stringify({code:+v})}) }
+$('#bd').addEventListener('pointerdown',()=>dragging=true);
+$('#bd').addEventListener('pointerup',()=>dragging=false);
+$('#bd').addEventListener('input',e=>{
+ const v=e.target.value, now=Date.now();
+ clearTimeout(pend);
+ if(now-lastSent>120){ lastSent=now; sendBench(v) } else pend=setTimeout(()=>sendBench(v),130);
+});
+$('#bd').addEventListener('change',e=>sendBench(e.target.value));
+async function benchTick(){
+ let s; try{ s=await (await fetch('/api/status')).json() }catch(e){ return }
+ const ok=s.driveCompiledIn && !s.armed && s.i2c.dac, b=$('#bd');
+ b.disabled=!ok;
+ if(!dragging) b.value=s.drive.dacCode;
+ const vdac=3.3*b.value/4095;
+ $('#benchk').textContent=`Bench drive \u2014 DAC ${b.value} (${vdac.toFixed(2)} V)`+(s.ampVolts!==undefined?` \u2014 pin 5 \u2248 ${s.ampVolts} V (A3 reading)`:'');
+ if(!s.driveCompiledIn) $('#benchn').textContent='Safe build: drive not compiled in.';
+ else if(s.armed) $('#benchn').textContent='Armed: use the calibrated slider above.';
+}
+tick(); setInterval(tick,500); benchTick(); setInterval(benchTick,500);
 </script>
 )HTML";
   server.send_P(200, "text/html", PAGE);
