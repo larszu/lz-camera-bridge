@@ -136,3 +136,14 @@ duplicate the issue warns about.
 
 Each goes into [`measurements/`](measurements/), and the calibration table for
 `enableDemand` is taken from the same session.
+
+## Canon J15ax8B4: sockets on the grip (observed 2026-10-10)
+
+Underside of the drive unit, top to bottom: a round socket with a black insert,
+a **12-pin Hirose socket with a white insert**, and a capped round socket. That
+is the same arrangement as Fujinon's ENG drive units (12-pin focus, 12-pin zoom,
+20-pin expansion). If the Canon follows the Fujinon zoom socket, pin 7 is zoom
+control (wide 7.5 V, tele 2.5 V), 3/4/5 the 7.5/5.0/2.5 V references, 8 the
+position, 6 detect. **Assumption from the arrangement, not measured.** Next step:
+each pin against GND with the lens on 12 V, through a mating plug, one pin at a
+time. Free drive hardware already on the bench: MCP4728 VB and LM358 half B.
