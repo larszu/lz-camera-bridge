@@ -168,7 +168,7 @@
  * the stop measured on the bench build (Raz 56k, Rbz 10k, R1z 10k, R2z 6.8k, 1.2k into the socket). The design value was 2360 (5.0 V at the op-amp); the lens input loads the stage, so the real stop is lower.
  */
 #define DAC_CH_ZOOM 1
-#define ZOOM_NULL_DEFAULT 1560  // bench 2026-10-10, found by hand (earlier 1270/1282; it wanders)
+#define ZOOM_NULL_DEFAULT 1790  // bench 2026-10-10, speed sweep: zero crossing ≈ 1780–1800
 #define ZOOM_DEADMAN_MS 400   // no command for this long -> back to stop
 /*
  * Position hold: the stop code wanders (it hangs on the 9 V divider and the
@@ -185,6 +185,18 @@
 #define ZOOM_HOLD_MANUAL_V 0.12f     // faster than this per period = someone zooms by hand
 #define ZOOM_HOLD_END_LOW_V 1.80f    // near the end stops nothing can be held
 #define ZOOM_HOLD_END_HIGH_V 6.65f
+#define ZOOM_HOLD_PERSIST_MS 30000  // fold a settled trim into the stored stop (NVS only)
+
+/*
+ * Local pots on the ESP32's own ADC1 (works alongside WLAN). Each pot between
+ * 3V3 and GND, wiper to the pin, 100 nF wiper -> GND. Off by default: an open
+ * input floats and would move the iris. Switch on with USB "p1" or the web page.
+ */
+#define POT_PIN_IRIS 34       // absolute: pot position = iris DAC code
+#define POT_PIN_ZOOM 35       // speed: centre = stop (use a self-centring joystick)
+#define POT_PIN_FOCUS 36      // read and reported only, until a focus motor exists
+#define POT_ZOOM_DEADBAND 220 // ADC counts either side of the centre
+#define POT_IRIS_STEP 24      // ignore iris pot changes smaller than this
 
 /*
  * The readback divider, docs/b4/wiring.md §3.
