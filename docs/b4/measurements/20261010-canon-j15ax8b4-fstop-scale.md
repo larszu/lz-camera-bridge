@@ -31,3 +31,22 @@ the ARIB points (F16, F2.8) — so ARIB is a guide here, not this lens's scale.
 With Ra = 15.6 kΩ the amplifier bottoms out at 2.53 V: the iris reaches about
 F22 but **not C** (2.11 V). Ra = 22 kΩ (single resistor, in stock) gives
 `Vout = 1.375 · Vdac + 2.06` → 2.06–6.60 V, which covers C to F1.7.
+
+## Driven, iris switch A (same evening)
+
+Each stop approached open-loop with the bench console `d<code>` and corrected
+from pin 7 (≤ 4 steps, 1.8 s settle). Ra still 15.6 kΩ.
+
+| Target | DAC code | Pin 7 reached |
+|---|---|---|
+| (DAC 0, lowest possible) | 0 | 2.62 V ≈ F22 |
+| F16 2.98 V | 407 | 3.00 V |
+| F11 3.51 V | 946 | 3.51 V |
+| F8 4.09 V | 1537 | 4.08 V |
+| F5.6 4.75 V | 2209 | 4.73 V |
+| F4 5.20 V | 2706 | 5.22 V |
+| F2.8 5.75 V | 3262 | 5.75 V |
+| F1.7 6.46 V | 3997 | 6.46 V |
+
+Every stop from F16 to F1.7 reached within 0.02 V. C stays out of reach until Ra
+is raised (see above).
