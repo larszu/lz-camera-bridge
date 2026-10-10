@@ -296,7 +296,16 @@ static String statusJson() {
     j += "\"focusCounts\":" + String(fFocus.smoothed(), 1);
     j += ",\"focusVolts\":" + lensVolts(fFocus.smoothed());
   }
-  j += "},";
+  j += "}";
+
+  // Amplifier output (Vout behind the 1 kΩ), read back through its own
+  // 100k/68k divider on A3. Absent when nothing answered.
+  {
+    float mc;
+    if (health.adcPresent && readChannel(ADS_CH_DAC_MONITOR, mc))
+      j += ",\"ampVolts\":" + lensVolts(mc);
+  }
+  j += ",";
 
   // Demands: present only when the second ADC answered, each field only when
   // it was read. Detect is reported as a voltage and deliberately NOT turned
