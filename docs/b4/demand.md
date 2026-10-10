@@ -180,3 +180,13 @@ towards wide, below it towards tele, faster the further from 1270. Stored with
 `n1270` (NVS + DAC EEPROM). The stage output at 1270 is ≈ 3.75 V by design —
 the lens input loads it, so "stop" is not simply 5.0 V at the op-amp. The grip
 rocker still works alongside.
+
+### Zoom position hold (2026-10-10, late)
+
+The stop code wandered between sessions (1270 → 1282 → 1560 by hand). A fixed
+code therefore lets the zoom creep. The firmware now trims the stop while nobody
+zooms: it captures pin 10 600 ms after the last command and corrects the stop
+code by 25 codes per volt of error every 200 ms (dead band 0.04 V, ±600 codes).
+A grip-rocker move (> 0.12 V per 200 ms) is followed, not fought. Bench test at
+mid zoom (4.75 V ≈ 30 mm): held within 4.60–4.77 V over 30 s, trim settled at
+≈ +90 codes (effective stop ≈ 1650). No hold near the end stops.
