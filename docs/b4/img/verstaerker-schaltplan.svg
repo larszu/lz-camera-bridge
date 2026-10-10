@@ -30,7 +30,7 @@
 </g>
 <text x="66" y="154" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="800" text-anchor="end" fill="#1D324F">3V3 (ESP32)</text>
 <text x="66" y="219" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="800" text-anchor="end" fill="#1D324F">MCP4728 VA</text>
-<text x="150" y="140" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="700" text-anchor="middle" fill="#1D324F">Ra 16 kΩ</text>
+<text x="150" y="140" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="700" text-anchor="middle" fill="#1D324F">Ra 15,6 kΩ (10 k + 5,6 k)</text>
 <text x="150" y="205" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="700" text-anchor="middle" fill="#1D324F">Rb 10 kΩ</text>
 <text x="240" y="100" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="700" text-anchor="middle" fill="#1D324F">R1 10 kΩ</text>
 <text x="360" y="45" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="700" text-anchor="middle" fill="#1D324F">R2 10 kΩ</text>
@@ -40,17 +40,17 @@
 <text x="408" y="124" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="800" text-anchor="start" fill="#1D324F">1</text>
 <text x="338" y="134" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="800" text-anchor="middle" fill="#1D324F">+</text>
 <text x="338" y="114" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="800" text-anchor="middle" fill="#1D324F">−</text>
-<text x="366" y="80" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="700" text-anchor="start" fill="#1D324F">8 · +8,6 V</text>
+<text x="366" y="80" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="700" text-anchor="start" fill="#1D324F">8 · +9 V</text>
 <text x="366" y="180" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="800" text-anchor="start" fill="#1D324F">4</text>
 <text x="565" y="134" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="800" text-anchor="start" fill="#1D324F">Hirose Pin 5</text>
 <text x="66" y="289" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="800" text-anchor="end" fill="#1D324F">Hirose Pin 6 · +12 V</text>
-<text x="190" y="275" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="700" text-anchor="middle" fill="#1D324F">470 Ω</text>
-<text x="342" y="319" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="700" text-anchor="start" fill="#1D324F">1,2 kΩ</text>
-<text x="338" y="278" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="700" text-anchor="start" fill="#1D324F">8,6 V</text>
+<text x="190" y="275" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="700" text-anchor="middle" fill="#1D324F">330 Ω</text>
+<text x="342" y="319" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="700" text-anchor="start" fill="#1D324F">1 kΩ</text>
+<text x="338" y="278" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="700" text-anchor="start" fill="#1D324F">9,0 V</text>
 <text x="475" y="289" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="800" text-anchor="start" fill="#1D324F">→ LM358 Pin 8</text>
 <text x="260" y="166" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="600" text-anchor="end" fill="#1D324F">Vp</text>
 <text x="446" y="148" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="700" text-anchor="start" fill="#1D324F">Vout</text>
 <text x="276" y="126" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="600" text-anchor="end" fill="#1D324F">Vn</text>
 <text x="565" y="148" font-family="Public Sans,Arial,sans-serif" font-size="9" font-weight="600" text-anchor="start" fill="#D6402E">erst nach Schritt 4</text>
-<text x="300" y="372" font-family="Public Sans,Arial,sans-serif" font-size="9" font-weight="500" text-anchor="middle" fill="#5C6B85">Vout = 1,231 · Vdac + 2,54 V  →  0 V → 2,54 V (zu) · 3,3 V → 6,60 V (offen) · Hälfte B: Pin 5 an GND, Pin 6 an Pin 7</text>
+<text x="300" y="372" font-family="Public Sans,Arial,sans-serif" font-size="9" font-weight="500" text-anchor="middle" fill="#5C6B85">Vout = 1,219 · Vdac + 2,58 V  →  0 V → 2,58 V (zu) · 3,3 V → 6,60 V (offen) · Hälfte B: Pin 5 an GND, Pin 6 an Pin 7</text>
 </svg>
