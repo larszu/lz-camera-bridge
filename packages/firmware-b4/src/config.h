@@ -161,6 +161,17 @@
 #define DAC_CH_IRIS 0
 
 /*
+ * Zoom speed (bench build, docs/b4/iris-anleitung.html "Aufbau 3"): MCP4728
+ * channel B through LM358 half B into pin 6 of the zoom socket on the grip.
+ * 5.0 V there is "stop"; the DAC code that produces it depends on the resistors,
+ * so it is stored (NVS + DAC EEPROM) rather than computed. ZOOM_NULL_DEFAULT is
+ * the design value for Raz 56k / Rbz 10k / R1z 10k / R2z 6.8k.
+ */
+#define DAC_CH_ZOOM 1
+#define ZOOM_NULL_DEFAULT 2360
+#define ZOOM_DEADMAN_MS 400   // no command for this long -> back to stop
+
+/*
  * The readback divider, docs/b4/wiring.md §3.
  *
  *   lens pin ──[ R_TOP ]──┬── ADS1115 input
