@@ -79,6 +79,10 @@ Gemessene Widerstandswerte in `config.h` eintragen (`DIVIDER_R_TOP_OHM`,
 
 ![LM358 DIP-8, Draufsicht](img/lm358-dip8.svg)
 
+![Steckplan Teil 2 mit Reihen](img/steckplan-teil2.svg)
+
+Loch für Loch: `iris-anleitung.html`, Abschnitt „Steckplan mit Reihen“.
+
 Vout ist die Spannung an **LM358 Pin 1**, Vp ist Pin 3, Vn ist Pin 2. Ra bekommt
 seine 3,3 V vom 3V3-Pin des ESP32. Schritt-für-Schritt-Steckplan mit allen Netzen:
 `iris-anleitung.html`, Abschnitt „Netze“.
