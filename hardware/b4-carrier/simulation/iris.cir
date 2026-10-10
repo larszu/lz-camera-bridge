@@ -1,0 +1,20 @@
+* Iris stage as on the carrier board (LM324 A) - DC sweep of DAC A
+.include opamp.lib
+V9   v9 0 9
+V33  a3v3 0 3.3
+VA   dac 0 0
+R10  dac ip 10k
+R11  a3v3 ira 10k
+R12  ira ip 5.6k
+R13  in 0 10k
+R15  iout in 10k
+R16  iout ictrl 1k
+Rlens ictrl 0 100k      ; lens pin 5 input, >= 100 kOhm (ARIB)
+R41  ictrl adc3 100k
+R42  adc3 0 68k
+X1 ip in iout v9 0 OPA
+.control
+dc VA 0 3.3 0.4125
+wrdata iris.dat v(ictrl) v(adc3) v(ip)
+.endc
+.end
