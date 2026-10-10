@@ -140,7 +140,7 @@ jumping to the top rail.
 
 **Limit the output.** With R1 open, an LM358 on 12 V puts about 10.5 V on pin 5.
 No source gives a maximum for pin 5; the highest a product is documented to
-apply is 7.5 V. Feed the amplifier from a **9 V regulator** off pin 6 (the bench build uses a 470 Ω / 1.2 kΩ divider instead, 8.6 V) (swing
+apply is 7.5 V. Feed the amplifier from a **9 V regulator** off pin 6 (the bench build uses a 330 Ω / 1 kΩ divider instead, 9.0 V) (swing
 then ≈ ≤ 7.5 V), and check the fault case on the bench: disconnect R1, the
 output must stay below that.
 

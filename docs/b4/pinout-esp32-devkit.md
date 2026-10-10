@@ -30,7 +30,7 @@ Ausgelesen am 08.10.2026 mit `esptool flash_id`.
 |---|---|---|---|
 | **21** | I²C SDA | MCP4728 SDA, ADS1115 SDA (beide) | belegt |
 | **22** | I²C SCL | MCP4728 SCL, ADS1115 SCL (beide) | belegt |
-| **3V3** | Versorgung | MCP4728 VCC, ADS1115 VDD, Op-Amp-Offset (Ra 16 kΩ) | belegt |
+| **3V3** | Versorgung | MCP4728 VCC, ADS1115 VDD, Op-Amp-Offset (Ra 15,6 kΩ) | belegt |
 | **GND** | Masse | Module, Op-Amp, 12-V-Netzteil-Masse, Hirose Pin 3 | belegt |
 | 2 | Onboard-LED (blau) | — | nur Sendebau, den es für dieses Board nicht gibt |
 | 16 | UART1 RX ← Hirose 11 | — | reserviert Gruppe B, **nicht verdrahten** (Canon = Gruppe C) |
@@ -83,7 +83,7 @@ Gemessene Widerstandswerte in `config.h` eintragen (`DIVIDER_R_TOP_OHM`,
 
 Loch für Loch: `iris-anleitung.html`, Abschnitt „Steckplan mit Reihen“.
 
-Vout ist die Spannung an **LM358 Pin 1**, Vp ist Pin 3, Vn ist Pin 2. Ra (16 kΩ) bekommt
+Vout ist die Spannung an **LM358 Pin 1**, Vp ist Pin 3, Vn ist Pin 2. Ra (15,6 kΩ) bekommt
 seine 3,3 V vom 3V3-Pin des ESP32. Schritt-für-Schritt-Steckplan mit allen Netzen:
 `iris-anleitung.html`, Abschnitt „Netze“.
 
@@ -93,9 +93,9 @@ seine 3,3 V vom 3V3-Pin des ESP32. Schritt-für-Schritt-Steckplan mit allen Netz
 | A (`DAC_CH_IRIS 0`) | Rb 10 kΩ → +Eingang des Op-Amps |
 | B, C, D | frei |
 
-Op-Amp **nur LM358, kein TL072** (Gleichtaktbereich), Versorgung über **Spannungsteiler 470 Ω / 1,2 kΩ** aus Hirose 6 (8,6 V; ein 7809 geht ebenso), damit Pin 5 im Fehlerfall nicht über ≈ 7,1 V geht:
-Ra 16 kΩ von 3,3 V an +In · Rb 10 kΩ vom DAC an +In · R1 10 kΩ −In → GND ·
-R2 10 kΩ Ausgang → −In. Ergebnis `1,231 · Vdac + 2,54` → 2,54–6,60 V,
+Op-Amp **nur LM358, kein TL072** (Gleichtaktbereich), Versorgung über **Spannungsteiler 330 Ω / 1 kΩ** aus Hirose 6 (9 V; ein 7809 geht ebenso), damit Pin 5 im Fehlerfall nicht über ≈ 7,5 V geht:
+Ra 15,6 kΩ (10 k + 5,6 k) von 3,3 V an +In · Rb 10 kΩ vom DAC an +In · R1 10 kΩ −In → GND ·
+R2 10 kΩ Ausgang → −In. Ergebnis `1,219 · Vdac + 2,58` → 2,58–6,60 V,
 dann **1 kΩ in Serie** zu Pin 5.
 
 ## Hirose 12-Pin (Objektiv)
@@ -110,7 +110,7 @@ Durchgang gegen das Gehäuse bestätigen.
 | 3 | GND | gemeinsame Masse (ESP32, Module, Netzteil) | schwarz → Breadboard − |
 | 4 | Forced Iris Servo (Tastenfunktion, kein Enable) | **offen lassen** | — |
 | 5 | Iris-Sollwert | Op-Amp-Ausgang über 1 kΩ — **erst Schritt 5 der Inbetriebnahme** | — |
-| 6 | **+12 V** (Norm: 10–17 V) | Labornetzteil 12 V, **Strombegrenzung 1,0 A**, Polarität doppelt prüfen; Teiler 470 Ω / 1,2 kΩ für den Op-Amp. **Nie an ESP32 oder Module** | rot → Breadboard + |
+| 6 | **+12 V** (Norm: 10–17 V) | Labornetzteil 12 V, **Strombegrenzung 1,0 A**, Polarität doppelt prüfen; Teiler 330 Ω / 1 kΩ für den Op-Amp. **Nie an ESP32 oder Module** | rot → Breadboard + |
 | 7 | Iris-Position | Teiler → ADS1115 A0 | grün |
 | 8 | Iris Remote/Auto | 5 V über **1 kΩ** (Remote); offen = Auto | — |
 | 10 | Zoom-Position | Teiler → ADS1115 A1 | weiß |
@@ -120,7 +120,7 @@ Durchgang gegen das Gehäuse bestätigen.
 Am Objektiv: für die Steuerung Iris-Schalter auf **A**, sonst ignoriert es Pin 5.
 **Den Irisring nur in M von Hand drehen** — Canon warnt, dass Drehen in A das
 Objektiv beschädigen kann. Pin 5 nie offen lassen, solange A steht; Reihenfolge:
-Verstärker auf ≈ 2,54 V → Pin 5 verbinden → Pin 8 auf 5 V → erst dann A.
+Verstärker auf ≈ 2,58 V → Pin 5 verbinden → Pin 8 auf 5 V → erst dann A.
 
 Pegel laut ARIB TR-B37 (Norm, nicht an dieser Optik gemessen): Pin 5/7 bei
 F2,8 = 6,2 V, F16 = 3,4 V; „zu" ist ein Band (Sollwert 2,1–2,9 V, Rückmeldung
