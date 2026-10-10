@@ -625,13 +625,26 @@ der 12-V-Leiste und Pin 1–4 rechts bei den Widerständen.</p>
 <text x="344.0" y="205.0" font-family="Public Sans,Arial,sans-serif" font-size="8.5" font-weight="700" text-anchor="start" fill="#1D324F" stroke="#fff" stroke-width="3" paint-order="stroke"></text>
 <circle cx="336" cy="190" r="3.4" fill="#1D324F"/>
 <circle cx="336" cy="214" r="3.4" fill="#1D324F"/>
-<text x="336" y="242" font-family="Public Sans,Arial,sans-serif" font-size="8.5" font-weight="700" text-anchor="middle" fill="#1D324F" stroke="#fff" stroke-width="3" paint-order="stroke">1 kΩ</text>
+<text x="346" y="208" font-family="Public Sans,Arial,sans-serif" font-size="8.5" font-weight="700" text-anchor="start" fill="#1D324F" stroke="#fff" stroke-width="3" paint-order="stroke">1k</text>
+<line x1="292" y1="214" x2="292" y2="238" stroke="#5C6B85" stroke-width="1.4"/>
+<rect x="287.0" y="215.0" width="10" height="22" fill="#9EC5E8" stroke="#1D324F" stroke-width="1"/>
+<text x="300.0" y="229.0" font-family="Public Sans,Arial,sans-serif" font-size="8.5" font-weight="700" text-anchor="start" fill="#1D324F" stroke="#fff" stroke-width="3" paint-order="stroke"></text>
+<circle cx="292" cy="214" r="3.4" fill="#1D324F"/>
+<circle cx="292" cy="238" r="3.4" fill="#1D324F"/>
+<text x="282" y="252" font-family="Public Sans,Arial,sans-serif" font-size="8.5" font-weight="700" text-anchor="end" fill="#1D324F" stroke="#fff" stroke-width="3" paint-order="stroke">100k</text>
+<line x1="270" y1="238" x2="82" y2="262" stroke="#5C6B85" stroke-width="1.4"/>
+<rect x="165.0" y="245.0" width="22" height="10" fill="#9EC5E8" stroke="#1D324F" stroke-width="1"/>
+<text x="176.0" y="242.0" font-family="Public Sans,Arial,sans-serif" font-size="8.5" font-weight="700" text-anchor="middle" fill="#1D324F" stroke="#fff" stroke-width="3" paint-order="stroke">56k</text>
+<circle cx="270" cy="238" r="3.4" fill="#1D324F"/>
 <polyline points="508,44 292,44 292,94" fill="none" stroke="#D6402E" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
 <circle cx="292" cy="94" r="3.4" fill="#1D324F"/>
 <text x="512" y="47" font-family="Public Sans,Arial,sans-serif" font-size="8" font-weight="800" text-anchor="start" fill="#D6402E" stroke="#fff" stroke-width="3" paint-order="stroke">3V3 vom ESP32</text>
 <polyline points="508,262 358,262" fill="none" stroke="#8B5A2B" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
 <circle cx="358" cy="262" r="3.4" fill="#1D324F"/>
 <text x="512" y="265" font-family="Public Sans,Arial,sans-serif" font-size="8" font-weight="800" text-anchor="start" fill="#8B5A2B" stroke="#fff" stroke-width="3" paint-order="stroke">MCP4728 VA</text>
+<polyline points="508,238 358,238" fill="none" stroke="#6B46C1" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
+<circle cx="358" cy="238" r="3.4" fill="#1D324F"/>
+<text x="512" y="241" font-family="Public Sans,Arial,sans-serif" font-size="8" font-weight="800" text-anchor="start" fill="#6B46C1" stroke="#fff" stroke-width="3" paint-order="stroke">zu ADS1115 A3</text>
 <polyline points="508,214 358,214" fill="none" stroke="#C9A400" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="5 4"/>
 <circle cx="358" cy="214" r="3.4" fill="#1D324F"/>
 <text x="512" y="217" font-family="Public Sans,Arial,sans-serif" font-size="8" font-weight="800" text-anchor="start" fill="#8A7000" stroke="#fff" stroke-width="3" paint-order="stroke">später: Hirose Pin 5</text>
@@ -670,10 +683,13 @@ der 12-V-Leiste und Pin 1–4 rechts bei den Widerständen.</p>
 <tr><td class="n">11</td><td>R1 10 kΩ</td><td>LM358 Pin 2 (−Eingang A, „Vn“)</td><td>Reihe von Pin 4 = GND</td><td class="n">i12 · i10</td></tr>
 <tr><td class="n">12</td><td>R2 10 kΩ, stehend</td><td>LM358 Pin 1 (Ausgang A, „Vout“)</td><td>LM358 Pin 2 — Rückkopplung, Verstärkung 2</td><td class="n">j13 · j12</td></tr>
 <tr><td class="n">13</td><td>1 kΩ, stehend</td><td>LM358 Pin 1 („Vout“)</td><td>Reihe 14 rechts („Iris-Soll“) — begrenzt den Strom zur Optik</td><td class="n">i13 · i14</td></tr>
+<tr><td class="n">13b</td><td>100 kΩ, stehend</td><td>Reihe „Iris-Soll“ (unteres Bein des 1-kΩ-Ausgangswiderstands)</td><td>Reihe 15 rechts („A3-Messpunkt“) — <strong>nie an 12 V</strong></td><td class="n">g14 · g15</td></tr>
+<tr><td class="n">13c</td><td>56 kΩ (oder 68 kΩ)</td><td>Reihe 15 rechts</td><td>GND-Leiste, über die Mittelrinne — Teiler unten</td><td class="n">f15 → Leiste</td></tr>
+<tr><td class="n">13d</td><td>Draht</td><td>Reihe 15 rechts</td><td>ADS1115 A3 auf Brett 1 — Firmware meldet die Spannung als <code>ampVolts</code></td><td class="n">j15 →</td></tr>
 <tr class="warn"><td class="n">14</td><td>Draht, später</td><td>Reihe „Iris-Soll“</td><td>Hirose Pin 5 (Iris-Sollwert) — erst nach dem Prüfen</td><td class="n">j14 →</td></tr>
 </tbody></table>
 <p><strong>Prüfen ohne Optik</strong> (12 V ein, Multimeter schwarz an GND): Pin 8 (d13) ≈ 8,6–9,0 V ·
-Pin 3 / Vp (h11) ≈ 1,29 V · Pin 1 / Vout (g13) ≈ 2,58 V · Iris-Soll (h14) ≈ 2,58 V.
+Pin 3 / Vp (h11) ≈ 1,29 V · Pin 1 / Vout (g13) ≈ 2,58 V · Iris-Soll (h14) ≈ 2,58 V · A3-Messpunkt (h15) ≈ 0,95 V (bei 56 kΩ).
 Stimmt ein Wert nicht: 12 V aus und die Löcher mit der Tabelle vergleichen.</p>
 
 <p>Farbcodes gelten für Metallschicht-Widerstände mit fünf Ringen (blauer Körper).
