@@ -85,6 +85,8 @@ async function tick(){
   cell('Iris',L.iris,' / 255')+
   cell('Iris volts',L.irisVolts,' V')+
   cell('Zoom volts',L.zoomVolts,' V')+
+  cell('Zoom',L.zoomVolts===undefined?undefined:focal(L.zoomVolts),'')+
+  cell('Iris',L.irisVolts===undefined?undefined:fstop(L.irisVolts),'')+
   cell('Focus volts',L.focusVolts,' V')+
   cell('Amp out (A3)',s.ampVolts,' V');
  const d=s.drive;
@@ -120,6 +122,18 @@ function fstop(v){
    return '\u2248 F'+(f>=10?f.toFixed(0):f.toFixed(1)) }
  }
  return '\u2248 F1.7';
+}
+// Zoom position (pin 10) -> focal length, same lens, same evening
+// (docs/b4/measurements/20261010-canon-j15ax8b4-zoom-scale.md).
+const ZSCALE=[[1.69,8],[3.32,15],[4.67,30],[5.69,60],[6.77,120]];
+function focal(v){
+ if(v===undefined) return '';
+ if(v<=ZSCALE[0][0]) return '\u2248 8 mm';
+ if(v>=ZSCALE[ZSCALE.length-1][0]) return '\u2248 120 mm';
+ for(let i=0;i<ZSCALE.length-1;i++){
+  const [v0,f0]=ZSCALE[i],[v1,f1]=ZSCALE[i+1];
+  if(v<=v1){ const k=(v-v0)/(v1-v0); return '\u2248 '+Math.round(Math.exp(Math.log(f0)+k*(Math.log(f1)-Math.log(f0))))+' mm' }
+ }
 }
 async function benchTick(){
  let s; try{ s=await (await fetch('/api/status')).json() }catch(e){ return }
