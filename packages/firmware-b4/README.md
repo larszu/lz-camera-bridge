@@ -117,6 +117,7 @@ Wiring, the two output ways and what is still unmeasured:
 | `POST /api/arm` | `{"armed": true\|false}` |
 | `POST /api/calibrate/point` · `/finish` · `/clear` | Recording the curve |
 | `GET /api/calibration.csv` · `/api/live.csv` | The artefacts worth keeping |
+| `POST /api/bench/dac` | `{"code": 0..4095}` — bench only: drive build, disarmed. Refused otherwise |
 
 The device speaks the bridge's 0–255 iris scale so that `B4LensClient` needs no
 conversion of its own. Turning that into a DAC code happens here, next to the
@@ -128,6 +129,15 @@ A host sending volts would be asserting a curve it cannot know.
 Send `s` over the USB serial port (115200 baud) and the device answers with one
 line: the same JSON as `/api/status`. That reads the lens on the bench without
 joining the access point.
+
+In a drive build (`env:*-armed`) and **only while disarmed**, `d<code>` followed
+by a newline writes DAC channel A directly (0–4095), bypassing the calibration
+table. It exists to sweep the amplifier with the lens off pin 5 and to move the
+iris open-loop on the bench. The web page has the same as a slider
+(`POST /api/bench/dac {"code": n}`), with the same refusals.
+
+`ampVolts` in the status is the amplifier output read back on ADS1115 A3, if a
+divider is fitted there; the firmware converts with the 100k/68k ratio.
 
 ## Layout
 
