@@ -123,6 +123,12 @@ conversion of its own. Turning that into a DAC code happens here, next to the
 calibration table — the only thing that knows the mapping for a particular lens.
 A host sending volts would be asserting a curve it cannot know.
 
+### USB console
+
+Send `s` over the USB serial port (115200 baud) and the device answers with one
+line: the same JSON as `/api/status`. That reads the lens on the bench without
+joining the access point.
+
 ## Layout
 
 | | |
