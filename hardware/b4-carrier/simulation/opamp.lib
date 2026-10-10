@@ -1,0 +1,6 @@
+* LM324-like single-supply op-amp (one section): gain 1e5, output swings from
+* ~0.02 V to V+ - 1.5 V, 10 ohm output resistance. Enough for DC behaviour.
+.subckt OPA inp inn out vcc vee
+B1 int 0 V = max(min(1e5*(V(inp)-V(inn)), V(vcc)-1.5), V(vee)+0.02)
+Ro int out 10
+.ends
