@@ -264,7 +264,7 @@ static String lensVolts(float counts) {
  * B4LensClient relies on that: it maps a missing iris to "no reading" and lets
  * the panel say so, rather than showing a closed iris that nobody observed.
  */
-static void handleStatus() {
+static String statusJson() {
   String j = "{";
   j += "\"firmware\":\"b4-lens-control/1\",";
   j += "\"uptimeMs\":" + String(millis()) + ",";
@@ -333,8 +333,20 @@ static void handleStatus() {
   if (lensName.known()) j += ",\"lensName\":\"" + String(lensName.name()) + "\"";
 #endif
   j += "}}";
+  return j;
+}
 
-  server.send(200, "application/json", j);
+static void handleStatus() { server.send(200, "application/json", statusJson()); }
+
+/**
+ * USB console: "s" prints the status document as one line, the same JSON as
+ * /api/status. Lets a bench host read the lens without joining the AP.
+ */
+static void serviceConsole() {
+  while (Serial.available() > 0) {
+    const int c = Serial.read();
+    if (c == 's' || c == 'S') Serial.println(statusJson());
+  }
 }
 
 /** Body parser for the two-field JSON this API accepts. No library needed. */
@@ -576,6 +588,7 @@ void setup() {
 
 void loop() {
   server.handleClient();
+  serviceConsole();
 #if B4_ENABLE_SERIAL_RX
   serviceSerial(); // every pass, not every LOOP_INTERVAL: the UART FIFO is 128 bytes
 #endif
