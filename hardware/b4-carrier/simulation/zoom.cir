@@ -1,0 +1,33 @@
+* Zoom stage as on the carrier board (LM324 B): difference amplifier on the
+* demand socket's own 5 V centre (pin 7). Lens pin 6 modelled as the grip's own
+* neutral 5.0 V behind RINT (unknown; swept). DAC C fixed at mid-scale.
+.include opamp.lib
+.param RINT=10k
+V9   v9 0 9
+VB   dacb 0 1.65
+VC   dacc 0 1.65
+Vri  zrefi 0 5.0
+Rref zrefi zref 1k      ; lens reference output impedance (assumed)
+R20  dacc zn 100k
+R21  zn zout 180k
+R22  dacb zp 100k
+R23  zp zref 180k
+X2 zp zn zout v9 0 OPA
+R24  zout zpin 1.2k
+Vneu zint 0 5.0
+Rint zint zpin {RINT}
+.control
+alterparam RINT=2200
+reset
+dc VB 0 3.3 0.05
+wrdata zoom_2k2.dat v(zpin) v(zout) v(zp)
+alterparam RINT=10000
+reset
+dc VB 0 3.3 0.05
+wrdata zoom_10k.dat v(zpin) v(zout) v(zp)
+alterparam RINT=47000
+reset
+dc VB 0 3.3 0.05
+wrdata zoom_47k.dat v(zpin) v(zout) v(zp)
+.endc
+.end

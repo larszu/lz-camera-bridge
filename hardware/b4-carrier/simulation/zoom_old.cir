@@ -1,0 +1,18 @@
+* The breadboard zoom stage (10.10.2026): offset from the 9 V divider row.
+* Stop drifts with the 9 V; sweep the 9 V at the stored stop code 1790.
+.include opamp.lib
+V9   v9 0 9
+VB   dacb 0 1.4425      ; code 1790 of 4095 at 3.3 V
+Raz  v9 zp 56k
+Rbz  dacb zp 10k
+R1z  zn 0 10k
+R2z  zout zn 6.8k
+X2 zp zn zout v9 0 OPA
+Rout zout zpin 1.2k
+Vneu zint 0 5.0
+Rint zint zpin 10k
+.control
+dc V9 8.4 9.6 0.1
+wrdata zoom_old.dat v(zpin) v(zout)
+.endc
+.end
