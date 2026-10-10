@@ -352,9 +352,33 @@ static void handleStatus() { server.send(200, "application/json", statusJson());
  * /api/status. Lets a bench host read the lens without joining the AP.
  */
 static void serviceConsole() {
+  static char line[12];
+  static uint8_t len = 0;
   while (Serial.available() > 0) {
     const int c = Serial.read();
-    if (c == 's' || c == 'S') Serial.println(statusJson());
+    if (len == 0 && (c == 's' || c == 'S')) { Serial.println(statusJson()); continue; }
+    if (c == '\n' || c == '\r') {
+      line[len] = 0;
+#if B4_ENABLE_IRIS_DRIVE
+      // Bench only: "d<code>" writes the DAC directly so the amplifier can be
+      // swept with the lens OFF pin 5. Refused while armed, so the control
+      // loop and this command never fight over the DAC.
+      if (len > 1 && (line[0] == 'd' || line[0] == 'D')) {
+        const long code = atol(line + 1);
+        if (drive.armed) Serial.println(F("{\"bench\":\"refused: armed\"}"));
+        else if (!health.dacPresent) Serial.println(F("{\"bench\":\"refused: no DAC\"}"));
+        else if (code < 0 || code > 4095) Serial.println(F("{\"bench\":\"refused: 0..4095\"}"));
+        else {
+          drive.dacCode = static_cast<uint16_t>(code);
+          dac.setChannelValue(static_cast<MCP4728_channel_t>(DAC_CH_IRIS), drive.dacCode);
+          Serial.printf("{\"bench\":\"ok\",\"dacCode\":%u}\n", drive.dacCode);
+        }
+      }
+#endif
+      len = 0;
+      continue;
+    }
+    if (len < sizeof(line) - 1) line[len++] = static_cast<char>(c);
   }
 }
 
