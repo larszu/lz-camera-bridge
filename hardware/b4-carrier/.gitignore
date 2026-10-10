@@ -1,0 +1,6 @@
+drc.json
+route.log
+*.dsn
+*.ses
+*.kicad_prl
+fp-info-cache
