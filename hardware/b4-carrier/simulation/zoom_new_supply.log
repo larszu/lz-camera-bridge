@@ -1,0 +1,18 @@
+Note: Starting dynamic gmin stepping
+Warning: Dynamic gmin stepping failed
+Note: Starting true gmin stepping
+Warning: True gmin stepping failed
+Note: Starting source stepping
+Note: Source stepping completed
+
+Note: No compatibility mode selected!
+
+
+Circuit: * new stage, same supply sweep: does the stop move with the 9 v?
+
+Doing analysis at TEMP = 27.000000 and TNOM = 27.000000
+
+Using SPARSE 1.3 as Direct Linear Solver
+
+No. of Data Rows : 13
+Note: Simulation executed from .control section 

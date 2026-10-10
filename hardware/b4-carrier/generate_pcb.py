@@ -39,7 +39,7 @@ FPROOT = "/Applications/KiCad/KiCad.app/Contents/SharedSupport/footprints/"
 FREEROUTING = os.path.join(HERE, "..", "..", ".tools", "freerouting.jar")
 JAVA = "/opt/homebrew/opt/openjdk/bin/java"
 
-W, H = 160.0, 100.0  # board, mm
+W, H = 184.0, 100.0  # board, mm
 
 
 def mm(v: float) -> int:
@@ -83,6 +83,7 @@ FOOT = {
     "S6": ("Connector_PinSocket_2.54mm", "PinSocket_1x06_P2.54mm_Vertical"),
     "S10": ("Connector_PinSocket_2.54mm", "PinSocket_1x10_P2.54mm_Vertical"),
     "S15": ("Connector_PinSocket_2.54mm", "PinSocket_1x15_P2.54mm_Vertical"),
+    "S20": ("Connector_PinSocket_2.54mm", "PinSocket_1x20_P2.54mm_Vertical"),
     "H2": ("Connector_PinHeader_2.54mm", "PinHeader_1x02_P2.54mm_Vertical"),
     "H3": ("Connector_PinHeader_2.54mm", "PinHeader_1x03_P2.54mm_Vertical"),
     "POT": ("Potentiometer_THT", "Potentiometer_Alps_RK09K_Single_Vertical"),
@@ -227,15 +228,17 @@ res("R16", "1k", "I_OUT", "IRIS_CTRL", 77, 77)
 cap("C12", "100nF", "I_P", "GND", 77, 81)
 
 # zoom and focus: Vout = REF + 1.8 * (V_ch - V_C); DAC C held at mid-scale.
-res("R20", "10k", "DAC_C", "Z_N", 60, 53)
-res("R21", "18k", "Z_N", "Z_OUT", 60, 57)
-res("R22", "10k", "DAC_B", "Z_P", 60, 61)
-res("R23", "18k", "Z_P", "ZREF", 60, 65)
+# 100k/180k rather than 10k/18k: SPICE showed 10k/18k loading the lens's 5 V
+# reference by ~0.1 V through an assumed 1 kOhm source (simulation/README.md).
+res("R20", "100k", "DAC_C", "Z_N", 60, 53)
+res("R21", "180k", "Z_N", "Z_OUT", 60, 57)
+res("R22", "100k", "DAC_B", "Z_P", 60, 61)
+res("R23", "180k", "Z_P", "ZREF", 60, 65)
 res("R24", "1.2k", "Z_OUT", "ZOOM_CTRL", 60, 69)
-res("R30", "10k", "DAC_C", "F_N", 60, 73)
-res("R31", "18k", "F_N", "F_OUT", 60, 77)
-res("R32", "10k", "DAC_D", "F_P", 60, 81)
-res("R33", "18k", "F_P", "FREF", 60, 85)
+res("R30", "100k", "DAC_C", "F_N", 60, 73)
+res("R31", "180k", "F_N", "F_OUT", 60, 77)
+res("R32", "100k", "DAC_D", "F_P", 60, 81)
+res("R33", "180k", "F_P", "FREF", 60, 85)
 res("R34", "1.2k", "F_OUT", "FOCUS_CTRL", 60, 89)
 
 # readback dividers 100k/68k (as on the bench) + 100 nF
@@ -295,6 +298,23 @@ text("ESP32 DEVKIT V1  USB ^", ESPX + 12, ESPY - 5.5, 1.0)
 outline(ESPX - 2.6, ESPY - 8.0, ESPX + 25.4 + 2.6, ESPY + 43.5, "ESP32 board (25.40 variant)")
 text("22.86 / 25.40 / 27.94", ESPX + 25, ESPY + 39, 0.8)
 
+# Waveshare ESP32-S3-ETH (with or without the PoE module, which sits on the
+# top side beside the RJ45): 2 x 20 pins, rows 17.78 mm apart, front (RJ45)
+# up, RJ45 end towards the top edge. Pin labels from Waveshare's drawing.
+S3X, S3Y = 161.0, 28.0
+s3l = ["IO20", "IO19", "GND", "IO48", "IO47", "IO46", "IO45", "GND", "IO42", "IO41",
+       "IO40", "IO39", "GND", "IO38", "IO37", "IO36", "IO35", "GND", "IO34", "IO33"]
+s3r = ["VBUS", "ESP_VIN", "GND", "3V3_EN", "3V3", "IO21", "SCL", "GND", "SDA", "IO18",
+       "RUN", "IO15", "GND", "POT_F", "POT_Z", "POT_I", "IO0", "GND", "IO44", "IO43"]
+place("J14", "S20", "S3-ETH IO20 row", S3X, S3Y, 0, {str(i + 1): n for i, n in enumerate(s3l) if n == "GND"},
+      note="ESP32-S3-ETH left row (IO20 ... IO33)")
+place("J15", "S20", "S3-ETH VBUS row", S3X + 17.78, S3Y, 0,
+      {str(i + 1): n for i, n in enumerate(s3r) if n in ("ESP_VIN", "GND", "SCL", "SDA", "POT_F", "POT_Z", "POT_I")},
+      note="ESP32-S3-ETH right row: VSYS <- 5 V, IO16 SDA, IO17 SCL, IO1/2/3 pots")
+outline(S3X - 1.6, S3Y - 20.0, S3X + 17.78 + 1.6, S3Y + 48.26 + 3.0, "ESP32-S3-ETH")
+text("ESP32-S3-ETH (+PoE)  RJ45 ^", S3X + 9, 6.0, 0.9)
+text("ONLY ONE ESP32 BOARD", 150, 64, 0.9)
+
 place("LED3", "LED", "blue", 103, 58, 0, {"1": "GND", "2": "STATLED"}, note="status, GPIO25")
 res("R53", "330", "LED_STAT", "STATLED", 108, 58)
 
@@ -303,11 +323,14 @@ place("RV1", "POT", "10k lin IRIS", 103.2, 85, 0, {"1": "A3V3", "2": "RV1W", "3"
 place("RV2", "POT", "10k lin ZOOM", 118, 85, 0, {"1": "A3V3", "2": "RV2W", "3": "GND"}, note="Alps RK09K with centre detent")
 place("JP2", "H3", "IRIS POT", 105, 75, 90, {"1": "RV1W", "2": "PI", "3": "EXT_I"}, note="1-2 on-board, 2-3 external")
 place("JP3", "H3", "ZOOM POT", 120, 75, 90, {"1": "RV2W", "2": "PZ", "3": "EXT_Z"}, note="1-2 on-board, 2-3 external")
+place("RV3", "POT", "10k lin FOCUS", 132.8, 85, 0, {"1": "A3V3", "2": "RV3W", "3": "GND"}, note="Alps RK09K")
+place("JP4", "H3", "FOCUS POT", 135, 75, 90, {"1": "RV3W", "2": "PF", "3": "EXT_F"}, note="1-2 on-board, 2-3 external")
+text("ONBOARD | EXT", 138, 72.5, 0.8)
 text("ONBOARD | EXT", 108, 72.5, 0.8)
 text("ONBOARD | EXT", 123, 72.5, 0.8)
 res("R50", "1k", "PI", "POT_I", 108, 62)
 res("R51", "1k", "PZ", "POT_Z", 108, 66)
-res("R52", "1k", "EXT_F", "POT_F", 108, 70)
+res("R52", "1k", "PF", "POT_F", 108, 70)
 cap("C20", "100nF", "POT_I", "GND", 120, 62)
 cap("C21", "100nF", "POT_Z", "GND", 120, 66)
 cap("C22", "100nF", "POT_F", "GND", 120, 70)

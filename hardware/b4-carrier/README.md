@@ -1,6 +1,6 @@
 # B4 lens carrier board v1
 
-A 160 × 100 mm two-layer carrier for the bench circuit in
+A 184 × 100 mm two-layer carrier for the bench circuit in
 [`docs/b4/iris-anleitung.html`](../../docs/b4/iris-anleitung.html): everything
 that was loose on two breadboards on 2026-10-10, on one board with plug-in
 modules and locking connectors.
@@ -24,10 +24,10 @@ the reviewable source. The stage formulas are in the table below.
 | 5 V | RECOM R-78E5.0-0.5 switcher → ESP32 VIN through 1N5819 | The ESP32's USB can stay plugged in |
 | 3.3 V (quiet) | LP2950CZ-3.3 from 5 V | DAC, ADC, OLED, pots and the iris offset, separate from the ESP32's noisy 3.3 V |
 | Op-amps | **LM324** in a socket | A: iris stage as on the bench. B: zoom. C: focus. D: unused, tied off |
-| Zoom / focus drive | Difference amplifier `Vout = REF + 1.8 · (V_B − V_C)`, REF = the demand socket's own 5 V centre (zoom socket pin 7) | "Stop" is now the lens's own reference when DAC B = DAC C, instead of a code that wandered 1270 … 1790 on the bench |
+| Zoom / focus drive | Difference amplifier `Vout = REF + 1.8 · (V_B − V_C)` with 100k/180k, REF = the demand socket's own 5 V centre (zoom socket pin 7); simulated in [`simulation/`](simulation/README.md) | "Stop" is now the lens's own reference when DAC B = DAC C, instead of a code that wandered 1270 … 1790 on the bench |
 | Readback | 100 k / 68 k + 100 nF into ADS1115 A0–A3 (iris position, zoom position, focus position, iris setpoint) | As measured on the bench |
-| Modules | ESP32 DevKit V1 (30 pin), Adafruit MCP4728, ADS1115 breakout, 0.96″ SSD1306 OLED — all on sockets | Swappable, and the DevKit's USB stays reachable |
-| Pots | Two on-board 10 k (Alps RK09K, iris and zoom), three JST-XH for external pots; jumpers JP2 / JP3 choose on-board or external | Bench test without anything plugged in |
+| Modules | **Either** ESP32 DevKit V1 (30 pin) **or** Waveshare ESP32-S3-ETH (with or without PoE module), Adafruit MCP4728, ADS1115 breakout, 0.96″ SSD1306 OLED — all on sockets | Swappable, and the DevKit's USB stays reachable |
+| Pots | Three on-board 10 k (Alps RK09K: iris, zoom, focus), three JST-XH for external pots; jumpers JP2 / JP3 / JP4 choose on-board or external | Bench test without anything plugged in |
 | Connectors | JST-XH, locking | Loose Dupont wires caused every fault on the bench |
 
 ## Connectors
@@ -48,6 +48,16 @@ rows. The 3V3 row (J10) is fixed; the VIN row is laid out three times (J11–J13
 three as overlapping courtyards — that is intended. Measure: centre of one pin
 row to the centre of the other.
 
+## Waveshare ESP32-S3-ETH instead of the DevKit
+
+J14 / J15: 2 × 20 pins, rows 17.78 mm apart, front side (RJ45) up, RJ45 end
+towards the top edge (Waveshare's dimension drawing). The optional PoE module
+plugs onto the 6-pin header on the top side, so it does not touch the carrier.
+Connections: VSYS ← 5 V (through D4), IO16 SDA, IO17 SCL, IO1 / IO2 / IO3 the
+iris / zoom / focus pots (camera-header pins — free while no camera is fitted).
+The lens still needs the board's 12 V; PoE only powers the ESP32 board.
+**Fit only one ESP32 board.**
+
 ## Firmware changes this board needs
 
 * Zoom: DAC C fixed at mid-scale (2048); zoom speed = DAC B − DAC C. The stored
@@ -55,7 +65,7 @@ row to the centre of the other.
   a safety net.
 * Focus: DAC D against DAC C, same scheme.
 * OLED: SSD1306 on the existing I²C bus (0x3C) — WLAN, IP, iris ≈ F, zoom ≈ mm.
-* Pots stay on GPIO 34 / 35 / 36.
+* Pots: DevKit GPIO 34 / 35 / 36, S3-ETH GPIO 1 / 2 / 3.
 
 ## Regenerate
 
@@ -88,3 +98,14 @@ module used on the bench — check yours.
 2. Check the ESP32 row width on your DevKit.
 3. Order 2-layer, 1.6 mm, HASL, with **SMT assembly for J1, U1, R1, C1 only**
    (USB-C, CH224A and its two parts); everything else is through-hole.
+
+## Ideas for v2 (not on this board)
+
+* **Outputs off at power-up:** an analog switch (e.g. 74HC4066) in pin 5 and the
+  zoom/focus lines, enabled by the firmware once the DAC holds sane values — no
+  twitch while the ESP32 boots.
+* **Lens current monitor** (INA219 on the I²C bus): a jammed servo or a short
+  shows up as current, not as a burnt polyfuse.
+* **VTR / RET buttons** to the lens via PC817 optocouplers (in stock).
+* **ESD protection** (TVS array) on every line that leaves the board.
+* A **touch panel** as a separate device using the HTTP API (see the B4 docs).
