@@ -170,3 +170,13 @@ line that sits at 5 V and deflects with the rocker) points to a **speed**
 control on pin 6. Not yet shown: whether pin 6 is an input that accepts an
 external voltage, and whether one of the 0 V pins is a demand-detect line.
 Free drive hardware on the bench: MCP4728 VB and LM358 half B.
+
+### Zoom drive, first run (2026-10-10, evening)
+
+Bench stage as in the guide (Aufbau 3), 1.2 kΩ into pin 6. With the design stop
+code 2360 the zoom ran to the wide end as soon as the grip rocker was released.
+Lars found the stop by hand at **DAC code ≈ 1270**; above it the zoom runs
+towards wide, below it towards tele, faster the further from 1270. Stored with
+`n1270` (NVS + DAC EEPROM). The stage output at 1270 is ≈ 3.75 V by design —
+the lens input loads it, so "stop" is not simply 5.0 V at the op-amp. The grip
+rocker still works alongside.

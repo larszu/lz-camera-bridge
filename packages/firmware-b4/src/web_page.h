@@ -150,7 +150,7 @@ async function benchTick(){
  if(!s.driveCompiledIn) $('#benchn').textContent='Safe build: drive not compiled in.';
  else if(s.armed) $('#benchn').textContent='Armed: use the calibrated slider above.';
 }
-let zNull=2360, zHeld=false, zTimer=null;
+let zNull=1270, zHeld=false, zTimer=null;
 function zCode(p){ return Math.round(p<0? zNull+p/100*zNull : zNull+p/100*(4095-zNull)) }
 function zSend(){ fetch('/api/zoom',{method:'POST',body:JSON.stringify({code:zCode(+$('#zs').value)})}) }
 function zStart(){ zHeld=true; clearInterval(zTimer); zSend(); zTimer=setInterval(zSend,150) }
