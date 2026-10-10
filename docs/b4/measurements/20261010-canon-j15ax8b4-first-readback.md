@@ -6,7 +6,8 @@ from other people's work or the simulator.
 ## Conditions
 
 - **Lens:** Canon J15ax8B4 IRS SX12. Serial not noted. Extender: not noted.
-- **Connected:** lab supply 12 V (limit 1.0 A) on Hirose pin 6, GND on pin 3.
+- **Connected:** USB-C PD trigger board (12 V setting, **no current limit**,
+  output voltage not measured) on Hirose pin 6, GND on pin 3.
   Pins 7 / 10 / 11 to ADS1115 A0 / A1 / A2, each through 100 kΩ / 68 kΩ.
   Pin 4, 5, 8, 12 open. **No camera.** MCP4728 not fitted.
 - **Instrument:** ADS1115 (`0x48`) on an ESP32-DevKit, firmware
