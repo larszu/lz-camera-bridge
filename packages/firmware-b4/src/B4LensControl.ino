@@ -451,8 +451,13 @@ static void serviceZoomHold(bool havePos, float posVolts) {
   // A higher code drives towards wide (lower pin-10 volts), so creep towards
   // tele is answered with a higher code.
   zoomTrim += ZOOM_HOLD_GAIN * err;
-  if (zoomTrim > ZOOM_HOLD_TRIM_MAX) zoomTrim = ZOOM_HOLD_TRIM_MAX;
-  if (zoomTrim < -ZOOM_HOLD_TRIM_MAX) zoomTrim = -ZOOM_HOLD_TRIM_MAX;
+  if (fabsf(zoomTrim) >= ZOOM_HOLD_TRIM_MAX) {
+    // The correction ran to its limit without the zoom following: the drive is
+    // not connected or the stop is far off. Give up instead of storing nonsense.
+    zoomTrim = 0;
+    zoomTarget = NAN;
+    zoomHoldPausedUntil = now + 60000;
+  }
   zoomCode = zoomStop();
   dac.setChannelValue(static_cast<MCP4728_channel_t>(DAC_CH_ZOOM), zoomCode);
 #endif
@@ -463,7 +468,7 @@ static void serviceZoomPersist() {
   const uint32_t now = millis();
   if (now - zoomLastPersistMs < ZOOM_HOLD_PERSIST_MS) return;
   zoomLastPersistMs = now;
-  if (isnan(zoomTarget) || fabsf(zoomTrim) < 10) return;
+  if (isnan(zoomTarget) || fabsf(zoomTrim) < 10 || fabsf(zoomTrim) > ZOOM_HOLD_TRIM_MAX / 2) return;
   const long n = lroundf(zoomNull + zoomTrim);
   zoomNull = static_cast<uint16_t>(n < 0 ? 0 : n > 4095 ? 4095 : n);
   zoomTrim = 0;
