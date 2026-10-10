@@ -105,13 +105,30 @@ $('#bd').addEventListener('input',e=>{
  if(now-lastSent>120){ lastSent=now; sendBench(v) } else pend=setTimeout(()=>sendBench(v),130);
 });
 $('#bd').addEventListener('change',e=>sendBench(e.target.value));
+// Iris voltage (pin 7) -> F-number. Measured on the Canon J15ax8B4 IRS SX12,
+// 2026-10-10 (docs/b4/measurements/20261010-canon-j15ax8b4-fstop-scale.md).
+// Another lens has another curve; this is an orientation, not a calibration.
+const FSCALE=[[2.98,16],[3.51,11],[4.09,8],[4.75,5.6],[5.20,4],[5.75,2.8],[6.46,1.7]];
+function fstop(v){
+ if(v===undefined) return '';
+ if(v<2.3) return 'C (zu)';
+ if(v<FSCALE[0][0]) return '\u2248 F16\u2013C';
+ if(v>=6.6) return 'offen (> F1.7)';
+ for(let i=0;i<FSCALE.length-1;i++){
+  const [v0,f0]=FSCALE[i],[v1,f1]=FSCALE[i+1];
+  if(v<=v1){ const k=(v-v0)/(v1-v0), f=Math.exp(Math.log(f0)+k*(Math.log(f1)-Math.log(f0)));
+   return '\u2248 F'+(f>=10?f.toFixed(0):f.toFixed(1)) }
+ }
+ return '\u2248 F1.7';
+}
 async function benchTick(){
  let s; try{ s=await (await fetch('/api/status')).json() }catch(e){ return }
  const ok=s.driveCompiledIn && !s.armed && s.i2c.dac, b=$('#bd');
  b.disabled=!ok;
  if(!dragging) b.value=s.drive.dacCode;
  const vdac=3.3*b.value/4095;
- $('#benchk').textContent=`Bench drive \u2014 DAC ${b.value} (${vdac.toFixed(2)} V)`+(s.ampVolts!==undefined?` \u2014 pin 5 \u2248 ${s.ampVolts} V (A3 reading)`:'');
+ $('#benchk').textContent=`Bench drive \u2014 DAC ${b.value} (${vdac.toFixed(2)} V)`+(s.ampVolts!==undefined?` \u2014 pin 5 \u2248 ${s.ampVolts} V (A3 reading)`:'')+
+  (s.lens&&s.lens.irisVolts!==undefined?` \u2014 Iris ${fstop(s.lens.irisVolts)} (pin 7 ${s.lens.irisVolts} V)`:'');
  if(!s.driveCompiledIn) $('#benchn').textContent='Safe build: drive not compiled in.';
  else if(s.armed) $('#benchn').textContent='Armed: use the calibrated slider above.';
 }
