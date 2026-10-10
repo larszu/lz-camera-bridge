@@ -63,12 +63,12 @@ antwortet. Stand 08.10.: nichts (Module noch nicht gesteckt).
 Jeder Eingang über Teiler **100 kΩ (oben) / 68 kΩ (unten)** (ARIB verlangt ≥ 20 kΩ Last an Pin 7; optional 10–100 nF am ADC-Eingang); 7,0 V am
 Objektiv → 2,83 V am ADC.
 
-| ADS-Eingang | Hirose-Pin | Signal |
-|---|---|---|
-| A0 | 7 | Iris-Position |
-| A1 | 10 | Zoom-Position |
-| A2 | 11 | Fokus-Position (Gruppe C) |
-| A3 | — | Op-Amp-Ausgang (Kontrolle, optional) |
+| ADS-Eingang | Hirose-Pin | Signal | Ader (Bank) |
+|---|---|---|---|
+| A0 | 7 | Iris-Position | grün |
+| A1 | 10 | Zoom-Position | weiß |
+| A2 | 11 | Fokus-Position (Gruppe C) | blau |
+| A3 | — | Op-Amp-Ausgang (Kontrolle, optional) | — |
 
 Gemessene Widerstandswerte in `config.h` eintragen (`DIVIDER_R_TOP_OHM`,
 `DIVIDER_R_BOTTOM_OHM`).
@@ -92,17 +92,17 @@ Von der falschen Seite gezählt sind Pin 3 (GND) und Pin 6 (+12 V) vertauscht �
 so beim Bankaufbau am 10.10.2026 verwechselt. Pin 3 vor dem Einschalten per
 Durchgang gegen das Gehäuse bestätigen.
 
-| Pin | Signal | Verbunden mit |
-|---|---|---|
-| 3 | GND | gemeinsame Masse (ESP32, Module, Netzteil) |
-| 4 | Forced Iris Servo (Tastenfunktion, kein Enable) | **offen lassen** |
-| 5 | Iris-Sollwert | Op-Amp-Ausgang über 1 kΩ — **erst Schritt 5 der Inbetriebnahme** |
-| 6 | **+12 V** (Norm: 10–17 V) | Labornetzteil 12 V, **Strombegrenzung 1,0 A**, Polarität doppelt prüfen; 9-V-Regler für den Op-Amp. **Nie an ESP32 oder Module** |
-| 7 | Iris-Position | Teiler → ADS1115 A0 |
-| 8 | Iris Remote/Auto | 5 V über **1 kΩ** (Remote); offen = Auto |
-| 10 | Zoom-Position | Teiler → ADS1115 A1 |
-| 11 | Fokus-Position | Teiler → ADS1115 A2 |
-| 12 | seriell (Gruppe B) | nicht verbunden |
+| Pin | Signal | Verbunden mit | Ader (Bank) |
+|---|---|---|---|
+| 3 | GND | gemeinsame Masse (ESP32, Module, Netzteil) | schwarz → Breadboard − |
+| 4 | Forced Iris Servo (Tastenfunktion, kein Enable) | **offen lassen** | — |
+| 5 | Iris-Sollwert | Op-Amp-Ausgang über 1 kΩ — **erst Schritt 5 der Inbetriebnahme** | — |
+| 6 | **+12 V** (Norm: 10–17 V) | Labornetzteil 12 V, **Strombegrenzung 1,0 A**, Polarität doppelt prüfen; 9-V-Regler für den Op-Amp. **Nie an ESP32 oder Module** | rot → Breadboard + |
+| 7 | Iris-Position | Teiler → ADS1115 A0 | grün |
+| 8 | Iris Remote/Auto | 5 V über **1 kΩ** (Remote); offen = Auto | — |
+| 10 | Zoom-Position | Teiler → ADS1115 A1 | weiß |
+| 11 | Fokus-Position | Teiler → ADS1115 A2 | blau |
+| 12 | seriell (Gruppe B) | nicht verbunden | — |
 
 Am Objektiv: für die Steuerung Iris-Schalter auf **A**, sonst ignoriert es Pin 5.
 **Den Irisring nur in M von Hand drehen** — Canon warnt, dass Drehen in A das
