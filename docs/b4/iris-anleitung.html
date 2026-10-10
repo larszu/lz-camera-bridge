@@ -88,6 +88,10 @@ tr{ break-inside:avoid; }
   <p>Auf Pin 6 liegen 12 V. Die GPIOs des ESP32 vertragen 3,3 V und sind nicht
   5-V-tolerant. Ein verrutschter Draht kostet den Chip, ein falsch belegter
   Steuerpin die Servoelektronik der Optik.</p>
+  <p><strong>Die Nummerierung an der Buchse läuft spiegelverkehrt zum Stecker.</strong>
+  Wer die Pins von der falschen Seite abzählt, hält Pin 3 für Pin 6 und legt
+  12 V auf Masse. Vor dem ersten Einschalten Pin 3 per Durchgangsprüfung gegen
+  das Gehäuse bestätigen.</p>
 </div>
 
 <h2>Was gebraucht wird</h2>
@@ -117,6 +121,7 @@ hat ≥ 100 kΩ Eingangswiderstand, Pin 6 liefert laut Norm 10–17 V. Quellen:
 <p>Das entscheidet den größten Teil des Vorhabens, kostet nichts und braucht nur
 ein Multimeter.</p>
 <ul>
+<li>Pin 3 und Pin 6 ohne Spannung per Durchgang identifizieren: Pin 3 piept gegen das Gehäuse. An der Buchse ist die Zählung gespiegelt.</li>
 <li>Optik an 12 V auf Pin 6 gegen Pin 3. Sonst nichts angeschlossen. Der Servo ist hörbar.</li>
 <li>Pin 11 gegen Masse messen und dabei den <strong>Fokusring</strong> durchdrehen.</li>
 </ul>

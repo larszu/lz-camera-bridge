@@ -22,13 +22,19 @@
 +12 V. Label that wire before you label any other, and keep it out of the
 breadboard row that feeds anything.
 
+**The socket is numbered mirror-image to the plug.** Counting from the wrong
+side swaps pin 3 and pin 6, so 12 V lands on ground. The mix-up happened on the
+bench (2026-10-10). Before powering anything, confirm pin 3 by continuity to
+the connector shell or lens housing.
+
 ---
 
 ## 1. First: which group is your lens?
 
 This decides most of the project, costs nothing, and needs only a multimeter.
 
-1. Power the lens from 12 V on **pin 6** against **pin 3** (GND). Nothing else
+1. Without power, confirm **pin 3** by continuity to the housing (see the
+   mirrored-socket warning above). Then power the lens from 12 V on **pin 6** against **pin 3** (GND). Nothing else
    connected. The servo should be audible.
 2. Measure **pin 11** against ground while turning the **focus ring**.
 

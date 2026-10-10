@@ -87,6 +87,11 @@ dann **1 kΩ in Serie** zu Pin 5.
 
 ## Hirose 12-Pin (Objektiv)
 
+**Achtung:** An der Buchse läuft die Nummerierung spiegelverkehrt zum Stecker.
+Von der falschen Seite gezählt sind Pin 3 (GND) und Pin 6 (+12 V) vertauscht —
+so beim Bankaufbau am 10.10.2026 verwechselt. Pin 3 vor dem Einschalten per
+Durchgang gegen das Gehäuse bestätigen.
+
 | Pin | Signal | Verbunden mit |
 |---|---|---|
 | 3 | GND | gemeinsame Masse (ESP32, Module, Netzteil) |
