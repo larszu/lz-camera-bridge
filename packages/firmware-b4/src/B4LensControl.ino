@@ -94,7 +94,9 @@ static uint32_t zoomHoldPausedUntil = 0, zoomLastHoldMs = 0;
 static uint32_t zoomLastPersistMs = 0;
 static const char *benchSetDac(long code);
 static const char *zoomSet(long code);
-static bool potsEnabled = false;
+static uint8_t potsMask = 0;   // bit 0 iris, bit 1 zoom, bit 2 focus
+#define POT_IRIS_ON (potsMask & 1)
+#define POT_ZOOM_ON (potsMask & 2)
 static float potIris = NAN, potZoom = NAN, potFocus = NAN;
 static int potIrisApplied = -1000;
 static bool potZoomActive = false;
@@ -359,7 +361,9 @@ static String statusJson() {
   j += ",\"zoom\":{\"code\":" + String(zoomCode) + ",\"null\":" + String(zoomStop()) +
        ",\"stored\":" + String(zoomNull) + ",\"trim\":" + String(zoomTrim, 1) +
        ",\"holding\":" + String(isnan(zoomTarget) ? "false" : "true") + "}";
-  j += ",\"pots\":{\"enabled\":" + String(potsEnabled ? "true" : "false") +
+  j += ",\"pots\":{\"irisOn\":" + String(potsMask & 1 ? "true" : "false") +
+       ",\"zoomOn\":" + String(potsMask & 2 ? "true" : "false") +
+       ",\"focusOn\":" + String(potsMask & 4 ? "true" : "false") +
        ",\"iris\":" + String(isnan(potIris) ? 0 : (int)potIris) +
        ",\"zoom\":" + String(isnan(potZoom) ? 0 : (int)potZoom) +
        ",\"focus\":" + String(isnan(potFocus) ? 0 : (int)potFocus) + "}";
@@ -469,12 +473,12 @@ static void serviceZoomPersist() {
   zp.end();
 }
 
-static void setPotsEnabled(bool on) {
-  potsEnabled = on;
+static void setPotsMask(uint8_t m) {
+  potsMask = m & 7;
   potIrisApplied = -1000;
   Preferences pp;
   pp.begin("b4pots", false);
-  pp.putBool("on", on);
+  pp.putUChar("mask", potsMask);
   pp.end();
 }
 
@@ -487,13 +491,12 @@ static void servicePots() {
   rd(POT_PIN_IRIS, potIris);
   rd(POT_PIN_ZOOM, potZoom);
   rd(POT_PIN_FOCUS, potFocus);
-  if (!potsEnabled) return;
 #if B4_ENABLE_IRIS_DRIVE
-  if (!drive.armed && fabsf(potIris - potIrisApplied) >= POT_IRIS_STEP) {
+  if (POT_IRIS_ON && !drive.armed && fabsf(potIris - potIrisApplied) >= POT_IRIS_STEP) {
     potIrisApplied = static_cast<int>(potIris);
     benchSetDac(potIrisApplied);
   }
-  const float off = potZoom - 2048.0f;
+  const float off = POT_ZOOM_ON ? potZoom - 2048.0f : 0.0f;
   if (fabsf(off) > POT_ZOOM_DEADBAND) {
     // Pot above centre -> tele (lower code), below -> wide (higher code).
     const float k = (fabsf(off) - POT_ZOOM_DEADBAND) / (2048.0f - POT_ZOOM_DEADBAND);
@@ -509,10 +512,14 @@ static void servicePots() {
 }
 
 static void handlePots() {
-  bool on = false;
-  if (!jsonBool(server.arg("plain"), "enabled", on)) return refuse(400, "need enabled");
-  setPotsEnabled(on);
-  server.send(200, "application/json", String("{\"ok\":true,\"enabled\":") + (on ? "true" : "false") + "}");
+  const String b = server.arg("plain");
+  uint8_t m = potsMask;
+  bool v;
+  if (jsonBool(b, "iris", v)) m = v ? (m | 1) : (m & ~1);
+  if (jsonBool(b, "zoom", v)) m = v ? (m | 2) : (m & ~2);
+  if (jsonBool(b, "focus", v)) m = v ? (m | 4) : (m & ~4);
+  setPotsMask(m);
+  server.send(200, "application/json", String("{\"ok\":true,\"mask\":") + potsMask + "}");
 }
 
 static void handleZoom() {
@@ -570,9 +577,16 @@ static void serviceConsole() {
     if (len == 0 && (c == 's' || c == 'S')) { Serial.println(statusJson()); continue; }
     if (c == '\n' || c == '\r') {
       line[len] = 0;
-      if (len == 2 && (line[0] == 'p' || line[0] == 'P') && (line[1] == '0' || line[1] == '1')) {
-        setPotsEnabled(line[1] == '1');
-        Serial.printf("{\"pots\":%s}\n", potsEnabled ? "true" : "false");
+      // Pots: "p0"/"p1" all, "pi1" "pz0" "pf1" one axis (iris, zoom, focus).
+      if (len >= 2 && (line[0] == 'p' || line[0] == 'P')) {
+        if (len == 2 && (line[1] == '0' || line[1] == '1')) setPotsMask(line[1] == '1' ? 7 : 0);
+        else if (len == 3 && (line[2] == '0' || line[2] == '1')) {
+          const uint8_t bit = line[1] == 'i' ? 1 : line[1] == 'z' ? 2 : line[1] == 'f' ? 4 : 0;
+          if (bit) setPotsMask(line[2] == '1' ? (potsMask | bit) : (potsMask & ~bit));
+        }
+        Serial.printf("{\"pots\":{\"iris\":%s,\"zoom\":%s,\"focus\":%s}}\n",
+                      potsMask & 1 ? "true" : "false", potsMask & 2 ? "true" : "false",
+                      potsMask & 4 ? "true" : "false");
       }
       // Zoom: "z<code>" speed (dead-man, repeat to keep moving), "n<code>" store stop.
       if (len > 1 && (line[0] == 'z' || line[0] == 'Z')) {
@@ -807,7 +821,9 @@ void setup() {
     {
       Preferences pp;
       pp.begin("b4pots", true);
-      potsEnabled = pp.getBool("on", false);
+      // Older firmware stored one flag for all pots; it maps to iris only, so
+      // an unplugged zoom input can never start the zoom after an update.
+      potsMask = pp.getUChar("mask", pp.getBool("on", false) ? 1 : 0);
       pp.end();
     }
     analogSetPinAttenuation(POT_PIN_IRIS, ADC_11db);
