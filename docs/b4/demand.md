@@ -147,9 +147,26 @@ Underside of the drive unit, top to bottom:
 | 12-pin Hirose, **white insert** | For an **add-on focus motor module** — not zoom | Lars, 2026-10-10 |
 | Round, capped | not identified | — |
 
-Measured on the black socket so far: one pin follows the zoom position and stays
-there — ≈ 2 V at wide, ≈ 7 V at tele (same curve as 12-pin pin 10). That is an
-**output** (position), not the control input. Which hole it is and what the other
-pins carry is still open; the hobby pinout for the 8-pin (A 2.5 V tele end,
-B 7.5 V wide end, C/D 5 V, E/G GND, F record, H return) is unconfirmed.
+Measured on the black socket, 2026-10-10 — lens on 12 V, grip on SERVO, each
+hole against GND with a multimeter, numbered as in the HR10 face view of the
+guide (key up, outer ring 1–9 clockwise, then the three inner). It is a
+**12-hole** insert, not 8.
+
+| Pin | At rest | While zooming with the grip rocker | Reading |
+|---|---|---|---|
+| 1 | 0 V | 0 V | GND or switch line |
+| 2 | 0 V | 0 V | GND or switch line |
+| 3 | ≈ 8 V | constant | upper reference |
+| 4 | ≈ 2 V | constant | lower reference |
+| 5 | 0 V | 0 V | GND or switch line |
+| 6 | ≈ 5 V | jumps to ≈ 6 V or below 5 V when zooming fast | **zoom control, speed — candidate** |
+| 7 | 5.0 V | constant | centre reference (stop) |
+| 8 | 12 V | constant | supply for a demand |
+| 9 | 2 V wide … 7 V tele | follows zoom, stays | **zoom position** (output) |
+| 10–12 (inner) | 0 V | 0 V | GND or switch lines |
+
+Not the Fujinon pinout. The pattern (2/8 V references around a 5 V centre, a
+line that sits at 5 V and deflects with the rocker) points to a **speed**
+control on pin 6. Not yet shown: whether pin 6 is an input that accepts an
+external voltage, and whether one of the 0 V pins is a demand-detect line.
 Free drive hardware on the bench: MCP4728 VB and LM358 half B.
