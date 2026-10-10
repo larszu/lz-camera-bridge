@@ -64,6 +64,10 @@ static void handleRoot() {
 <div class="card"><div class="k" id="benchk">Bench drive</div>
 <input type=range min=0 max=4095 value=0 id="bd" disabled>
 <div class="sub" id="benchn">Sets the DAC directly, no calibration. Drive build only, refused while armed.</div></div>
+<h2 style="font-size:15px">Zoom</h2>
+<div class="card"><div class="k" id="zoomk">Zoom speed</div>
+<input type=range min=-100 max=100 value=0 id="zs">
+<div class="sub">Hold to zoom, let go to stop. Left = one direction, right = the other. Stops by itself 0.4 s after the last command.</div></div>
 <div class="warn">Every electrical figure this device reports rests on a divider
 ratio you entered in <code>config.h</code>. It is measuring, not certifying.</div>
 <h2 style="font-size:15px">Calibration</h2>
@@ -146,7 +150,21 @@ async function benchTick(){
  if(!s.driveCompiledIn) $('#benchn').textContent='Safe build: drive not compiled in.';
  else if(s.armed) $('#benchn').textContent='Armed: use the calibrated slider above.';
 }
-tick(); setInterval(tick,500); benchTick(); setInterval(benchTick,500);
+let zNull=2360, zHeld=false, zTimer=null;
+function zCode(p){ return Math.round(p<0? zNull+p/100*zNull : zNull+p/100*(4095-zNull)) }
+function zSend(){ fetch('/api/zoom',{method:'POST',body:JSON.stringify({code:zCode(+$('#zs').value)})}) }
+function zStart(){ zHeld=true; clearInterval(zTimer); zSend(); zTimer=setInterval(zSend,150) }
+function zStop(){ zHeld=false; clearInterval(zTimer); $('#zs').value=0; fetch('/api/zoom',{method:'POST',body:JSON.stringify({code:zNull})}) }
+$('#zs').addEventListener('pointerdown',zStart);
+$('#zs').addEventListener('input',()=>{ if(!zHeld) zStart() });
+['pointerup','pointercancel','pointerleave','blur'].forEach(e=>$('#zs').addEventListener(e,()=>{ if(zHeld) zStop() }));
+async function zoomTick(){
+ let s; try{ s=await (await fetch('/api/status')).json() }catch(e){ return }
+ if(s.zoom){ zNull=s.zoom.null }
+ const L=s.lens||{};
+ $('#zoomk').textContent='Zoom speed'+(s.zoom?` \u2014 code ${s.zoom.code} (stop ${s.zoom.null})`:'')+(L.zoomVolts!==undefined?` \u2014 ${focal(L.zoomVolts)}`:'');
+}
+tick(); setInterval(tick,500); benchTick(); setInterval(benchTick,500); zoomTick(); setInterval(zoomTick,500);
 </script>
 )HTML";
   server.send_P(200, "text/html", PAGE);

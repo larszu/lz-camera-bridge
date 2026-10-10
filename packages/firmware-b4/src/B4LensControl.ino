@@ -40,6 +40,7 @@
 #include <WebServer.h>
 #include <Adafruit_ADS1X15.h>
 #include <Adafruit_MCP4728.h>
+#include <Preferences.h>
 
 #include "config.h"
 #include "analog_filter.h"
@@ -81,6 +82,11 @@ WebServer server(HTTP_PORT);
 Adafruit_ADS1115 ads;
 Adafruit_ADS1115 adsDemand; // second chip, 0x49 — demands (phase 4)
 Adafruit_MCP4728 dac;
+
+// Zoom speed channel. zoomNull is the code that holds the zoom still.
+static uint16_t zoomNull = ZOOM_NULL_DEFAULT;
+static uint16_t zoomCode = ZOOM_NULL_DEFAULT;
+static uint32_t zoomLastCmdMs = 0;
 Calibration cal;
 
 AnalogFilter fIris(ADC_EMA_ALPHA, ADC_DEADBAND_COUNTS);
@@ -335,6 +341,7 @@ static String statusJson() {
   if (drive.fault) j += ",\"fault\":\"" + String(drive.fault) + "\"";
   j += "}";
 
+  j += ",\"zoom\":{\"code\":" + String(zoomCode) + ",\"null\":" + String(zoomNull) + "}";
   j += ",\"serial\":{\"rxCompiledIn\":" + String(B4_ENABLE_SERIAL_RX ? "true" : "false") +
        ",\"txCompiledIn\":" + String(B4_ENABLE_SERIAL_TX ? "true" : "false");
 #if B4_ENABLE_SERIAL_RX
@@ -346,6 +353,66 @@ static String statusJson() {
 }
 
 static void handleStatus() { server.send(200, "application/json", statusJson()); }
+
+/**
+ * Zoom speed: code 0..4095 on channel B; zoomNull is stop. Every command
+ * refreshes the dead-man timer; loop() returns to stop when it runs out.
+ */
+static const char *zoomSet(long code) {
+#if !B4_ENABLE_IRIS_DRIVE
+  // The safe build moves nothing — not the iris, not the zoom. It only holds stop.
+  (void)code;
+  return "drive not compiled in";
+#endif
+  if (!health.dacPresent) return "no DAC";
+  if (code < 0 || code > 4095) return "0..4095";
+  zoomCode = static_cast<uint16_t>(code);
+  zoomLastCmdMs = millis();
+  dac.setChannelValue(static_cast<MCP4728_channel_t>(DAC_CH_ZOOM), zoomCode);
+  return nullptr;
+}
+
+/** Store a new stop code: NVS for the firmware, DAC EEPROM for power-up. */
+static const char *zoomSetNull(long code) {
+  if (!health.dacPresent) return "no DAC";
+  if (code < 0 || code > 4095) return "0..4095";
+  zoomNull = static_cast<uint16_t>(code);
+  Preferences zp;
+  zp.begin("b4zoom", false);
+  zp.putUShort("null", zoomNull);
+  zp.end();
+  // The EEPROM takes all four channels as they are now: iris at 0, zoom at stop.
+  dac.setChannelValue(static_cast<MCP4728_channel_t>(DAC_CH_IRIS), 0);
+  drive.dacCode = 0;
+  zoomCode = zoomNull;
+  dac.setChannelValue(static_cast<MCP4728_channel_t>(DAC_CH_ZOOM), zoomNull);
+  if (!dac.saveToEEPROM()) return "EEPROM write failed";
+  return nullptr;
+}
+
+static void serviceZoomDeadman() {
+  if (zoomCode != zoomNull && millis() - zoomLastCmdMs > ZOOM_DEADMAN_MS) {
+    zoomCode = zoomNull;
+    if (health.dacPresent)
+      dac.setChannelValue(static_cast<MCP4728_channel_t>(DAC_CH_ZOOM), zoomNull);
+  }
+}
+
+static void handleZoom() {
+  long code = 0;
+  if (!jsonNumber(server.arg("plain"), "code", code)) return refuse(400, "need code");
+  const char *why = zoomSet(code);
+  if (why) return refuse(409, why);
+  server.send(200, "application/json", String("{\"ok\":true,\"zoomCode\":") + zoomCode + "}");
+}
+
+static void handleZoomNull() {
+  long code = 0;
+  if (!jsonNumber(server.arg("plain"), "code", code)) return refuse(400, "need code");
+  const char *why = zoomSetNull(code);
+  if (why) return refuse(409, why);
+  server.send(200, "application/json", String("{\"ok\":true,\"zoomNull\":") + zoomNull + "}");
+}
 
 /**
  * Bench: write the DAC directly, bypassing the calibration table. Only in a
@@ -386,6 +453,17 @@ static void serviceConsole() {
     if (len == 0 && (c == 's' || c == 'S')) { Serial.println(statusJson()); continue; }
     if (c == '\n' || c == '\r') {
       line[len] = 0;
+      // Zoom: "z<code>" speed (dead-man, repeat to keep moving), "n<code>" store stop.
+      if (len > 1 && (line[0] == 'z' || line[0] == 'Z')) {
+        const char *why = zoomSet(atol(line + 1));
+        if (why) Serial.printf("{\"zoom\":\"refused: %s\"}\n", why);
+        else Serial.printf("{\"zoom\":\"ok\",\"zoomCode\":%u}\n", zoomCode);
+      }
+      if (len > 1 && (line[0] == 'n' || line[0] == 'N')) {
+        const char *why = zoomSetNull(atol(line + 1));
+        if (why) Serial.printf("{\"zoomNull\":\"refused: %s\"}\n", why);
+        else Serial.printf("{\"zoomNull\":%u}\n", zoomNull);
+      }
       // Bench only: "d<code>" writes the DAC directly (see benchSetDac).
       if (len > 1 && (line[0] == 'd' || line[0] == 'D')) {
         const char *why = benchSetDac(atol(line + 1));
@@ -516,6 +594,8 @@ static void setupRoutes() {
   server.on("/api/iris", HTTP_POST, handleSetIris);
   server.on("/api/arm", HTTP_POST, handleArm);
   server.on("/api/bench/dac", HTTP_POST, handleBenchDac);
+  server.on("/api/zoom", HTTP_POST, handleZoom);
+  server.on("/api/zoom/null", HTTP_POST, handleZoomNull);
   server.on("/api/calibrate/point", HTTP_POST, handleCalPoint);
   server.on("/api/calibrate/finish", HTTP_POST, handleCalFinish);
   server.on("/api/calibrate/clear", HTTP_POST, handleCalClear);
@@ -595,7 +675,15 @@ void setup() {
   health.dacPresent = i2cPresent(ADDR_MCP4728) && dac.begin(ADDR_MCP4728);
   if (health.dacPresent) {
     dac.setChannelValue(static_cast<MCP4728_channel_t>(DAC_CH_IRIS), 0);
-    Serial.println(F("MCP4728 ready, parked at 0."));
+    {
+      Preferences zp;
+      zp.begin("b4zoom", true);
+      zoomNull = zp.getUShort("null", ZOOM_NULL_DEFAULT);
+      zp.end();
+    }
+    zoomCode = zoomNull;
+    dac.setChannelValue(static_cast<MCP4728_channel_t>(DAC_CH_ZOOM), zoomNull);
+    Serial.printf("MCP4728 ready, iris parked at 0, zoom held at stop %u.\n", zoomNull);
   } else {
     Serial.println(F("MCP4728 NOT found — cannot drive iris."));
   }
@@ -640,6 +728,7 @@ void setup() {
 void loop() {
   server.handleClient();
   serviceConsole();
+  serviceZoomDeadman();
 #if B4_ENABLE_SERIAL_RX
   serviceSerial(); // every pass, not every LOOP_INTERVAL: the UART FIFO is 128 bytes
 #endif
