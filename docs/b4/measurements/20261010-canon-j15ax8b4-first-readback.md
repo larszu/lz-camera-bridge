@@ -26,16 +26,26 @@ Raw data: [`20261010-canon-j15ax8b4-first-readback.csv`](20261010-canon-j15ax8b4
 | Iris, fully open (F2.8 on this lens) | 7 | **6.88–6.93 V** | F2.8 6.2 V | **no, ~0.7 V higher** |
 | Zoom, wide | 10 | **1.62–1.66 V** | 2.0 V | ~0.35 V low |
 | Zoom, tele | 10 | **6.80 V** | 7.0 V | roughly |
-| Focus | 11 | **−0.24 to −0.47 V** | 2–7 V (group C) | **failed: input floating** |
+| Focus | 11 | **−0.27 V** (= undriven) | 2–7 V (group C) | **no signal: no focus sensor on this lens** |
 
 Iris sweep, closed and back: 6.88 → 1.83 → 6.88 V within about 4 s, smooth,
 no steps (CSV rows t = 5.3–9.8 s).
 
 ## Failures and oddities
 
-- **Focus never read.** Negative counts on a single-ended ADS1115 input mean
-  nothing drives it; the pin 11 wire or its divider was not connected. Group
-  (B or C) is therefore **still open**.
+- **Focus never read.** First run: the pin 11 wire was not connected. Second
+  run with the wire on A2, focus ring turned for 60 s: −0.27 V ± 0.02, the same
+  reading as an undriven input (the 68 kΩ pulls A2 to ADS ground). **Pin 11
+  carries nothing on this lens.** Explanation: the IRS SX12 has servos for
+  iris and zoom only; focus is manual with no position sensor, so there is
+  nothing to report. Not yet cross-checked with a multimeter at the connector.
+  Consequence: the focus ring cannot settle group B / C on this lens. A
+  group-B TXD would idle at a defined level, not at ground, so the reading
+  leans towards C, but that is an inference, not a measurement.
+- **Common offset.** An undriven channel reads −0.27 V lens-side (−0.11 V at
+  the ADC), i.e. ADS ground sits about 0.1 V above the lens ground. All
+  channels are shifted by the same amount: corrected, iris open ≈ 7.15 V,
+  zoom wide ≈ 1.9 V. Suspected ground path on the breadboard, not confirmed.
 - **Common-mode dips.** All three channels drop together for single samples
   (e.g. t = 15.6 s, 22.1 s in the CSV; −0.1…−0.2 V each). Suspected loose
   ground on the breadboard; not confirmed.
@@ -46,6 +56,7 @@ no steps (CSV rows t = 5.3–9.8 s).
 
 ## Open
 
-- Focus on pin 11 → settles group B / C.
+- Cross-check pin 11 and pin 10 with a multimeter directly at the connector.
+- Find the 0.1 V ground offset (separate ground return for the ADS1115).
 - Repeat the iris sweep slowly with the extender state noted; check whether
   6.9 V at F2.8 is this lens or the divider tolerance (measure the resistors).
