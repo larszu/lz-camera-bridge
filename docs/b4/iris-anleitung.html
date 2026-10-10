@@ -766,6 +766,13 @@ kommt der Offset aus der 9-V-Reihe, so braucht die Stufe keinen Draht über das 
 <p>Nach dem Einschalten gibt der MCP4728 auf VB 0 V aus. Das sind 2,3 V am Zoomeingang — die Optik
 zoomt dann mit voller Geschwindigkeit bis zum Anschlag. Den Draht zu Pin 6 erst stecken, wenn die
 Firmware den Stoppwert setzt und im EEPROM des DAC abgelegt hat.</p></div>
+<div class="box"><div class="lbl">Stand am Bankaufbau, 10.10.2026</div>
+<p>Aufgebaut wie unten, Ausgangswiderstand zur Buchse <strong>1,2 kΩ</strong>, Draht an Zoombuchse Pin 6
+gesteckt. Der berechnete Stopp (Code 2360) ließ den Zoom nach Weitwinkel laufen; <strong>gemessener
+Stopp: Code 1270</strong> (in NVS und DAC-EEPROM gespeichert). Darüber zoomt es Richtung Weit, darunter
+Richtung Tele, je weiter weg, desto schneller. Der Wippschalter am Griff arbeitet weiter parallel.
+Gelegentliches Zucken von Zoom und Blende lag an Wackelkontakten im Steckbrett — alle Drähte fest
+gesteckt, seitdem ruhig.</p></div>
 <h3>Steckplan Zoom</h3>
 <p>Gleiches Brett wie Aufbau 2, Ansicht wie dort. Drei Brücken der Hälfte B fallen weg; Pin 4
 bekommt seine Masse über einen eigenen isolierten Draht.</p>
@@ -1069,6 +1076,40 @@ bekommt seine Masse über einen eigenen isolierten Draht.</p>
 Pin 5 ≈ 1,36 V bei DAC 0 · Pin 7 ≈ 2,3 V · Reihe „Zoom“ ≈ 2,3 V. Die Irisstufe muss unverändert
 2,6 V am Ausgang zeigen.</p>
 
+<h2>Nächste Version · Lochrasterplatine</h2>
+<p>Das Steckbrett hat seinen Zweck erfüllt: alles ist gemessen und läuft. Fast jeder Fehler an diesem
+Abend war aber ein Steckbrett-Fehler — ein Bein ohne Kontakt, ein Wackelkontakt, ein Draht in der falschen
+Reihe. Für den Dauerbetrieb gehört die Schaltung auf eine Lochraster- oder Streifenrasterplatine
+(≈ 100 × 80 mm).</p>
+<div class="keep">
+<svg class="zeichnung breit" viewBox="0 0 640 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Aufteilung der Lochrasterplatine">
+<rect width="640" height="300" fill="#fff"/>
+<g font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="700" fill="#1D324F">
+<rect x="10" y="20" width="140" height="120" fill="#FBF0EE" stroke="#D6402E"/><text x="20" y="38">12-V-Zone</text>
+<text x="20" y="56" font-weight="500">Schraubklemme 12 V in</text><text x="20" y="70" font-weight="500">Verpolschutz, Sicherung 1 A</text><text x="20" y="84" font-weight="500">Elko 470 µF</text><text x="20" y="98" font-weight="500">→ Hirose 6 / 3 direkt</text><text x="20" y="112" font-weight="500">Abzweig 12 V → 9 V</text>
+<rect x="158" y="20" width="230" height="120" fill="#E1ECEF" stroke="#1D324F"/><text x="166" y="38">Analog-Zone</text>
+<text x="166" y="56" font-weight="500">9 V (Regler oder Teiler) + 10 µF + 100 nF</text><text x="166" y="70" font-weight="500">LM358 im Sockel</text><text x="166" y="84" font-weight="500">Iris-Stufe · Zoom-Stufe</text><text x="166" y="98" font-weight="500">Messpunkte (Lötnägel)</text><text x="166" y="112" font-weight="500">100 nF an Vp und ADC-Eingängen</text>
+<rect x="396" y="20" width="234" height="120" fill="#F6F5F0" stroke="#5C6B85"/><text x="404" y="38">3,3-V-Zone</text>
+<text x="404" y="56" font-weight="500">ESP32-DevKit auf Buchsenleisten</text><text x="404" y="70" font-weight="500">MCP4728 · ADS1115 auf Buchsenleisten</text><text x="404" y="84" font-weight="500">Teiler 100k/68k für Pin 7 · 10 · 11 · A3</text><text x="404" y="98" font-weight="500">Potis / Joystick: GPIO 34 · 35 · 36</text><text x="404" y="112" font-weight="500">Pin 8: 1 kΩ von VIN</text>
+<line x1="10" y1="170" x2="630" y2="170" stroke="#1D324F" stroke-width="3"/><text x="10" y="162">Masse-Schiene, ein Sternpunkt an der Schraubklemme (links)</text>
+<rect x="10" y="200" width="200" height="70" fill="#fff" stroke="#1D324F"/><text x="20" y="218">Stecker zum Objektiv</text><text x="20" y="236" font-weight="500">Hirose-Kabel mit Zugentlastung</text><text x="20" y="250" font-weight="500">Pins 3 5 6 7 8 10 11</text>
+<rect x="220" y="200" width="200" height="70" fill="#fff" stroke="#1D324F"/><text x="230" y="218">Stecker zur Zoombuchse</text><text x="230" y="236" font-weight="500">Pin 6 (Steuerung), Pin 9 (Position)</text><text x="230" y="250" font-weight="500">verriegelnd (JST-XH)</text>
+<rect x="430" y="200" width="200" height="70" fill="#fff" stroke="#1D324F"/><text x="440" y="218">Bedienteil</text><text x="440" y="236" font-weight="500">Poti Iris, Joystick Zoom/Fokus</text><text x="440" y="250" font-weight="500">3-polige Stecker</text>
+</g></svg>
+</div>
+<table><thead><tr><th>Regel</th><th>Warum</th></tr></thead><tbody>
+<tr><td><strong>Objektivstrom nie über die Platine</strong>: Netzteil → Schraubklemme → Hirose 6/3 mit dickem Draht</td><td>Motorstrom auf der Signalmasse lässt Zoom und Blende zucken</td></tr>
+<tr><td><strong>Ein Sternpunkt</strong> für Masse an der Eingangsklemme; Analog- und 3,3-V-Masse je ein eigener Draht dorthin</td><td>Kein Spannungsabfall der Motoren in den Sollwerten</td></tr>
+<tr><td><strong>Zonen</strong>: 12 V links, Analog Mitte, 3,3 V rechts; keine 12-V-Leitung durch die 3,3-V-Zone</td><td>Ein Lötspritzer zwischen 12 V und 3,3 V kostet ESP32 und Module</td></tr>
+<tr><td><strong>9 V aus einem Regler</strong> (78L09 oder 7809) statt Teiler, sonst Teiler 330 Ω / 1 kΩ mit 10 µF + 100 nF</td><td>Der Zoom-Stopp hängt an dieser Spannung</td></tr>
+<tr><td><strong>Elko 470 µF / 25 V</strong> am 12-V-Eingang, Schottky-Diode als Verpolschutz, Sicherung 1 A</td><td>Motorstromspitzen, verpolter Stecker, Kurzschluss</td></tr>
+<tr><td><strong>IC-Sockel, Module auf Buchsenleisten</strong></td><td>Ein verdrehter oder beschädigter LM358 ist in Sekunden getauscht</td></tr>
+<tr><td><strong>Lötnägel als Messpunkte</strong>: Pin 8, Vp, Vout Iris, Vout Zoom, A3</td><td>Die Prüfwerte dieser Anleitung ohne Fummeln messen</td></tr>
+<tr><td><strong>Verriegelnde Stecker</strong> statt Dupont-Steckbrücken; Hirose-Kabel mit Zugentlastung</td><td>Wackelkontakte waren der häufigste Fehler am Steckbrett</td></tr>
+<tr><td><strong>Widerstände 1 %</strong>, Werte vor dem Einlöten messen</td><td>10 kΩ und 120 Ω haben dieselben Farben in umgekehrter Reihenfolge</td></tr>
+<tr><td><strong>Voller Blendenbereich</strong>: Ra = 22 kΩ + 6,8 kΩ, 100 kΩ parallel zu R1 — vorher auf dem Steckbrett messen</td><td>Der Steckbrett-Wert 15,6 kΩ erreicht C und die Anschläge nicht</td></tr>
+</tbody></table>
+
 <h2>Belegte Pins am Board</h2>
 <p>ESP32-DevKit (ESP32-D0WD-V3, CP2102). Kein GPIO ist mit dem Objektiv verbunden —
 alles läuft über I²C, die einzige Verbindung ist die gemeinsame Masse.</p>
@@ -1144,7 +1185,9 @@ Anschläge erreicht er nicht. Für den vollen Bereich (≈ 1,8–7,0 V): Ra = 22
 100 kΩ parallel zu R1 (10 kΩ). <strong>Diese Änderung ist berechnet, noch nicht gemessen.</strong></p>
 
 <h2>Wenn etwas nicht geht</h2>
-<table><thead><tr><th>Beobachtung</th><th>Zuerst prüfen</th></tr></thead><tbody><tr><td>I²C-Scan meldet nichts</td><td>GPIO 21/22, Masse gemeinsam, Module an 3,3 V</td></tr><tr><td>Kein Netz</td><td>WLAN <code>b4-lens</code> (Passwort <code>b4-iris-bench</code>), dann http://192.168.4.1</td></tr><tr><td>Blende rührt sich nicht</td><td>Schalter am Tubus auf A, Pin 8 auf 5 V, scharfgeschaltet, Kennlinie vorhanden</td></tr><tr><td>Blende pendelt</td><td>Masseverbindung zwischen Netzteil und ESP32, dann den Iris-Gain-Trimmer am Objektiv — nicht die Firmware</td></tr><tr><td>Kennlinie springt zurück</td><td>Wartezeit je Punkt erhöhen (<code>--settle</code>)</td></tr><tr><td>Alle Spannungen etwa ein Zehntel zu klein</td><td>Ein Bein ohne Kontakt im Steckbrett: von Reihe zu Reihe messen, nicht am Bein</td></tr>
+<table><thead><tr><th>Beobachtung</th><th>Zuerst prüfen</th></tr></thead><tbody><tr><td>I²C-Scan meldet nichts</td><td>GPIO 21/22, Masse gemeinsam, Module an 3,3 V</td></tr><tr><td>Kein Netz</td><td>WLAN <code>b4-lens</code> (Passwort <code>b4-iris-bench</code>), dann http://192.168.4.1</td></tr><tr><td>Blende rührt sich nicht</td><td>Schalter am Tubus auf A, Pin 8 auf 5 V, scharfgeschaltet, Kennlinie vorhanden</td></tr><tr><td>Blende pendelt</td><td>Masseverbindung zwischen Netzteil und ESP32, dann den Iris-Gain-Trimmer am Objektiv — nicht die Firmware</td></tr><tr><td>Kennlinie springt zurück</td><td>Wartezeit je Punkt erhöhen (<code>--settle</code>)</td></tr><tr><td>Zoom oder Blende zucken gelegentlich</td><td>Steckkontakte fest drücken (war hier die Ursache). Sonst: Objektivstrom direkt vom Netzteil an Hirose 6/3, eine Sternmasse, 100 nF an LM358 Pin 8</td></tr>
+<tr><td>Zoom läuft nach dem Loslassen weiter</td><td>Stoppwert falsch: mit <code>z&lt;Code&gt;</code> den Code suchen, bei dem er steht, dann <code>n&lt;Code&gt;</code></td></tr>
+<tr><td>Alle Spannungen etwa ein Zehntel zu klein</td><td>Ein Bein ohne Kontakt im Steckbrett: von Reihe zu Reihe messen, nicht am Bein</td></tr>
 <tr><td>Verstärkerausgang ≈ 0,6 V</td><td>LM358 verdreht (Pin 4 und 8 vertauscht): 12 V aus, Kerbe prüfen, neuen Chip nehmen</td></tr>
 <tr><td>A3 klebt bei ≈ 9,6 V</td><td>Oberer A3-Widerstand an 12 V statt an Iris-Soll, oder unterer fehlt</td></tr>
 <tr><td>Messwert steht fest auf 0</td><td>Teiler falsch herum, oder der Kanal liegt auf Masse</td></tr></tbody></table>

@@ -154,3 +154,17 @@ pio run -e esp32-devkit-armed -t upload
 
 Auch dieser Build fährt erst, wenn er über `POST /api/arm` scharfgeschaltet
 ist und eine Kalibriertabelle existiert.
+
+## Zoom (Stand 10.10.2026, aufgebaut)
+
+| Teil | Verbindung |
+|---|---|
+| MCP4728 **VB** | Rbz 10 kΩ → LM358 Pin 5 (+IN B) |
+| 9-V-Reihe (Pin 8) | Raz 56 kΩ → LM358 Pin 5 |
+| LM358 Pin 6 (−IN B) | R1z 10 kΩ → GND, R2z 6,8 kΩ → Pin 7 |
+| LM358 Pin 7 (OUT B) | **1,2 kΩ** → Zoombuchse am Griff (schwarz) **Pin 6** |
+| LM358 Pin 4 | eigener isolierter GND-Draht (nicht mehr über die Pin-5-Reihe) |
+
+Stoppwert gemessen: **DAC-Code 1270** (NVS + DAC-EEPROM, `ZOOM_NULL_DEFAULT`).
+Zoombuchse am Griff: 3 ≈ 8 V, 4 ≈ 2 V, 7 = 5 V, 8 = 12 V, 9 = Position, 6 = Geschwindigkeit
+(siehe `demand.md`).
