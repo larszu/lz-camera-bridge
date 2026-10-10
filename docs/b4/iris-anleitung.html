@@ -266,6 +266,60 @@ des Gleichtaktbereichs des TL072 — sein Ausgang kann dann nach oben springen.
 <strong>Der LM358 hängt am 9-V-Regler</strong>, nicht direkt an 12 V: fällt R1 ab, gäbe
 er sonst etwa 10,5 V auf Pin 5. Mit 9 V bleibt es bei etwa 7,5 V.</p>
 
+
+<h3>Stecken: Regler, DAC, Operationsverstärker</h3>
+<p>Beim Stecken liegt <strong>keine 12 V</strong> an und die Optik ist <strong>abgezogen</strong>.
+Sie kommt erst in Schritt 5 der Inbetriebnahme dazu.</p>
+<div class="keep">
+<svg class="zeichnung" viewBox="0 0 560 210" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="LM358 DIP-8 von oben mit Beschaltung">
+<style>.p{font:700 10px "Public Sans",Arial,sans-serif;fill:#1D324F}.n{font:800 10px "Public Sans",Arial,sans-serif;fill:#1D324F}.c{font:500 8.5px "Public Sans",Arial,sans-serif;fill:#5C6B85}.t{font:800 11px "Public Sans",Arial,sans-serif;fill:#1D324F}</style>
+<rect x="230" y="30" width="100" height="150" fill="#E1ECEF" stroke="#1D324F" stroke-width="1.6"/>
+<path d="M270.0 30 a10 10 0 0 0 20 0" fill="#fff" stroke="#1D324F" stroke-width="1.2"/>
+<circle cx="244" cy="46" r="4" fill="#1D324F"/>
+<text x="280.0" y="109.0" text-anchor="middle" class="t">LM358</text>
+<text x="280.0" y="198" text-anchor="middle" class="c">von oben, Kerbe oben · Punkt = Pin 1</text>
+<rect x="216" y="46" width="14" height="12" fill="#fff" stroke="#1D324F"/>
+<text x="210" y="56" text-anchor="end" class="n" fill="#D6402E">1  OUT A</text>
+<text x="210" y="68" text-anchor="end" class="c">Vout → 1 kΩ → (später) Pin 5 · R2 nach Pin 2</text>
+<rect x="216" y="81" width="14" height="12" fill="#fff" stroke="#1D324F"/>
+<text x="210" y="91" text-anchor="end" class="n" fill="#1D324F">2  −IN A</text>
+<text x="210" y="103" text-anchor="end" class="c">R1 10 kΩ → GND · R2 10 kΩ ← Pin 1</text>
+<rect x="216" y="116" width="14" height="12" fill="#fff" stroke="#1D324F"/>
+<text x="210" y="126" text-anchor="end" class="n" fill="#1D324F">3  +IN A</text>
+<text x="210" y="138" text-anchor="end" class="c">Ra 16 kΩ ← 3V3 · Rb 10 kΩ ← MCP VA</text>
+<rect x="216" y="151" width="14" height="12" fill="#fff" stroke="#1D324F"/>
+<text x="210" y="161" text-anchor="end" class="n" fill="#1D324F">4  GND</text>
+<text x="210" y="173" text-anchor="end" class="c">Minus-Leiste</text>
+<rect x="330" y="46" width="14" height="12" fill="#fff" stroke="#1D324F"/>
+<text x="350" y="56" class="n">V+  8</text>
+<text x="350" y="68" class="c">9-V-Reihe (7809 OUT) — nie 12 V</text>
+<rect x="330" y="81" width="14" height="12" fill="#fff" stroke="#1D324F"/>
+<text x="350" y="91" class="n">OUT B  7</text>
+<text x="350" y="103" class="c">an Pin 6 (Hälfte B ungenutzt)</text>
+<rect x="330" y="116" width="14" height="12" fill="#fff" stroke="#1D324F"/>
+<text x="350" y="126" class="n">−IN B  6</text>
+<text x="350" y="138" class="c">an Pin 7</text>
+<rect x="330" y="151" width="14" height="12" fill="#fff" stroke="#1D324F"/>
+<text x="350" y="161" class="n">+IN B  5</text>
+<text x="350" y="173" class="c">GND</text>
+</svg>
+</div>
+<table><thead><tr><th>Baustein</th><th>Pin</th><th>an</th></tr></thead><tbody>
+<tr><td>7809 (TO-220, Schrift zu dir, Beine unten)</td><td class="n">1 IN · links</td><td>Plus-Leiste (12 V, rot)</td></tr>
+<tr><td></td><td class="n">2 GND · Mitte</td><td>Minus-Leiste</td></tr>
+<tr><td></td><td class="n">3 OUT · rechts</td><td>eigene Reihe „9 V“ → LM358 Pin 8</td></tr>
+<tr><td></td><td class="n">Kondensatoren</td><td>330 nF IN–GND, 100 nF OUT–GND, nah am Regler</td></tr>
+<tr><td>MCP4728</td><td class="n">VCC · GND</td><td>ESP32 3V3 · Minus-Leiste</td></tr>
+<tr><td></td><td class="n">SDA · SCL</td><td>GPIO21 · GPIO22, parallel zum ADS1115</td></tr>
+<tr><td></td><td class="n">LDAC</td><td>GND</td></tr>
+<tr><td></td><td class="n">VA</td><td>Rb 10 kΩ → LM358 Pin 3</td></tr>
+<tr><td></td><td class="n">RDY · VB · VC · VD</td><td>offen</td></tr>
+<tr><td>LM358 (DIP-8)</td><td class="n">1 … 8</td><td>siehe Zeichnung</td></tr>
+<tr class="warn"><td>1 kΩ am Ausgang</td><td class="n">Pin 1 → Pin 5</td><td>erst nach Schritt 4 an die Optik</td></tr>
+</tbody></table>
+<p>Prüfen vor der Optik: 12 V ein, ohne Objektiv. 9-V-Reihe ≈ 9,0 V, LM358 Pin 1 ≈ 2,54 V
+(DAC steht nach dem Start auf 0).</p>
+
 <h3>Zwei Dinge an der Optik selbst</h3>
 <ul>
 <li>Zum Steuern steht der <strong>Iris-Schalter am Tubus auf A</strong>. Auf M folgt die Blende dem Ring und ignoriert Pin 5 vollständig.</li>
