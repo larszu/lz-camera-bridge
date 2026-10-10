@@ -101,7 +101,7 @@ ol.schritte li::before{ content:none; }
 </div>
 
 <h2>Was gebraucht wird</h2>
-<table><thead><tr><th>Teil</th><th>Wofür</th></tr></thead><tbody><tr><td>ESP32-DevKit (ESP32-D0WD-V3, CP2102)</td><td>Rechner, Netz über WLAN. 4 MB Flash</td></tr><tr><td>MCP4728, I²C, 12 Bit</td><td>Sollwert. Der eingebaute DAC des ESP32 ist zu grob und zu ungenau</td></tr><tr><td>ADS1115, I²C, 16 Bit</td><td>Rücklesung von Blende, Zoom und Fokus</td></tr><tr><td><strong>LM358</strong>, DIP-8 — <strong>kein TL072</strong></td><td>Hebt 0–3,3 V auf 2,5–6,6 V</td></tr><tr><td>Spannungsregler 9 V (z. B. 7809)</td><td>Versorgt den LM358 und begrenzt damit Pin 5 im Fehlerfall</td></tr><tr><td>Widerstände 100 k, 68 k, 16 k, 10 k, 1 k</td><td>Teiler und Verstärkerstufe</td></tr><tr><td>Hirose-Verlängerung 12-polig</td><td>Zum Auftrennen. Alle zwölf Adern müssen belegt sein</td></tr><tr><td>Labornetzteil 12 V, Strombegrenzung</td><td>Versorgt die Optik; Begrenzung auf 1,0 A</td></tr></tbody></table>
+<table><thead><tr><th>Teil</th><th>Wofür</th></tr></thead><tbody><tr><td>ESP32-DevKit (ESP32-D0WD-V3, CP2102)</td><td>Rechner, Netz über WLAN. 4 MB Flash</td></tr><tr><td>MCP4728, I²C, 12 Bit</td><td>Sollwert. Der eingebaute DAC des ESP32 ist zu grob und zu ungenau</td></tr><tr><td>ADS1115, I²C, 16 Bit</td><td>Rücklesung von Blende, Zoom und Fokus</td></tr><tr><td><strong>LM358</strong>, DIP-8 — <strong>kein TL072</strong></td><td>Hebt 0–3,3 V auf 2,5–6,6 V</td></tr><tr><td>Spannungsteiler 470 Ω / 1,2 kΩ</td><td>8,6 V für den LM358 aus den 12 V; begrenzt damit Pin 5 im Fehlerfall</td></tr><tr><td>Widerstände 100 k, 68 k, 16 k, 10 k, 1,2 k, 1 k, 470</td><td>Teiler und Verstärkerstufe</td></tr><tr><td>Hirose-Verlängerung 12-polig</td><td>Zum Auftrennen. Alle zwölf Adern müssen belegt sein</td></tr><tr><td>Labornetzteil 12 V, Strombegrenzung</td><td>Versorgt die Optik; Begrenzung auf 1,0 A</td></tr></tbody></table>
 
 <h2>Der Steckverbinder</h2>
 <p>Pin 1 bis 10 sind in beiden Betriebsarten gleich; 11 und 12 unterscheiden sich
@@ -233,7 +233,7 @@ Widerstandswerte gehören in <code>config.h</code> — ein 5-%-Widerstand ist ei
 
 Pin 8  --&gt; 1k --&gt; 5 V   Remote statt Eigenautomatik
 Pin 4  offen             Forced Iris Servo, wird nicht gebraucht
-Pin 6  --&gt; +12 V --&gt; 9-V-Regler --&gt; LM358
+Pin 6  --&gt; +12 V --&gt; Teiler 470/1,2k (8,6 V) --&gt; LM358
 Pin 3  --&gt; GND, gemeinsam mit dem ESP32</pre>
 
 <div class="box">
@@ -246,7 +246,7 @@ Pin 3  --&gt; GND, gemeinsam mit dem ESP32</pre>
 
 <h3>Die Verstärkerstufe</h3>
 <p>Nichtinvertierender Verstärker mit Summierung am Plus-Eingang. Vier
-Widerstände, ein Operationsverstärker hinter dem 9-V-Regler.</p>
+Widerstände, ein Operationsverstärker an 8,6 V aus einem Spannungsteiler.</p>
 <div class="two">
 <div>
 <pre>Ra = 16k  von 3,3 V      zum +Eingang
@@ -267,17 +267,19 @@ Vout = Vp * (1 + R2/R1)
 die Blende schließt nie. Alles Weitere regelt die Kennlinie.</p>
 <p><strong>Nur LM358, kein TL072:</strong> am +Eingang liegen unten 1,27 V, außerhalb
 des Gleichtaktbereichs des TL072 — sein Ausgang kann dann nach oben springen.
-<strong>Der LM358 hängt am 9-V-Regler</strong>, nicht direkt an 12 V: fällt R1 ab, gäbe
-er sonst etwa 10,5 V auf Pin 5. Mit 9 V bleibt es bei etwa 7,5 V.</p>
+<strong>Der LM358 hängt an 8,6 V</strong> aus dem Teiler 470 Ω / 1,2 kΩ, nicht direkt an 12 V: fällt R1 ab,
+gäbe er sonst etwa 10,5 V auf Pin 5; so bleibt es unter etwa 7,1 V. Ein einzelner Vorwiderstand
+reicht nicht — der Strom des LM358 schwankt, die Spannung wandert mit. Ein Regler 7809 geht
+ebenso (9 V, Grenze ≈ 7,5 V).</p>
 
 
-<h3>Stecken: Regler, DAC, Operationsverstärker</h3>
+<h3>Stecken: Versorgung, DAC, Operationsverstärker</h3>
 <p>Beim Stecken liegt <strong>keine 12 V</strong> an und die Optik ist <strong>abgezogen</strong>.
 Sie kommt erst in Schritt 5 der Inbetriebnahme dazu.</p>
 
 <h3>Schaltplan</h3>
 <div class="keep">
-<svg class="zeichnung breit" xmlns="http://www.w3.org/2000/svg" viewBox="-50 30 715 350" role="img" aria-label="Schaltplan Verstärkerstufe und 9-V-Regler">
+<svg class="zeichnung breit" xmlns="http://www.w3.org/2000/svg" viewBox="-50 30 715 350" role="img" aria-label="Schaltplan Verstärkerstufe und Versorgung">
 <rect x="-120" width="840" height="380" fill="#fff"/>
 <g stroke="#1D324F" stroke-width="1.4" fill="none">
 <polygon points="320,80 320,180 400,130" fill="#E1ECEF"/>
@@ -300,21 +302,12 @@ Sie kommt erst in Schritt 5 der Inbetriebnahme dazu.</p>
 <polyline points="360,95 360,75"/>
 <polyline points="360,165 360,185"/>
 <line x1="360" y1="185" x2="360" y2="193"/><line x1="351" y1="193" x2="369" y2="193"/><line x1="355" y1="197" x2="365" y2="197"/><line x1="358" y1="201" x2="362" y2="201"/>
-<rect x="230" y="270" width="80" height="44" fill="#E1ECEF"/>
-<polyline points="70,285 230,285"/>
-<polyline points="310,285 470,285"/>
-<polyline points="270,314 270,330"/>
-<line x1="270" y1="330" x2="270" y2="338"/><line x1="261" y1="338" x2="279" y2="338"/><line x1="265" y1="342" x2="275" y2="342"/><line x1="268" y1="346" x2="272" y2="346"/>
-<polyline points="180,285 180,300"/>
-<line x1="170" y1="300" x2="190" y2="300"/><line x1="170" y1="306" x2="190" y2="306"/>
-<polyline points="180,306 180,318"/>
-<line x1="180" y1="318" x2="180" y2="326"/><line x1="171" y1="326" x2="189" y2="326"/><line x1="175" y1="330" x2="185" y2="330"/><line x1="178" y1="334" x2="182" y2="334"/>
-<circle cx="180" cy="285" r="3" fill="#1D324F"/>
-<polyline points="360,285 360,300"/>
-<line x1="350" y1="300" x2="370" y2="300"/><line x1="350" y1="306" x2="370" y2="306"/>
-<polyline points="360,306 360,318"/>
-<line x1="360" y1="318" x2="360" y2="326"/><line x1="351" y1="326" x2="369" y2="326"/><line x1="355" y1="330" x2="365" y2="330"/><line x1="358" y1="334" x2="362" y2="334"/>
-<circle cx="360" cy="285" r="3" fill="#1D324F"/>
+<polyline points="70,285 330,285 470,285"/>
+<rect x="170" y="278" width="40" height="14" fill="#fff"/>
+<circle cx="330" cy="285" r="3" fill="#1D324F"/>
+<polyline points="330,285 330,345"/>
+<rect x="323" y="295" width="14" height="40" fill="#fff"/>
+<line x1="330" y1="345" x2="330" y2="353"/><line x1="321" y1="353" x2="339" y2="353"/><line x1="325" y1="357" x2="335" y2="357"/><line x1="328" y1="361" x2="332" y2="361"/>
 </g>
 <text x="66" y="154" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="800" text-anchor="end" fill="#1D324F">3V3 (ESP32)</text>
 <text x="66" y="219" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="800" text-anchor="end" fill="#1D324F">MCP4728 VA</text>
@@ -328,17 +321,14 @@ Sie kommt erst in Schritt 5 der Inbetriebnahme dazu.</p>
 <text x="408" y="124" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="800" text-anchor="start" fill="#1D324F">1</text>
 <text x="338" y="134" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="800" text-anchor="middle" fill="#1D324F">+</text>
 <text x="338" y="114" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="800" text-anchor="middle" fill="#1D324F">−</text>
-<text x="366" y="80" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="700" text-anchor="start" fill="#1D324F">8 · +9 V</text>
+<text x="366" y="80" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="700" text-anchor="start" fill="#1D324F">8 · +8,6 V</text>
 <text x="366" y="180" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="800" text-anchor="start" fill="#1D324F">4</text>
 <text x="565" y="134" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="800" text-anchor="start" fill="#1D324F">Hirose Pin 5</text>
 <text x="66" y="289" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="800" text-anchor="end" fill="#1D324F">Hirose Pin 6 · +12 V</text>
-<text x="270" y="297" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="800" text-anchor="middle" fill="#1D324F">7809</text>
-<text x="234" y="281" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="500" text-anchor="start" fill="#1D324F">IN</text>
-<text x="306" y="281" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="500" text-anchor="end" fill="#1D324F">OUT</text>
-<text x="274" y="326" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="500" text-anchor="start" fill="#1D324F">GND</text>
-<text x="196" y="304" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="600" text-anchor="start" fill="#1D324F">330 nF</text>
-<text x="376" y="304" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="600" text-anchor="start" fill="#1D324F">100 nF</text>
-<text x="475" y="289" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="800" text-anchor="start" fill="#1D324F">+9 V → LM358 Pin 8</text>
+<text x="190" y="275" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="700" text-anchor="middle" fill="#1D324F">470 Ω</text>
+<text x="342" y="319" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="700" text-anchor="start" fill="#1D324F">1,2 kΩ</text>
+<text x="338" y="278" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="700" text-anchor="start" fill="#1D324F">8,6 V</text>
+<text x="475" y="289" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="800" text-anchor="start" fill="#1D324F">→ LM358 Pin 8</text>
 <text x="260" y="166" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="600" text-anchor="end" fill="#1D324F">Vp</text>
 <text x="446" y="148" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="700" text-anchor="start" fill="#1D324F">Vout</text>
 <text x="276" y="126" font-family="Public Sans,Arial,sans-serif" font-size="10" font-weight="600" text-anchor="end" fill="#1D324F">Vn</text>
@@ -405,9 +395,9 @@ Der Chip enthält zwei Verstärker; gebraucht wird nur A (Pin 1–3). Hälfte B 
 Brettoberkante: dann liegen Pin 1–4 in vier Reihen links, Pin 8–5 in vier Reihen rechts,
 und die Reihen von Pin 1, 2 und 3 <em>sind</em> die Netze Vout, Vn und Vp.</p>
 <table><thead><tr><th>Netz</th><th>Wo</th><th>Hinein gehört</th></tr></thead><tbody>
-<tr class="warn"><td><strong>12 V</strong></td><td>Plus-Leiste</td><td>Hirose 6 (rot), Netzteil +, 7809 IN, 330-nF-Bein</td></tr>
-<tr><td><strong>GND</strong></td><td>Minus-Leiste</td><td>Hirose 3 (schwarz), Netzteil −, ESP32 GND, ADS1115 GND, MCP4728 GND + LDAC, 7809 GND, beide Kondensatoren, R1, LM358 Pin 4 und Pin 5, die drei 68-kΩ-Teiler</td></tr>
-<tr><td><strong>9 V</strong></td><td>eigene Reihe</td><td>7809 OUT, 100-nF-Bein, Draht zu LM358 Pin 8</td></tr>
+<tr class="warn"><td><strong>12 V</strong></td><td>Plus-Leiste</td><td>Hirose 6 (rot), Netzteil +, 470-Ω-Bein</td></tr>
+<tr><td><strong>GND</strong></td><td>Minus-Leiste</td><td>Hirose 3 (schwarz), Netzteil −, ESP32 GND, ADS1115 GND, MCP4728 GND + LDAC, 1,2-kΩ-Bein, R1, LM358 Pin 4 und Pin 5, die drei 68-kΩ-Teiler</td></tr>
+<tr><td><strong>8,6 V</strong></td><td>eigene Reihe</td><td>470 Ω (von 12 V), 1,2 kΩ (nach GND), Draht zu LM358 Pin 8</td></tr>
 <tr><td><strong>3V3</strong></td><td>eigene Reihe</td><td>ESP32 3V3, ADS1115 VDD, MCP4728 VCC, <strong>Ra-Bein 1</strong></td></tr>
 <tr><td><strong>VA</strong></td><td>eigene Reihe</td><td>MCP4728 VA, <strong>Rb-Bein 1</strong></td></tr>
 <tr><td><strong>Vp</strong></td><td>Reihe von Pin 3</td><td><strong>Ra-Bein 2</strong>, <strong>Rb-Bein 2</strong></td></tr>
@@ -420,10 +410,10 @@ und die Reihen von Pin 1, 2 und 3 <em>sind</em> die Netze Vout, Vn und Vp.</p>
 <h3>Steckplan mit Reihen</h3>
 <p>Jedes Teil mit Loch-Koordinate: Buchstabe = Spalte (a–e links der Mittelrinne, f–j rechts),
 Zahl = Reihe. Die Reihen 1–17 müssen frei sein; sind sie belegt, alles um dieselbe Zahl
-verschieben. Die Leiste mit der <strong>roten</strong> Linie links führt 12 V, die mit der
-<strong>blauen</strong> Linie GND.</p>
+verschieben. Benutzt werden nur die beiden linken Leisten: <strong>rote</strong> Linie = 12 V,
+<strong>blaue</strong> Linie = GND. Die rechten Leisten bleiben frei.</p>
 <p><strong>Auf einem zweiten Steckbrett</strong> gilt der Plan unverändert. Dazu drei Verbindungen
-vom ersten Brett: GND-Leiste ↔ GND-Leiste (schwarz, zuerst stecken), 12-V-Leiste ↔ 12-V-Leiste
+vom ersten Brett: linke GND-Leiste ↔ GND (schwarz, zuerst stecken), linke 12-V-Leiste ↔ 12 V
 (rot), und die Drähte 3V3 (a15) und VA (a16) kommen von ESP32 und MCP4728 herüber.
 Ohne die GND-Verbindung stimmt keine Spannung.</p>
 <div class="keep">
@@ -467,8 +457,8 @@ Ohne die GND-Verbindung stimmt keine Spannung.</p>
 <circle cx="82" cy="386" r="2.2" fill="#8C9CB3"/>
 <circle cx="82" cy="410" r="2.2" fill="#8C9CB3"/>
 <circle cx="82" cy="434" r="2.2" fill="#8C9CB3"/>
-<line x1="398" y1="36" x2="398" y2="448" stroke="#2B6CB0" stroke-width="1" opacity=".5"/>
-<text x="398" y="464" font-family="Public Sans,Arial,sans-serif" font-size="8" font-weight="700" text-anchor="middle" fill="#2B6CB0">GND</text>
+<line x1="398" y1="36" x2="398" y2="448" stroke="#8C9CB3" stroke-width="1" opacity=".5"/>
+<text x="398" y="464" font-family="Public Sans,Arial,sans-serif" font-size="8" font-weight="700" text-anchor="middle" fill="#8C9CB3">nicht benutzt</text>
 <circle cx="398" cy="50" r="2.2" fill="#8C9CB3"/>
 <circle cx="398" cy="74" r="2.2" fill="#8C9CB3"/>
 <circle cx="398" cy="98" r="2.2" fill="#8C9CB3"/>
@@ -486,8 +476,8 @@ Ohne die GND-Verbindung stimmt keine Spannung.</p>
 <circle cx="398" cy="386" r="2.2" fill="#8C9CB3"/>
 <circle cx="398" cy="410" r="2.2" fill="#8C9CB3"/>
 <circle cx="398" cy="434" r="2.2" fill="#8C9CB3"/>
-<line x1="418" y1="36" x2="418" y2="448" stroke="#D6402E" stroke-width="1" opacity=".5"/>
-<text x="418" y="476" font-family="Public Sans,Arial,sans-serif" font-size="8" font-weight="700" text-anchor="middle" fill="#D6402E">frei</text>
+<line x1="418" y1="36" x2="418" y2="448" stroke="#8C9CB3" stroke-width="1" opacity=".5"/>
+<text x="418" y="476" font-family="Public Sans,Arial,sans-serif" font-size="8" font-weight="700" text-anchor="middle" fill="#8C9CB3"></text>
 <circle cx="418" cy="50" r="2.2" fill="#8C9CB3"/>
 <circle cx="418" cy="74" r="2.2" fill="#8C9CB3"/>
 <circle cx="418" cy="98" r="2.2" fill="#8C9CB3"/>
@@ -703,11 +693,6 @@ Ohne die GND-Verbindung stimmt keine Spannung.</p>
 <circle cx="336" cy="434" r="2.6" fill="#fff" stroke="#8C9CB3" stroke-width="1"/>
 <circle cx="358" cy="434" r="2.6" fill="#fff" stroke="#8C9CB3" stroke-width="1"/>
 <rect x="229" y="42" width="30" height="400" fill="#E1ECEF" opacity=".6"/>
-<rect x="161" y="41" width="26" height="66" fill="#C9D3DF" stroke="#1D324F" stroke-width="1.2"/>
-<circle cx="174" cy="50" r="3.4" fill="#1D324F"/>
-<circle cx="174" cy="74" r="3.4" fill="#1D324F"/>
-<circle cx="174" cy="98" r="3.4" fill="#1D324F"/>
-<text x="232" y="53" font-family="Public Sans,Arial,sans-serif" font-size="8" font-weight="600" text-anchor="start" fill="#1D324F"></text>
 <rect x="212" y="256" width="64" height="92" fill="#2A2F38" stroke="#1D324F"/>
 <path d="M238.0 256 a6 6 0 0 0 12 0" fill="#fff"/>
 <circle cx="222" cy="264" r="2.2" fill="#fff"/>
@@ -728,22 +713,14 @@ Ohne die GND-Verbindung stimmt keine Spannung.</p>
 <circle cx="270" cy="338" r="3.4" fill="#1D324F"/>
 <text x="230.0" y="341" font-family="Public Sans,Arial,sans-serif" font-size="7" font-weight="800" text-anchor="middle" fill="#fff">4</text>
 <text x="258.0" y="341" font-family="Public Sans,Arial,sans-serif" font-size="7" font-weight="800" text-anchor="middle" fill="#fff">5</text>
-<polyline points="130,50 56,50" fill="none" stroke="#D6402E" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
-<circle cx="130" cy="50" r="3.4" fill="#1D324F"/>
-<polyline points="130,74 82,74" fill="none" stroke="#111" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
-<circle cx="130" cy="74" r="3.4" fill="#1D324F"/>
 <polyline points="218,98 218,98 233,98 233,170 358,170 358,266" fill="none" stroke="#E07B00" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
 <circle cx="218" cy="98" r="3.4" fill="#1D324F"/>
 <circle cx="358" cy="266" r="3.4" fill="#1D324F"/>
 <polyline points="130,338 82,338" fill="none" stroke="#111" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
 <circle cx="130" cy="338" r="3.4" fill="#1D324F"/>
-<polyline points="358,338 398,338" fill="none" stroke="#111" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
-<circle cx="358" cy="338" r="3.4" fill="#1D324F"/>
 <polyline points="292,290 292,314" fill="none" stroke="#2F855A" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
 <circle cx="292" cy="290" r="3.4" fill="#1D324F"/>
 <circle cx="292" cy="314" r="3.4" fill="#1D324F"/>
-<polyline points="82,36 82,24 398,24 398,36" fill="none" stroke="#111" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="5 4"/>
-<text x="240.0" y="20" font-family="Public Sans,Arial,sans-serif" font-size="8" font-weight="700" text-anchor="middle" fill="#5C6B85">Brücke: linke und rechte GND-Leiste verbinden</text>
 <polyline points="4,386 130,386" fill="none" stroke="#D6402E" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
 <circle cx="130" cy="386" r="3.4" fill="#1D324F"/>
 <text x="4" y="381" font-family="Public Sans,Arial,sans-serif" font-size="8" font-weight="800" text-anchor="start" fill="#D6402E">3V3 vom ESP32</text>
@@ -753,16 +730,17 @@ Ohne die GND-Verbindung stimmt keine Spannung.</p>
 <polyline points="4,218 130,218" fill="none" stroke="#C9A400" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="5 4"/>
 <circle cx="130" cy="218" r="3.4" fill="#1D324F"/>
 <text x="4" y="213" font-family="Public Sans,Arial,sans-serif" font-size="8" font-weight="800" text-anchor="start" fill="#8A7000">später: Hirose Pin 5</text>
-<line x1="196" y1="50" x2="196" y2="59.0" stroke="#5C6B85" stroke-width="1.4"/><line x1="196" y1="65.0" x2="196" y2="74" stroke="#5C6B85" stroke-width="1.4"/>
-<line x1="190" y1="59.0" x2="202" y2="59.0" stroke="#1D324F" stroke-width="2"/><line x1="190" y1="65.0" x2="202" y2="65.0" stroke="#1D324F" stroke-width="2"/>
-<text x="205" y="65.0" font-family="Public Sans,Arial,sans-serif" font-size="8" font-weight="700" text-anchor="start" fill="#1D324F">330 nF</text>
-<circle cx="196" cy="50" r="3.4" fill="#1D324F"/>
-<circle cx="196" cy="74" r="3.4" fill="#1D324F"/>
-<line x1="152" y1="74" x2="152" y2="83.0" stroke="#5C6B85" stroke-width="1.4"/><line x1="152" y1="89.0" x2="152" y2="98" stroke="#5C6B85" stroke-width="1.4"/>
-<line x1="146" y1="83.0" x2="158" y2="83.0" stroke="#1D324F" stroke-width="2"/><line x1="146" y1="89.0" x2="158" y2="89.0" stroke="#1D324F" stroke-width="2"/>
-<text x="143" y="89.0" font-family="Public Sans,Arial,sans-serif" font-size="8" font-weight="700" text-anchor="end" fill="#1D324F">100 nF</text>
-<circle cx="152" cy="74" r="3.4" fill="#1D324F"/>
+<line x1="56" y1="98" x2="130" y2="98" stroke="#5C6B85" stroke-width="1.4"/>
+<rect x="82.0" y="93.0" width="22" height="10" fill="#9EC5E8" stroke="#1D324F" stroke-width="1"/>
+<text x="93.0" y="90.0" font-family="Public Sans,Arial,sans-serif" font-size="8.5" font-weight="700" text-anchor="middle" fill="#1D324F">470 Ω</text>
+<circle cx="130" cy="98" r="3.4" fill="#1D324F"/>
+<line x1="152" y1="98" x2="82" y2="146" stroke="#5C6B85" stroke-width="1.4"/>
+<rect x="106.0" y="117.0" width="22" height="10" fill="#9EC5E8" stroke="#1D324F" stroke-width="1"/>
+<text x="117.0" y="114.0" font-family="Public Sans,Arial,sans-serif" font-size="8.5" font-weight="700" text-anchor="middle" fill="#1D324F">1,2 kΩ</text>
 <circle cx="152" cy="98" r="3.4" fill="#1D324F"/>
+<polyline points="292,338 292,351 196,351 196,338" fill="none" stroke="#111" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
+<circle cx="292" cy="338" r="3.4" fill="#1D324F"/>
+<circle cx="196" cy="338" r="3.4" fill="#1D324F"/>
 <line x1="174" y1="218" x2="174" y2="266" stroke="#5C6B85" stroke-width="1.4"/>
 <rect x="169.0" y="231.0" width="10" height="22" fill="#9EC5E8" stroke="#1D324F" stroke-width="1"/>
 <text x="166.0" y="245.0" font-family="Public Sans,Arial,sans-serif" font-size="8.5" font-weight="700" text-anchor="end" fill="#1D324F">1 kΩ</text>
@@ -779,7 +757,8 @@ Ohne die GND-Verbindung stimmt keine Spannung.</p>
 <circle cx="130" cy="290" r="3.4" fill="#1D324F"/>
 <line x1="174" y1="386" x2="174" y2="314" stroke="#5C6B85" stroke-width="1.4"/>
 <rect x="169.0" y="339.0" width="10" height="22" fill="#9EC5E8" stroke="#1D324F" stroke-width="1"/>
-<text x="182.0" y="353.0" font-family="Public Sans,Arial,sans-serif" font-size="8.5" font-weight="700" text-anchor="start" fill="#1D324F">Ra 16k</text>
+<text x="182.0" y="353.0" font-family="Public Sans,Arial,sans-serif" font-size="8.5" font-weight="700" text-anchor="start" fill="#1D324F"></text>
+<text x="182" y="376" font-family="Public Sans,Arial,sans-serif" font-size="8.5" font-weight="700" text-anchor="start" fill="#1D324F">Ra 16k</text>
 <circle cx="174" cy="386" r="3.4" fill="#1D324F"/>
 <circle cx="174" cy="314" r="3.4" fill="#1D324F"/>
 <line x1="152" y1="410" x2="152" y2="314" stroke="#5C6B85" stroke-width="1.4"/>
@@ -787,9 +766,7 @@ Ohne die GND-Verbindung stimmt keine Spannung.</p>
 <text x="144.0" y="365.0" font-family="Public Sans,Arial,sans-serif" font-size="8.5" font-weight="700" text-anchor="end" fill="#1D324F">Rb 10k</text>
 <circle cx="152" cy="410" r="3.4" fill="#1D324F"/>
 <circle cx="152" cy="314" r="3.4" fill="#1D324F"/>
-<text x="438" y="53" font-family="Public Sans,Arial,sans-serif" font-size="8.5" font-weight="700" text-anchor="start" fill="#1D324F">Reihe 1: 12 V (7809 IN)</text>
-<text x="438" y="77" font-family="Public Sans,Arial,sans-serif" font-size="8.5" font-weight="700" text-anchor="start" fill="#1D324F">Reihe 2: GND</text>
-<text x="438" y="101" font-family="Public Sans,Arial,sans-serif" font-size="8.5" font-weight="700" text-anchor="start" fill="#1D324F">Reihe 3: 9 V (7809 OUT)</text>
+<text x="438" y="101" font-family="Public Sans,Arial,sans-serif" font-size="8.5" font-weight="700" text-anchor="start" fill="#1D324F">Reihe 3: 8,6 V für LM358 Pin 8</text>
 <text x="438" y="221" font-family="Public Sans,Arial,sans-serif" font-size="8.5" font-weight="700" text-anchor="start" fill="#1D324F">Reihe 8: Iris-Soll</text>
 <text x="438" y="269" font-family="Public Sans,Arial,sans-serif" font-size="8.5" font-weight="700" text-anchor="start" fill="#D6402E">Reihe 10: Vout = Pin 1</text>
 <text x="438" y="293" font-family="Public Sans,Arial,sans-serif" font-size="8.5" font-weight="700" text-anchor="start" fill="#1D324F">Reihe 11: Vn = Pin 2</text>
@@ -800,30 +777,25 @@ Ohne die GND-Verbindung stimmt keine Spannung.</p>
 <text x="320" y="504" font-family="Public Sans,Arial,sans-serif" font-size="8.5" font-weight="500" text-anchor="middle" fill="#5C6B85">Draufsicht aufs Steckbrett · Punkte = belegte Löcher · Reihen 1–17, Spalten a–j</text>
 </svg>
 </div>
-<table><thead><tr><th>#</th><th>Teil</th><th>Bein / Ende</th><th>Loch</th></tr></thead><tbody>
-<tr><td class="n">1</td><td>Draht schwarz</td><td>linke GND-Leiste ↔ rechte GND-Leiste</td><td class="n">oben, quer übers Brett</td></tr>
-<tr><td class="n">2</td><td>7809 (Schrift zu dir)</td><td>IN (links) · GND (Mitte) · OUT (rechts)</td><td class="n">c1 · c2 · c3</td></tr>
-<tr><td class="n">3</td><td>Draht rot</td><td>12-V-Leiste → 7809 IN</td><td class="n">a1</td></tr>
-<tr><td class="n">4</td><td>Draht schwarz</td><td>GND-Leiste → 7809 GND</td><td class="n">a2</td></tr>
-<tr><td class="n">5</td><td>Kondensator 330 nF</td><td>IN ↔ GND</td><td class="n">d1 · d2</td></tr>
-<tr><td class="n">6</td><td>Kondensator 100 nF</td><td>GND ↔ OUT</td><td class="n">b2 · b3</td></tr>
-<tr><td class="n">7</td><td>LM358, Kerbe zu Reihe 9</td><td>Pin 1 · 2 · 3 · 4</td><td class="n">e10 · e11 · e12 · e13</td></tr>
-<tr><td class="n"></td><td></td><td>Pin 8 · 7 · 6 · 5</td><td class="n">f10 · f11 · f12 · f13</td></tr>
-<tr><td class="n">8</td><td>Draht (z. B. orange) „9 V“</td><td>7809 OUT → LM358 Pin 8</td><td class="n">e3 → j10</td></tr>
-<tr><td class="n">9</td><td>Draht schwarz</td><td>LM358 Pin 4 → GND-Leiste links</td><td class="n">a13</td></tr>
-<tr><td class="n">10</td><td>Draht schwarz</td><td>LM358 Pin 5 → GND-Leiste rechts</td><td class="n">j13</td></tr>
-<tr><td class="n">11</td><td>kurze Brücke</td><td>LM358 Pin 7 ↔ Pin 6</td><td class="n">g11 · g12</td></tr>
-<tr><td class="n">12</td><td>Draht vom ESP32</td><td>3V3 (Leitung, an der ADS1115 und MCP4728 schon hängen)</td><td class="n">a15</td></tr>
-<tr><td class="n">13</td><td>Draht vom MCP4728</td><td>VA</td><td class="n">a16</td></tr>
-<tr><td class="n">14</td><td>Ra 16 kΩ</td><td>3V3 ↔ Vp</td><td class="n">c15 · c12</td></tr>
-<tr><td class="n">15</td><td>Rb 10 kΩ</td><td>VA ↔ Vp</td><td class="n">b16 · b12</td></tr>
-<tr><td class="n">16</td><td>R1 10 kΩ</td><td>Vn ↔ GND-Leiste links</td><td class="n">a11 · Leiste</td></tr>
-<tr><td class="n">17</td><td>R2 10 kΩ, stehend</td><td>Vout ↔ Vn</td><td class="n">d10 · d11</td></tr>
-<tr><td class="n">18</td><td>1 kΩ, stehend</td><td>Vout ↔ Iris-Soll</td><td class="n">c10 · c8</td></tr>
-<tr class="warn"><td class="n">19</td><td>Draht zu Hirose Pin 5</td><td>erst nach dem Prüfen ohne Optik</td><td class="n">a8</td></tr>
+<table><thead><tr><th>#</th><th>Teil</th><th>kommt von</th><th>geht zu</th><th>Loch</th></tr></thead><tbody>
+<tr><td class="n">1</td><td>470 Ω</td><td>12-V-Leiste (dort: Hirose Pin 6 und Netzteil +)</td><td>Reihe „8,6 V“</td><td class="n">Leiste · a3</td></tr>
+<tr><td class="n">2</td><td>1,2 kΩ</td><td>Reihe „8,6 V“</td><td>GND-Leiste (dort: Hirose Pin 3, Netzteil −, ESP32 GND)</td><td class="n">b3 · Leiste</td></tr>
+<tr><td class="n">3</td><td>LM358, Kerbe zu Reihe 9</td><td>—</td><td>Pin 1–4 links, Pin 8–5 rechts der Mittelrinne</td><td class="n">e10–e13 · f10–f13</td></tr>
+<tr><td class="n">4</td><td>Draht „8,6 V“</td><td>Reihe „8,6 V“ (Teiler)</td><td>LM358 Pin 8 (V+, Versorgung)</td><td class="n">e3 → j10</td></tr>
+<tr><td class="n">5</td><td>Draht schwarz</td><td>LM358 Pin 4 (V−)</td><td>GND-Leiste</td><td class="n">a13 → Leiste</td></tr>
+<tr><td class="n">6</td><td>Draht schwarz</td><td>LM358 Pin 5 (+Eingang B, ungenutzt)</td><td>Reihe von Pin 4, also GND</td><td class="n">g13 → d13</td></tr>
+<tr><td class="n">7</td><td>kurze Brücke</td><td>LM358 Pin 7 (Ausgang B)</td><td>LM358 Pin 6 (−Eingang B) — Hälfte B als Folger stillgelegt</td><td class="n">g11 · g12</td></tr>
+<tr><td class="n">8</td><td>Draht</td><td>ESP32 3V3 (dieselbe Leitung wie ADS1115 VDD und MCP4728 VCC)</td><td>Reihe „3V3“</td><td class="n">→ a15</td></tr>
+<tr><td class="n">9</td><td>Draht</td><td>MCP4728 VA (Kanal A, Sollwert 0–3,3 V)</td><td>Reihe „VA“</td><td class="n">→ a16</td></tr>
+<tr><td class="n">10</td><td>Ra 16 kΩ</td><td>Reihe „3V3“</td><td>LM358 Pin 3 (+Eingang A, „Vp“)</td><td class="n">c15 · c12</td></tr>
+<tr><td class="n">11</td><td>Rb 10 kΩ</td><td>Reihe „VA“</td><td>LM358 Pin 3</td><td class="n">b16 · b12</td></tr>
+<tr><td class="n">12</td><td>R1 10 kΩ</td><td>LM358 Pin 2 (−Eingang A, „Vn“)</td><td>GND-Leiste</td><td class="n">a11 · Leiste</td></tr>
+<tr><td class="n">13</td><td>R2 10 kΩ, stehend</td><td>LM358 Pin 1 (Ausgang A, „Vout“)</td><td>LM358 Pin 2 — Rückkopplung, Verstärkung 2</td><td class="n">d10 · d11</td></tr>
+<tr><td class="n">14</td><td>1 kΩ, stehend</td><td>LM358 Pin 1 („Vout“)</td><td>Reihe „Iris-Soll“ — begrenzt den Strom zur Optik</td><td class="n">c10 · c8</td></tr>
+<tr class="warn"><td class="n">15</td><td>Draht, später</td><td>Reihe „Iris-Soll“</td><td>Hirose Pin 5 (Iris-Sollwert) — erst nach dem Prüfen</td><td class="n">a8 →</td></tr>
 </tbody></table>
-<p><strong>Prüfen ohne Optik</strong> (12 V ein, Multimeter schwarz an GND): c3 ≈ 9,0 V ·
-a12 (Vp) ≈ 1,27 V · a10 (Vout) ≈ 2,54 V · a8 ≈ 2,54 V. Stimmt ein Wert nicht: 12 V aus und die
+<p><strong>Prüfen ohne Optik</strong> (12 V ein, Multimeter schwarz an GND): Reihe „8,6 V“ (d3) ≈ 8,1–8,6 V ·
+Pin 3 / Vp (a12) ≈ 1,27 V · Pin 1 / Vout (a10) ≈ 2,54 V · Iris-Soll (a8) ≈ 2,54 V. Stimmt ein Wert nicht: 12 V aus und die
 Löcher mit der Tabelle vergleichen.</p>
 
 <p>Farbcodes gelten für Metallschicht-Widerstände mit fünf Ringen (blauer Körper).

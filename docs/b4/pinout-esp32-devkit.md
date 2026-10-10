@@ -75,7 +75,7 @@ Gemessene Widerstandswerte in `config.h` eintragen (`DIVIDER_R_TOP_OHM`,
 
 ## MCP4728 `0x60` → Op-Amp → Pin 5
 
-![Schaltplan Verstärkerstufe und 9-V-Regler](img/verstaerker-schaltplan.svg)
+![Schaltplan Verstärkerstufe und Versorgung](img/verstaerker-schaltplan.svg)
 
 ![LM358 DIP-8, Draufsicht](img/lm358-dip8.svg)
 
@@ -93,7 +93,7 @@ seine 3,3 V vom 3V3-Pin des ESP32. Schritt-für-Schritt-Steckplan mit allen Netz
 | A (`DAC_CH_IRIS 0`) | Rb 10 kΩ → +Eingang des Op-Amps |
 | B, C, D | frei |
 
-Op-Amp **nur LM358, kein TL072** (Gleichtaktbereich), Versorgung über **9-V-Regler** aus Hirose 6, damit Pin 5 im Fehlerfall nicht über ≈ 7,5 V geht:
+Op-Amp **nur LM358, kein TL072** (Gleichtaktbereich), Versorgung über **Spannungsteiler 470 Ω / 1,2 kΩ** aus Hirose 6 (8,6 V; ein 7809 geht ebenso), damit Pin 5 im Fehlerfall nicht über ≈ 7,1 V geht:
 Ra 16 kΩ von 3,3 V an +In · Rb 10 kΩ vom DAC an +In · R1 10 kΩ −In → GND ·
 R2 10 kΩ Ausgang → −In. Ergebnis `1,231 · Vdac + 2,54` → 2,54–6,60 V,
 dann **1 kΩ in Serie** zu Pin 5.
@@ -110,7 +110,7 @@ Durchgang gegen das Gehäuse bestätigen.
 | 3 | GND | gemeinsame Masse (ESP32, Module, Netzteil) | schwarz → Breadboard − |
 | 4 | Forced Iris Servo (Tastenfunktion, kein Enable) | **offen lassen** | — |
 | 5 | Iris-Sollwert | Op-Amp-Ausgang über 1 kΩ — **erst Schritt 5 der Inbetriebnahme** | — |
-| 6 | **+12 V** (Norm: 10–17 V) | Labornetzteil 12 V, **Strombegrenzung 1,0 A**, Polarität doppelt prüfen; 9-V-Regler für den Op-Amp. **Nie an ESP32 oder Module** | rot → Breadboard + |
+| 6 | **+12 V** (Norm: 10–17 V) | Labornetzteil 12 V, **Strombegrenzung 1,0 A**, Polarität doppelt prüfen; Teiler 470 Ω / 1,2 kΩ für den Op-Amp. **Nie an ESP32 oder Module** | rot → Breadboard + |
 | 7 | Iris-Position | Teiler → ADS1115 A0 | grün |
 | 8 | Iris Remote/Auto | 5 V über **1 kΩ** (Remote); offen = Auto | — |
 | 10 | Zoom-Position | Teiler → ADS1115 A1 | weiß |
