@@ -67,7 +67,7 @@ Objektiv → 2,83 V am ADC.
 |---|---|---|---|
 | A0 | 7 | Iris-Position | grün |
 | A1 | 10 | Zoom-Position | weiß |
-| A2 | 11 | Fokus-Position (Gruppe C) | blau |
+| A2 | 11 | Fokus-Position (Gruppe C) — an der J15ax8B4 IRS SX12 ohne Signal, kein Fokusgeber | blau |
 | A3 | — | Op-Amp-Ausgang (Kontrolle, optional) | — |
 
 Gemessene Widerstandswerte in `config.h` eintragen (`DIVIDER_R_TOP_OHM`,
