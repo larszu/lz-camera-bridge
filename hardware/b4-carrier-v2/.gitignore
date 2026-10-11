@@ -9,3 +9,4 @@ fp-info-cache
 route.log
 routed.*
 routed.kicad_pcb
+__pycache__/
