@@ -1,7 +1,12 @@
-drc.json
-route.log
+*.base.kicad_pcb
 *.dsn
-*.ses
 *.kicad_prl
-fp-info-cache
 *.lck
+*.ses
+*.work.kicad_pcb
+drc.json
+fp-info-cache
+route.log
+routed.*
+routed.kicad_pcb
+__pycache__/
