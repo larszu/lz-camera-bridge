@@ -183,7 +183,7 @@ for i, (x, y) in enumerate([(14.2, 4), (W - 4, 4), (4, 66.5), (W - 4, H - 4)], 1
 place("J1", "USBC", "USB-C PD/CHARGE", 5.5, 8, 270, {
     "A4": "USB_VBUS", "A9": "USB_VBUS", "B4": "USB_VBUS", "B9": "USB_VBUS",
     "A1": "GND", "A12": "GND", "B1": "GND", "B12": "GND", "SH": "GND",
-    "A5": "CC1", "B5": "CC2", "A6": "DP", "B6": "DP", "A7": "DM", "B7": "DM"},
+    "A5": "CC1", "B5": "CC2"},   # D+/D- unused: PD is the CH224A's job
     mpn="HRO TYPE-C-31-M-12 (LCSC C165948)")
 place("U1", "SSOP10EP", "CH224A", 15.5, 11, 0, {
     "1": "USB_VBUS", "8": "USB_VBUS", "9": "PD_CFG1", "6": "CC2", "7": "CC1", "10": "PD_PG", "11": "GND"},
@@ -197,43 +197,52 @@ place("D2", "SMC", "B540C", 45, 7, 90, {"2": "DC_IN", "1": "CHG_IN"}, mpn="Diode
 place("D3", "SMB", "SMBJ22A", 51.2, 6, 90, {"1": "CHG_IN", "2": "GND"}, mpn="TVS SMBJ22A, cathode to CHG_IN")
 
 # ------------------------------- charger BQ25798 ------------------------------------
-OFF[:] = [-4, -14]
-U2 = place("U2", "RQM", "BQ25798", 24, 40, 0, {
+# Hand-placed core (absolute mm). U2 turned 180 deg: its SW1/SW2 pins face L1 below,
+# PMID caps to the right, SYS caps to the left (TI layout guide: shortest SW, PMID and
+# SYS loops). The fan-out right at the 0.45 mm pitch pins is drawn in charger_core().
+OFF[:] = [0, 0]
+U2 = place("U2", "RQM", "BQ25798", 20, 26, 180, {
     "1": "CHG_STAT", "2": "CHG_IN", "3": "CHG_IN", "4": "BTST1", "5": "REGN",
-    "6": "DP", "7": "DM", "8": "CHG_IN", "9": "CHG_IN", "10": "GND", "11": "GND",
+    "6": "CHG_DPDM", "7": "CHG_DPDM", "8": "CHG_IN", "9": "CHG_IN", "10": "GND", "11": "GND",
     "12": "QON", "13": "CHG_CE", "14": "SCL", "15": "SDA", "16": "TS", "17": "REGN",
     "18": "BATP", "19": "BTST2", "20": "PROG", "21": "CHG_INT", "22": "VBAT", "23": "VBAT",
     "24": "SDRV", "25": "VSYS", "26": "SW2", "27": "GND", "28": "SW1", "29": "PMID"},
     mpn="TI BQ25798RQMR")
-place("L1", "L7", "2.2uH", 27, 49.5, 0, {"1": "SW1", "2": "SW2"}, mpn="2.2 uH >= 8 A sat, e.g. Bourns SRP7028A-2R2M")
-C("C2", "47nF 25V", "BTST1", "SW1", 18.5, 36.5)
-C("C3", "47nF 25V", "BTST2", "SW2", 29.5, 36.5)
-C("C4", "4.7uF 16V", "REGN", "GND", 18.5, 43.5, kind="C08")
-for i, (x, y) in enumerate([(16, 33), (16, 47)]):
-    C(f"C{5 + i}", "10uF 25V", "CHG_IN", "GND", x, y, kind="C12")
-C("C7", "100nF 50V", "CHG_IN", "GND", 20, 33)
-for i, (x, y) in enumerate([(32, 31), (32, 34.5), (32, 38)]):
-    C(f"C{8 + i}", "10uF 25V", "PMID", "GND", x, y, kind="C12")
-C("C11", "100nF 50V", "PMID", "GND", 28, 33)
-for i, (x, y) in enumerate([(32, 43), (32, 46.5), (32, 50), (35.5, 43), (35.5, 46.5)]):
-    C(f"C{12 + i}", "10uF 25V", "VSYS", "GND", x, y, kind="C12")
-C("C17", "100nF 50V", "VSYS", "GND", 28, 46)
-C("C18", "10uF 25V", "VBAT", "GND", 16, 50.5, kind="C12")
-C("C19", "10uF 25V", "VBAT", "GND", 16, 54, kind="C12")
-R("R2", "8.2k", "PROG", "GND", 20, 46.5, mpn="8.2k 1% 0603: 750 kHz, 2S (datasheet 7.3.2)")
-R("R3", "100", "VBAT", "BATP", 24, 46.5)
-C("C20", "1nF 50V", "SDRV", "GND", 28, 49)
+place("L1", "L7", "2.2uH", 20, 32.4, 180, {"1": "SW1", "2": "SW2"}, mpn="2.2 uH >= 8 A sat, e.g. Bourns SRP7028A-2R2M")
+C("C2", "47nF 25V", "BTST1", "SW1", 27.0, 34.0, rot=180)
+C("C3", "47nF 25V", "BTST2", "SW2", 13.0, 34.0)
+C("C4", "4.7uF 16V", "REGN", "GND", 25.0, 25.4, kind="C08")
+C("C5", "10uF 25V", "CHG_IN", "GND", 25.0, 23.0, kind="C12")
+C("C6", "10uF 25V", "CHG_IN", "GND", 25.0, 20.5, kind="C12")
+C("C7", "100nF 50V", "CHG_IN", "GND", 24.2, 27.35)
+# pad 1 of every bus cap sits on the bus at y 28.9 (courtyards just clear of L1 and U2)
+for i, x in enumerate([27.5, 29.95, 32.4]):
+    C(f"C{8 + i}", "10uF 25V", "PMID", "GND", x, 30.38, rot=270, kind="C12")
+C("C11", "100nF 50V", "PMID", "GND", 25.4, 29.68, rot=270)
+for i, x in enumerate([12.5, 10.05, 7.6, 5.15, 2.7]):
+    C(f"C{12 + i}", "10uF 25V", "VSYS", "GND", x, 30.38, rot=270, kind="C12")
+C("C17", "100nF 50V", "VSYS", "GND", 14.6, 29.68, rot=270)
+C("C18", "10uF 25V", "VBAT", "GND", 12.5, 24.5, rot=180, kind="C12")
+C("C19", "10uF 25V", "VBAT", "GND", 11.0, 22.0, rot=180, kind="C12")
+R("R2", "8.2k", "PROG", "GND", 15.6, 26.0, rot=180, mpn="8.2k 1% 0603: 750 kHz, 2S (datasheet 7.3.2)")
+R("R3", "100", "VBAT", "BATP", 16.0, 24.0)
+C("C20", "1nF 50V", "SDRV", "GND", 11.5, 25.0)
+CORE = {"U2", "L1", "C2", "C3", "C4", "C5", "C6", "C7", "C8", "C9", "C10", "C11", "C12", "C13", "C14", "C15",
+        "C16", "C17", "R2", "LED1", "R7"}   # R2 sits right in front of PROG (pin 20); C18, R3, C20 go to the legaliser
+OFF[:] = [-4, -14]
 R("R4", "5.23k", "REGN", "TS", 13, 40)
 R("R5", "30.1k", "TS", "GND", 13, 43)
 place("RT1", "NTC", "10k NTC 103AT", 41, 52, 0, {"1": "TS", "2": "GND"}, mpn="Semitec 103AT-2 or 10k B3435 0603, at the cells")
 R("R6", "10k", "CHG_INT", "A3V3", 13, 46)
-R("R7", "1k", "A3V3", "LED_CHG", 13, 37)
-place("LED1", "LED", "CHG", 9, 37, 0, {"1": "CHG_STAT", "2": "LED_CHG"}, mpn="0603 orange")
+OFF[:] = [0, 0]
+R("R7", "1k", "A3V3", "LED_CHG", 31.6, 27.25, rot=180)   # charge LED right next to STAT (pin 1)
+place("LED1", "LED", "CHG", 28.3, 27.25, 0, {"1": "CHG_STAT", "2": "LED_CHG"}, mpn="0603 orange")
+OFF[:] = [-4, -14]
 place("TP1", "TP", "QON", 9, 41, pads={"1": "QON"})
 
 # ------------------------------- cells, fuse, balancer -------------------------------
 OFF[:] = [0, 0]
-place("BT1", "BAT", "18650 low", 46.5, 26, 0, {"1": "VMID", "2": "GND"}, bottom=True, smt=False,
+place("BT1", "BAT", "18650 low", 46.5, 26, 180, {"1": "VMID", "2": "GND"}, bottom=True, smt=False,
       mpn="Keystone 1042 + 18650 cell (protected cell recommended)")
 place("BT2", "BAT", "18650 high", 46.5, 50, 0, {"1": "VBAT_RAW", "2": "VMID"}, bottom=True, smt=False,
       mpn="Keystone 1042 + 18650 cell")
@@ -402,7 +411,7 @@ place("J15", "S20", "S3-ETH IO20 ROW", X0 + 20.32, Y0 + 19 * 2.54, 180,
 box(X0 - 2.6, Y0 - 8, X0 + 25.4 + 2.6, Y0 + 43.5, label="DEVKIT V1")
 box(X0 + 0.9, Y0 - 3, X0 + 21.96, Y0 + 48.26 + 20, label="ESP32-S3-ETH")
 text("ESP32: DEVKIT V1  oder  S3-ETH (+PoE)", X0 + 10, Y0 - 5.5, 0.85)
-text("NUR EIN BOARD", X0 + 14, Y0 + 71, 1.0)
+text("nur ein Board stecken", X0 + 10, Y0 - 4.0, 0.8, bold=False)
 
 R("R64", "4.7k", "SDA", "A3V3", 95, 33)
 R("R65", "4.7k", "SCL", "A3V3", 95, 36)
@@ -484,7 +493,7 @@ text("OLED", 61.5, 8.0, 1.0)
 text("GND 3V3 SCL SDA", 61.5, 9.6, 0.8, bold=False)
 text("USB-C", 5.5, 15, 0.9)
 text("DC 6-20V", 28, 15.6, 0.9)
-text("2x 18650 - POLUNG BEACHTEN", 46.5, 38, 1.5, layer=pcbnew.B_SilkS)
+text("2x 18650 - POLUNG BEACHTEN", 46.5, 38, 1.0, layer=pcbnew.B_SilkS)
 text("B4 LENS CARRIER v2  github.com/larszu/lz-camera-bridge", 46.5, 63, 1.2, layer=pcbnew.B_SilkS)
 
 # test points
@@ -511,6 +520,8 @@ def hit(a, b):
 
 def is_small(fp):
     r = fp.GetReference()
+    if r in CORE:
+        return False   # hand-placed charger core stays where it is
     return r.startswith(SMALL) and not r.startswith(("CP",)) and r not in ("C34", "D1", "D2", "D3", "D4", "F1", "RS1")
 
 
@@ -525,6 +536,9 @@ for fp in board.GetFootprints():
                                 pcbnew.ToMM(bb.GetRight()) + 0.6, pcbnew.ToMM(bb.GetBottom()) + 0.6])
 holders = [cy_box(fp) for fp in board.GetFootprints() if fp.GetSide() != 0]
 obst = list(holder_pads)
+# fan-out room around the 0.4 mm pitch BQ25798: nothing within 2 mm of its courtyard
+FANOUT = [cy_box(board.FindFootprintByReference("U2"), 0.8)]
+obst += FANOUT
 for fp in board.GetFootprints():
     if fp.GetSide() != 0 or is_small(fp):
         continue
@@ -587,11 +601,97 @@ nsx.RecomputeEffectiveNetclasses()
 ds.m_CopperEdgeClearance = mm(0.5)
 ds.m_TrackMinWidth = mm(0.12)
 ds.m_MinThroughDrill = mm(0.2)   # thermal vias under the TPS55340
+ds.m_ViasMinSize = mm(0.45)      # 0.2 mm drill + 0.125 mm ring (PCBWay standard)
 
 for fp in board.GetFootprints():   # silkscreen: references only, small
     fp.Value().SetVisible(False)
     fp.Reference().SetTextSize(pcbnew.VECTOR2I(mm(0.8), mm(0.8)))
     fp.Reference().SetTextThickness(mm(0.12))
+# =============================== charger core fan-out (locked) =========================
+def trk(netname, pts, w, layer=pcbnew.F_Cu):
+    for (x1, y1), (x2, y2) in zip(pts, pts[1:]):
+        t = pcbnew.PCB_TRACK(board)
+        t.SetStart(pcbnew.VECTOR2I(mm(x1), mm(y1)))
+        t.SetEnd(pcbnew.VECTOR2I(mm(x2), mm(y2)))
+        t.SetWidth(mm(w))
+        t.SetLayer(layer)
+        t.SetNet(net(netname))
+        t.SetLocked(True)
+        board.Add(t)
+
+
+def via(netname, x, y, d=0.6, drill=0.3):
+    v = pcbnew.PCB_VIA(board)
+    v.SetPosition(pcbnew.VECTOR2I(mm(x), mm(y)))
+    v.SetWidth(mm(d))
+    v.SetDrill(mm(drill))
+    v.SetNet(net(netname))
+    v.SetLocked(True)
+    board.Add(v)
+
+
+def padxy(ref, name):
+    p = [p for p in board.FindFootprintByReference(ref).Pads() if p.GetName() == name][0]
+    return pcbnew.ToMM(p.GetPosition().x), pcbnew.ToMM(p.GetPosition().y)
+
+
+def charger_core():
+    """U2 turned 180 deg at (20, 26): south pins PMID 29, SW1 28, GND 27, SW2 26, SYS 25 (0.45 mm)."""
+    pm, s1, g27, s2, sy = (padxy("U2", n) for n in ("29", "28", "27", "26", "25"))
+    yb = 28.9                                   # PMID / SYS buses run here, 0.7 mm below the pins
+    # SW1 / SW2 leave the pin row at 0.25 mm and widen at once; the PGND via sits between them
+    trk("SW1", [s1, (s1[0], 29.6), (s1[0] + 0.5, 30.1)], 0.25)   # narrow until clear of buses and PGND
+    trk("SW1", [(s1[0] + 0.5, 30.1), (21.5, 30.65), padxy("L1", "1")], 0.8)
+    trk("SW2", [s2, (s2[0], 29.6), (s2[0] - 0.5, 30.1)], 0.25)
+    trk("SW2", [(s2[0] - 0.5, 30.1), (18.5, 30.65), padxy("L1", "2")], 0.8)
+    trk("GND", [g27, (g27[0], 31.3)], 0.3)       # power ground straight into the planes
+    via("GND", g27[0], 30.4)
+    via("GND", g27[0], 31.3)
+    trk("PMID", [pm, (pm[0], yb), (pm[0] + 0.3, yb)], 0.25)
+    trk("PMID", [(pm[0] + 0.3, yb), padxy("C10", "1")], 0.6)
+    for c in ("C11", "C8", "C9", "C10"):
+        trk("PMID", [(padxy(c, "1")[0], yb), padxy(c, "1")], 0.6)
+    trk("VSYS", [sy, (sy[0], yb), (sy[0] - 0.3, yb)], 0.25)
+    trk("VSYS", [(sy[0] - 0.3, yb), (padxy("C16", "1")[0], yb)], 0.6)
+    for c in ("C17", "C12", "C13", "C14", "C15", "C16"):
+        trk("VSYS", [(padxy(c, "1")[0], yb), padxy(c, "1")], 0.6)
+    # VBAT pins 22/23 (west) bridged, out to C18; CHG_IN pins 2/3 and 8/9 (east) bridged
+    v22, v23 = padxy("U2", "22"), padxy("U2", "23")
+    trk("VBAT", [v22, v23], 0.2)
+    ym = (v22[1] + v23[1]) / 2
+    trk("VBAT", [(v22[0], ym), (17.05, ym)], 0.25)
+    via("VBAT", 17.05, ym, 0.7, 0.35)            # battery trunk lands here (power_trunks.py)
+    c2, c3, c8, c9 = (padxy("U2", n) for n in ("2", "3", "8", "9"))
+    trk("CHG_IN", [c2, c3], 0.2)
+    trk("CHG_IN", [c8, c9], 0.2)
+    ym = (c2[1] + c3[1]) / 2
+    trk("CHG_IN", [(c2[0], ym), padxy("C7", "1")], 0.25)
+    via("CHG_IN", 22.75, ym)                     # pins 2/3 reach the rest of CHG_IN through the planes
+    trk("PROG", [padxy("U2", "20"), padxy("R2", "1")], 0.2)
+    # D+/D- tied together at the pins
+    trk("CHG_DPDM", [padxy("U2", "6"), padxy("U2", "7")], 0.2)
+
+
+charger_core()
+
+
+def efuse_core():
+    """TPS259541 input (pins 3/4, 1.5 A for the lens) gets a via group the 12 V trunk ends on."""
+    p3, p4 = padxy("U5", "3"), padxy("U5", "4")
+    ym = (p3[1] + p4[1]) / 2
+    trk("V12", [p3, p4], 0.25)
+    trk("V12", [(p3[0], ym), (62.6, ym)], 0.5)
+    for (x, y) in [(63.6, ym), (62.6, ym), (63.1, ym + 0.9)]:
+        via("V12", x, y, 0.7, 0.35)
+    trk("V12", [(63.6, ym), (63.1, ym + 0.9), (62.6, ym)], 0.5)
+
+
+efuse_core()
+
+import power_trunks   # noqa: E402  (wide B.Cu power paths, locked, before Freerouting)
+for line in power_trunks.run(board, W, H, nets, keepouts=FANOUT):
+    print("trunk", line)
+
 pcbnew.SaveBoard(OUT, board)
 print("placed", len(board.GetFootprints()), "footprints,", len(nets), "nets")
 
@@ -609,7 +709,7 @@ if "--route" in sys.argv:
         for (x, y) in [(x1, y1), (x2, y1), (x2, y2), (x1, y2)]:
             o.Append(mm(x), mm(y))
         board.Add(k)
-    # all four layers route; GND is poured on every layer afterwards (In1 stays mostly solid)
+    # all four layers route; GND is poured on every layer afterwards
     dsn = OUT.replace(".kicad_pcb", ".dsn"); ses = OUT.replace(".kicad_pcb", ".ses")
     pcbnew.ExportSpecctraDSN(board, dsn)
     subprocess.run([JAVA, "-jar", FREEROUTING, "-de", dsn, "-do", ses, "-mp", "60", "--gui.enabled=false"], check=True)
@@ -624,4 +724,7 @@ if "--route" in sys.argv:
         board.Add(z)
     pcbnew.ZONE_FILLER(board).Fill(board.Zones())
     pcbnew.SaveBoard(OUT, board)
+    pcbnew.SaveBoard(os.path.join(HERE, "routed.kicad_pcb"), board)
     print("routed")
+    for step in ("fixup.py", "postprocess.py"):   # close Freerouting's gaps, then widen / stitch / silk
+        subprocess.run([sys.executable, os.path.join(HERE, step)], check=True)

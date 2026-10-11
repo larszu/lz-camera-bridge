@@ -1,0 +1,19 @@
+Narrowest copper width per power net (away from pads, mm)
+SW2           0.45 of 1.5  at (  19.4,  29.7) F.Cu
+VSYS          0.55 of 1.5  at (  33.0,  63.0) In1.Cu
+VBAT          0.75 of 1.5  at (  32.0,  63.0) In1.Cu
+SW1           0.85 of 1.5  at (  20.6,  29.7) F.Cu
+V5            0.50 of 0.8  at (  30.7,  63.0) In1.Cu
+V12           0.95 of 1.5  at (  39.0,  57.8) In1.Cu
+VMID          0.95 of 1.5  at (  34.6,  52.2) In2.Cu
+CHG_IN        0.95 of 1.5  at (  23.0,  47.9) In1.Cu
+PMID          1.00 of 1.5  at (  23.0,  28.9) F.Cu
+TALLY_V       0.60 of 0.8  at (  97.3,  67.1) F.Cu
+V9            0.60 of 0.8  at (  85.8,   7.6) F.Cu
+USB_VBUS      1.35 of 1.5  at (  14.4,   7.6) In2.Cu
+V12E          1.40 of 1.5  at (  69.7,  23.9) In2.Cu
+V12_LENS      1.45 of 1.5  at (  40.4,  62.7) F.Cu
+BST_SW        1.45 of 1.5  at (  52.8,  31.1) F.Cu
+VBAT_RAW      1.45 of 1.5  at (   6.5,  46.1) F.Cu
+DC_IN         1.50 of 1.5  at (  43.0,   5.2) B.Cu
+ESP_5V        1.00 of 0.8  at (  69.9,   6.1) B.Cu
