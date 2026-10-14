@@ -13,7 +13,9 @@
  * 4. SEAT SHOTS. A seating chart; each seat names shots on one or more
  *    cameras, best first. A click picks the first camera that is connected
  *    and NOT on air; only if every candidate is on air is the recall held
- *    back for a "move anyway".
+ *    back for a "move anyway". The chart is a rows × seats grid by default;
+ *    with `layout: 'free'` the seats sit anywhere on a simple room plan
+ *    (x/y in percent). The grid stays the quick way to fill a room.
  * 5. MOVES. A sequence of shots on one camera, each with its own move time
  *    and an optional hold — a keyframe move built from eased shots.
  *
@@ -49,15 +51,23 @@ export interface ShotSet {
 export interface Seat {
   id: string;
   label?: string;
-  row: number;
-  col: number;
+  /** Grid cell. A seat placed only on the room plan has none. */
+  row?: number;
+  col?: number;
+  /** Position on the room plan, percent of its width / depth (0 = stage edge). */
+  x?: number;
+  y?: number;
   /** Candidates, best first. */
   shots: ShotRef[];
 }
 
+export type SeatLayout = 'grid' | 'free';
+
 export interface SeatChart {
   rows: number;
   cols: number;
+  /** Default `grid`. */
+  layout?: SeatLayout;
   seats: Seat[];
 }
 
@@ -105,6 +115,12 @@ const str = (v: unknown): string | undefined => (typeof v === 'string' && v.trim
 const int = (v: unknown): number | undefined => (Number.isInteger(Number(v)) && v !== null && v !== '' ? Number(v) : undefined);
 const mode = (v: unknown): RecallMode | undefined => (v === 'cut' || v === 'fade' ? v : undefined);
 const source = (v: unknown): ShotSource | undefined => (v === 'plan' || v === 'head' ? v : undefined);
+/** 0…100, one decimal; anything else is "not placed". */
+const percent = (v: unknown): number | undefined => {
+  if (v === null || v === '' || v === undefined) return undefined;
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.round(Math.min(100, Math.max(0, n)) * 10) / 10 : undefined;
+};
 
 export function normaliseShotRef(raw: unknown): ShotRef | null {
   if (!raw || typeof raw !== 'object') return null;
@@ -152,18 +168,29 @@ export function normaliseStudioShots(raw: unknown): StudioShots {
   const rows = Math.min(MAX_ROWS, Math.max(0, int(chart.rows) ?? 0));
   const cols = Math.min(MAX_COLS, Math.max(0, int(chart.cols) ?? 0));
   out.seats = { rows, cols, seats: [] };
+  if (chart.layout === 'free') out.seats.layout = 'free';
   const taken = new Set<string>();
   for (const s of Array.isArray(chart.seats) ? chart.seats : []) {
     if (!s || typeof s !== 'object') continue;
     const r = s as Record<string, unknown>;
     const row = int(r.row);
     const col = int(r.col);
-    if (row === undefined || col === undefined || row < 0 || col < 0 || row >= rows || col >= cols) continue;
+    const x = percent(r.x);
+    const y = percent(r.y);
+    const placed = x !== undefined && y !== undefined;
     const key = `${row}:${col}`;
-    if (taken.has(key)) continue;
-    taken.add(key);
+    const inGrid = row !== undefined && col !== undefined && row >= 0 && col >= 0 && row < rows && col < cols && !taken.has(key);
+    // A seat needs somewhere to be: a free grid cell, or a spot on the room plan.
+    if (!inGrid && !placed) continue;
+    if (inGrid) taken.add(key);
     const label = str(r.label);
-    out.seats.seats.push({ id: freshId(r.id, 'seat'), row, col, shots: refs(r.shots), ...(label ? { label } : {}) });
+    out.seats.seats.push({
+      id: freshId(r.id, 'seat'),
+      ...(inGrid ? { row, col } : {}),
+      ...(placed ? { x, y } : {}),
+      shots: refs(r.shots),
+      ...(label ? { label } : {}),
+    });
   }
 
   for (const m of Array.isArray(o.moves) ? o.moves : []) {
@@ -204,6 +231,32 @@ export function heldByOnAir(onAir: boolean, config: { tallyProtect?: boolean } |
 }
 
 // ── Seat shots ───────────────────────────────────────────────────────────────
+
+/** What a seat is called when nobody named it. */
+export function seatLabel(seat: Pick<Seat, 'id' | 'label' | 'row' | 'col'>): string {
+  if (seat.label) return seat.label;
+  if (seat.row !== undefined && seat.col !== undefined) return `Row ${seat.row + 1}, seat ${seat.col + 1}`;
+  return `Seat ${seat.id}`;
+}
+
+/** Room plan depth kept free for the stage when a grid is placed on it (%). */
+const GRID_TOP = 12;
+
+/**
+ * Where a seat sits on the room plan (percent): its own spot, else the
+ * centre of its grid cell, with the grid filling the room below the stage.
+ */
+export function seatPosition(seat: Pick<Seat, 'row' | 'col' | 'x' | 'y'>, chart: Pick<SeatChart, 'rows' | 'cols'>): { x: number; y: number } {
+  if (seat.x !== undefined && seat.y !== undefined) return { x: seat.x, y: seat.y };
+  const rows = Math.max(1, chart.rows);
+  const cols = Math.max(1, chart.cols);
+  const r = seat.row ?? 0;
+  const c = seat.col ?? 0;
+  return {
+    x: Math.round(((c + 0.5) / cols) * 1000) / 10,
+    y: Math.round((GRID_TOP + ((r + 0.5) / rows) * (100 - GRID_TOP)) * 10) / 10,
+  };
+}
 
 export interface CameraFacts {
   cameraNumber: number;

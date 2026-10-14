@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import type {
   CameraSlot, MoveProgress, MoveStep, RecallMode, Seat, ShotMove, ShotRecalled, ShotRef, ShotSet, StudioShots,
 } from '../hooks/useBridge.ts';
@@ -278,34 +278,86 @@ function SetsTab({ shots, cameras, editing, camNums, camName, onAir, onChange, o
 
 // ── Seating chart ──────────────────────────────────────────────────────────────
 
+type Chart = StudioShots['seats'];
+/** Room plan depth kept for the stage when the grid is laid on it (%) — same as the bridge. */
+const GRID_TOP = 12;
+const round1 = (n: number) => Math.round(Math.min(100, Math.max(0, n)) * 10) / 10;
+const inGrid = (s: Seat, c: Pick<Chart, 'rows' | 'cols'>) => s.row !== undefined && s.col !== undefined && s.row < c.rows && s.col < c.cols;
+const placed = (s: Seat) => s.x !== undefined && s.y !== undefined;
+const seatName = (s: Seat) => s.label ?? (s.row !== undefined && s.col !== undefined ? `Row ${s.row + 1}, seat ${s.col + 1}` : `Seat ${s.id}`);
+const seatShort = (s: Seat) => s.label ?? (s.row !== undefined && s.col !== undefined ? `${s.row + 1}·${s.col + 1}` : s.id);
+/** Mirrors `seatPosition` in the bridge: own spot, else the centre of its grid cell. */
+function seatPos(s: Seat, c: Pick<Chart, 'rows' | 'cols'>): { x: number; y: number } {
+  if (s.x !== undefined && s.y !== undefined) return { x: s.x, y: s.y };
+  const rows = Math.max(1, c.rows);
+  const cols = Math.max(1, c.cols);
+  return { x: round1((((s.col ?? 0) + 0.5) / cols) * 100), y: round1(GRID_TOP + (((s.row ?? 0) + 0.5) / rows) * (100 - GRID_TOP)) };
+}
+
 function SeatsTab({ shots, cameras, editing, camNums, camName, onChange, onRecallSeat }: TabProps) {
   const [editKey, setEditKey] = useState<string | null>(null);
   const [last, setLast] = useState<string | null>(null);
   const { rows, cols, seats } = shots.seats;
+  const free = shots.seats.layout === 'free';
   const at = (r: number, c: number) => seats.find((s) => s.row === r && s.col === c);
   const edit = editKey ? seats.find((s) => s.id === editKey) ?? null : null;
-  const setChart = (next: Partial<StudioShots['seats']>) => {
+  const setChart = (next: Partial<Chart>) => {
     const chart = { ...shots.seats, ...next };
-    chart.seats = chart.seats.filter((s) => s.row < chart.rows && s.col < chart.cols);
+    // A seat outside the grid keeps its spot on the room plan; without one it goes.
+    chart.seats = chart.seats
+      .map((s) => (inGrid(s, chart) || s.row === undefined ? s : { ...s, row: undefined, col: undefined }))
+      .filter((s) => inGrid(s, chart) || placed(s));
     onChange({ ...shots, seats: chart });
   };
   const updateSeat = (seat: Seat) => setChart({ seats: seats.map((s) => (s.id === seat.id ? seat : s)) });
-  const clickSeat = (r: number, c: number) => {
+  const recall = (seat: Seat) => { if (seat.shots.length) { onRecallSeat(seat.id); setLast(seat.id); } };
+  const freshId = (base: string) => { let id = base; while (seats.some((s) => s.id === id)) id = `${id}_`; return id; };
+  const clickCell = (r: number, c: number) => {
     const seat = at(r, c);
-    if (!editing) {
-      if (seat && seat.shots.length) { onRecallSeat(seat.id); setLast(seat.id); }
-      return;
-    }
+    if (!editing) { if (seat) recall(seat); return; }
     if (seat) { setEditKey(seat.id); return; }
-    const fresh: Seat = { id: `r${r + 1}s${c + 1}`, row: r, col: c, shots: [firstShot(camNums)] };
+    const fresh: Seat = { id: freshId(`r${r + 1}s${c + 1}`), row: r, col: c, shots: [firstShot(camNums)] };
     setChart({ seats: [...seats, fresh] });
     setEditKey(fresh.id);
   };
+  const setLayout = (layout: 'grid' | 'free') => {
+    if (layout === 'free') {
+      // Every seat gets a spot where the grid had it — switching loses nothing.
+      setChart({ layout: 'free', seats: seats.map((s) => (placed(s) ? s : { ...s, ...seatPos(s, shots.seats) })) });
+    } else {
+      setChart({ layout: undefined });
+    }
+  };
+  const addSeat = () => {
+    const n = seats.length + 1;
+    const fresh: Seat = { id: freshId(`seat${n}`), label: `Seat ${n}`, x: 50, y: 50, shots: [firstShot(camNums)] };
+    setChart({ seats: [...seats, fresh] });
+    setEditKey(fresh.id);
+  };
+  /** The grid as a quick start on the room plan: one seat per empty cell. */
+  const placeGrid = () => {
+    const added: Seat[] = [];
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+      const id = `r${r + 1}s${c + 1}`;
+      if (at(r, c) || seats.some((s) => s.id === id)) continue;
+      added.push({ id, row: r, col: c, ...seatPos({ id, row: r, col: c, shots: [] }, shots.seats), shots: [] });
+    }
+    if (added.length) setChart({ seats: [...seats, ...added] });
+  };
+  const offGrid = seats.filter((s) => !inGrid(s, shots.seats)).length;
+  const empty = free ? seats.length === 0 : rows * cols === 0;
 
   return (
     <>
       {editing && (
         <div className="connection-row">
+          <div className="field" style={{ flex: '0 0 auto', minWidth: 0 }}>
+            <label id="seat-layout">Layout</label>
+            <span className="row" role="group" aria-labelledby="seat-layout">
+              <button className={`btn btn--sm ${!free ? 'btn--on' : ''}`} aria-pressed={!free} onClick={() => setLayout('grid')} title="Rows × seats">Grid</button>
+              <button className={`btn btn--sm ${free ? 'btn--on' : ''}`} aria-pressed={free} onClick={() => setLayout('free')} title="Seats anywhere on a room plan">Room plan</button>
+            </span>
+          </div>
           <div className="field field--sm">
             <label htmlFor="seat-rows">Rows</label>
             <input id="seat-rows" type="number" min={0} max={40} value={rows} onChange={(e) => setChart({ rows: Math.max(0, Math.min(40, Number(e.target.value) || 0)) })} />
@@ -314,10 +366,29 @@ function SeatsTab({ shots, cameras, editing, camNums, camName, onChange, onRecal
             <label htmlFor="seat-cols">Seats per row</label>
             <input id="seat-cols" type="number" min={0} max={60} value={cols} onChange={(e) => setChart({ cols: Math.max(0, Math.min(60, Number(e.target.value) || 0)) })} />
           </div>
+          {free && (
+            <div className="row">
+              <button className="btn btn--sm" onClick={addSeat}>+ Seat</button>
+              <button className="btn btn--sm" onClick={placeGrid} disabled={rows * cols === 0} title="One seat per empty grid cell, laid out on the plan">Place grid</button>
+            </div>
+          )}
         </div>
       )}
-      {rows * cols === 0 ? (
-        <div className="empty">No seating chart yet. “Edit” → rows and seats, then tap a seat to give it a shot per camera.</div>
+      {empty ? (
+        <div className="empty">
+          {free
+            ? 'No seats on the room plan yet. “+ Seat” adds one, “Place grid” lays out rows × seats — then drag them where they are.'
+            : 'No seating chart yet. “Edit” → rows and seats, then tap a seat to give it a shot per camera.'}
+        </div>
+      ) : free ? (
+        <div className="panel">
+          <RoomPlan
+            chart={shots.seats} editing={editing} editKey={editKey} last={last} camName={camName}
+            onSelect={(seat) => (editing ? setEditKey(seat.id) : recall(seat))}
+            onMove={(seat, x, y) => updateSeat({ ...seat, x, y })}
+          />
+          {editing && <p className="hint">Drag a seat to where it is in the room (arrow keys nudge it). Tap a seat to give it its shots.</p>}
+        </div>
       ) : (
         <div className="panel">
           <div className="stage-mark">Stage</div>
@@ -327,13 +398,14 @@ function SeatsTab({ shots, cameras, editing, camNums, camName, onChange, onRecal
               const usable = Boolean(seat?.shots.length);
               const cls = ['seat', !usable && 'seat--empty', editing && seat && seat.id === editKey && 'seat--edit', !editing && seat && seat.id === last && 'seat--last'].filter(Boolean).join(' ');
               return (
-                <button key={`${r}:${c}`} className={cls} onClick={() => clickSeat(r, c)} disabled={!editing && !usable}
-                  title={seat ? `${seat.label ?? `Row ${r + 1}, seat ${c + 1}`}: ${seat.shots.map((s) => camName(s.cameraNumber)).join(', ') || 'no shot'}` : `Row ${r + 1}, seat ${c + 1}`}>
-                  {seat?.label ?? `${r + 1}·${c + 1}`}
+                <button key={`${r}:${c}`} className={cls} onClick={() => clickCell(r, c)} disabled={!editing && !usable}
+                  title={seat ? `${seatName(seat)}: ${seat.shots.map((s) => camName(s.cameraNumber)).join(', ') || 'no shot'}` : `Row ${r + 1}, seat ${c + 1}`}>
+                  {seat ? seatShort(seat) : `${r + 1}·${c + 1}`}
                 </button>
               );
             }))}
           </div>
+          {offGrid > 0 && <p className="hint">{offGrid === 1 ? '1 seat is' : `${offGrid} seats are`} only on the room plan.</p>}
         </div>
       )}
       {editing && edit && (
@@ -341,7 +413,7 @@ function SeatsTab({ shots, cameras, editing, camNums, camName, onChange, onRecal
           <div className="connection-row">
             <div className="field">
               <label htmlFor="seat-label">Name (optional)</label>
-              <input id="seat-label" value={edit.label ?? ''} placeholder={`Row ${edit.row + 1}, seat ${edit.col + 1}`} onChange={(e) => updateSeat({ ...edit, label: e.target.value || undefined })} />
+              <input id="seat-label" value={edit.label ?? ''} placeholder={seatName({ ...edit, label: undefined })} onChange={(e) => updateSeat({ ...edit, label: e.target.value || undefined })} />
             </div>
           </div>
           <p className="hint">Best camera first. A tap takes the first one that is connected and not on air.</p>
@@ -353,11 +425,97 @@ function SeatsTab({ shots, cameras, editing, camNums, camName, onChange, onRecal
           <div className="row">
             <button className="btn btn--sm" onClick={() => updateSeat({ ...edit, shots: [...edit.shots, firstShot(camNums.filter((n) => !edit.shots.some((r) => r.cameraNumber === n)).concat(camNums))] })}>+ Camera</button>
             <span style={{ flex: 1 }} />
-            <button className="btn btn--sm btn--danger" onClick={() => { setChart({ seats: seats.filter((s) => s.id !== edit.id) }); setEditKey(null); }}>Clear seat</button>
+            <button className="btn btn--sm btn--danger" onClick={() => { setChart({ seats: seats.filter((s) => s.id !== edit.id) }); setEditKey(null); }}>{free ? 'Delete seat' : 'Clear seat'}</button>
           </div>
         </div>
       )}
     </>
+  );
+}
+
+/**
+ * The room plan: stage at the top, seats where they are. In edit mode a seat
+ * is dragged (mouse, pen or touch) or nudged with the arrow keys; the new
+ * spot goes to the bridge once, on release — not on every pixel.
+ */
+function RoomPlan({ chart, editing, editKey, last, camName, onSelect, onMove }: {
+  chart: Chart;
+  editing: boolean;
+  editKey: string | null;
+  last: string | null;
+  camName: (n: number) => string;
+  onSelect: (seat: Seat) => void;
+  onMove: (seat: Seat, x: number, y: number) => void;
+}) {
+  const planRef = useRef<HTMLDivElement>(null);
+  const drag = useRef<{ id: string; startX: number; startY: number; moved: boolean } | null>(null);
+  /** Set right after a drag so the click that follows the release is not a "select". */
+  const justDragged = useRef(false);
+  const [live, setLive] = useState<{ id: string; x: number; y: number } | null>(null);
+  const toPercent = (e: React.PointerEvent) => {
+    const r = planRef.current!.getBoundingClientRect();
+    return { x: round1(((e.clientX - r.left) / r.width) * 100), y: round1(((e.clientY - r.top) / r.height) * 100) };
+  };
+  const nudge: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+
+  return (
+    <div className={`room-plan ${editing ? 'room-plan--edit' : ''}`}>
+      <div className="room-plan__stage">Stage</div>
+      {/* Seat centres live on this inset floor, so a seat at 0 % or 100 % is still whole. */}
+      <div className="room-plan__floor" ref={planRef}>
+        {chart.seats.map((seat) => {
+          const pos = live?.id === seat.id ? live : seatPos(seat, chart);
+          const usable = seat.shots.length > 0;
+          const cls = ['seat', 'room-plan__seat', !usable && 'seat--empty', editing && seat.id === editKey && 'seat--edit',
+            !editing && seat.id === last && 'seat--last', live?.id === seat.id && 'room-plan__seat--drag'].filter(Boolean).join(' ');
+          return (
+            <button
+              key={seat.id}
+              className={cls}
+              style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
+              disabled={!editing && !usable}
+              title={`${seatName(seat)}: ${seat.shots.map((s) => camName(s.cameraNumber)).join(', ') || 'no shot'}`}
+              onPointerDown={(e) => {
+                if (!editing || e.button !== 0) return;
+                e.currentTarget.setPointerCapture(e.pointerId);
+                drag.current = { id: seat.id, startX: e.clientX, startY: e.clientY, moved: false };
+              }}
+              onPointerMove={(e) => {
+                const d = drag.current;
+                if (!d || d.id !== seat.id) return;
+                if (!d.moved && Math.hypot(e.clientX - d.startX, e.clientY - d.startY) < 5) return;
+                d.moved = true;
+                setLive({ id: seat.id, ...toPercent(e) });
+              }}
+              onPointerUp={(e) => {
+                const d = drag.current;
+                drag.current = null;
+                if (!d?.moved) return;
+                justDragged.current = true;
+                const p = toPercent(e);
+                setLive(null);
+                onMove(seat, p.x, p.y);
+              }}
+              onPointerCancel={() => { drag.current = null; setLive(null); }}
+              onClick={() => {
+                if (justDragged.current) { justDragged.current = false; return; }
+                onSelect(seat);
+              }}
+              onKeyDown={(e) => {
+                const d = nudge[e.key];
+                if (!editing || !d) return;
+                e.preventDefault();
+                const step = e.shiftKey ? 5 : 1;
+                const p = seatPos(seat, chart);
+                onMove(seat, round1(p.x + d[0] * step), round1(p.y + d[1] * step));
+              }}
+            >
+              {seatShort(seat)}
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 

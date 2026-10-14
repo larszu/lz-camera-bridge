@@ -103,14 +103,16 @@ export type RecallMode = 'cut' | 'fade';
 export type ShotSource = 'head' | 'plan';
 export interface ShotRef { cameraNumber: number; preset: number; source?: ShotSource }
 export interface ShotSet { id: string; name: string; shots: ShotRef[]; mode?: RecallMode; timeMs?: number }
-export interface Seat { id: string; label?: string; row: number; col: number; shots: ShotRef[] }
+/** `row`/`col`: grid cell (none = only on the room plan). `x`/`y`: spot on the room plan, percent. */
+export interface Seat { id: string; label?: string; row?: number; col?: number; x?: number; y?: number; shots: ShotRef[] }
+export type SeatLayout = 'grid' | 'free';
 export interface MoveStep { preset: number; source?: ShotSource; timeMs?: number; holdMs?: number }
 export interface ShotMove { id: string; name: string; cameraNumber: number; steps: MoveStep[] }
 export interface StudioShots {
   defaultMode: RecallMode;
   defaultTimeMs: number;
   sets: ShotSet[];
-  seats: { rows: number; cols: number; seats: Seat[] };
+  seats: { rows: number; cols: number; layout?: SeatLayout; seats: Seat[] };
   moves: ShotMove[];
 }
 export const EMPTY_STUDIO_SHOTS: StudioShots = { defaultMode: 'fade', defaultTimeMs: 3000, sets: [], seats: { rows: 0, cols: 0, seats: [] }, moves: [] };

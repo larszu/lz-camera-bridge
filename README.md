@@ -174,7 +174,9 @@ device stays silent, is in [`docs/dji-gimbal.md`](docs/dji-gimbal.md).
     on by default.
   - *Seats* — a seating chart (rows × seats); each seat lists shots on one
     or more cameras, best first. A tap takes the first camera that is
-    connected and not on air.
+    connected and not on air. Optionally a *room plan* instead of the
+    grid: seats are dragged to where they are (a lectern, a sofa, a panel
+    table), and *Place grid* lays out rows × seats as a quick start.
   - *Moves* — shots of one camera in a row, each with its own move time and
     an optional hold; any joystick touch stops the move.
 
