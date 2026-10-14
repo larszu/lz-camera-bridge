@@ -14,6 +14,10 @@
  *       POST /birddogwbsetup                 — { WbMode, ColorTemp, RedGain, BlueGain }
  *       POST /recall | /save                 — { Preset: "Preset-<n>" }
  *     (Field values are strings, per the verified module payloads.)
+ *
+ * Absolute pan/tilt/zoom and the position inquiry are the standard VISCA
+ * ones on the motion plane — what eased preset recall needs. The REST
+ * presets stay the fallback for a preset the bridge holds no pose for.
  */
 import { EventEmitter } from 'events';
 import { CameraState } from '../protocol/CcuClient.js';
@@ -35,6 +39,13 @@ export class BirddogClient extends EventEmitter implements GenericCameraClient {
       this.emit('stateChanged', s);
     });
     this.visca.on('error', (err: Error) => this.emit('error', err));
+  }
+
+  /** Pan/tilt/zoom positions ride the VISCA plane, so eased preset recall does too. */
+  readonly poseStream = { intervalMs: 50 };
+
+  readPose(): ReturnType<ViscaClient['readPose']> {
+    return this.visca.readPose();
   }
 
   get isConnected(): boolean {
@@ -86,6 +97,8 @@ export class BirddogClient extends EventEmitter implements GenericCameraClient {
       case 'setFocus':
       case 'autoFocus':
       case 'setCameraPower':
+      case 'ptzAbsolute':
+      case 'zoomAbsolute':
         return this.visca.handleRcpCommand(cmd, params);
 
       default:

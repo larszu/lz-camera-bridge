@@ -57,6 +57,23 @@ export class CompanionServer extends EventEmitter {
     this.httpServer = createServer((req, res) => this.handleHttp(req, res));
     this.wss = new WebSocketServer({ port: wsPort });
     this.wss.on('connection', (ws) => this.onWsClient(ws));
+    // Issue #143: a port held by something else (a second instance, a bridge
+    // started by hand) ended the whole app with an uncaught EADDRINUSE — the
+    // WebSocketServer listens in its constructor and reports asynchronously,
+    // so no try/catch around `new BridgeServer` ever saw it. Companion is an
+    // add-on: without its ports the panel and the cameras keep working.
+    this.wss.on('error', (err) => this.portError('WebSocket feedback', wsPort, err));
+    this.httpServer.on('error', (err) => this.portError('HTTP API', httpPort, err));
+  }
+
+  private portError(what: string, port: number, err: Error): void {
+    const busy = (err as NodeJS.ErrnoException).code === 'EADDRINUSE';
+    console.error(
+      busy
+        ? `[Companion] ${what}: port ${port} is in use — Companion is not reachable on it. Is another LZ Camera Bridge running?`
+        : `[Companion] ${what} on port ${port}: ${err.message}`,
+    );
+    this.emit('portError', { what, port, message: err.message, busy });
   }
 
   start(): void {

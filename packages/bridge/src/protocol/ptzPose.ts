@@ -239,6 +239,15 @@ export function awAbsolutePanTilt(pan: number, tilt: number): string {
   const t = Math.round(AW_CENTER - tc * (tc >= 0 ? AW_TILT_UP_PER_DEG : AW_TILT_DOWN_PER_DEG));
   return `APC${hex4(p)}${hex4(t)}`;
 }
+/**
+ * `#APS[pan][tilt][speed][table]` — the same position, at a speed: 2 hex digits
+ * 01h..1Dh, speed table 0 slow / 1 mid / 2 fast (AW interface specification,
+ * "pan/tilt position control with speed"). `speed01` is 0..1 of the top speed.
+ */
+export function awAbsolutePanTiltSpeed(pan: number, tilt: number, speed01: number): string {
+  const s = Math.max(1, Math.min(0x1d, Math.round(Math.min(1, Math.max(0, speed01)) * 0x1d)));
+  return `APS${awAbsolutePanTilt(pan, tilt).slice(3)}${s.toString(16).toUpperCase().padStart(2, '0')}2`;
+}
 export function awAbsoluteZoom(zoom01: number): string {
   return `AXZ${Math.round(AW_ZOOM_MIN + clamp01(zoom01) * (AW_ZOOM_MAX - AW_ZOOM_MIN)).toString(16).toUpperCase().padStart(3, '0')}`;
 }

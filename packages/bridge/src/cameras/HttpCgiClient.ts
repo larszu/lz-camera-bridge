@@ -125,7 +125,7 @@ export function parsePowerReply(family: CgiFamily, body: string | undefined): bo
   return m ? m[1] === '2' : null;
 }
 
-type QueueKind = 'ptz' | 'zoom' | 'focus' | 'other';
+type QueueKind = 'ptz' | 'zoom' | 'focus' | 'pose' | 'other';
 
 interface Job {
   kind: QueueKind;
@@ -162,6 +162,13 @@ export class HttpCgiClient extends EventEmitter {
     this.viscaPort = opts.viscaPort ?? VISCA_TCP_PORT;
     this.unitsPerDeg = opts.unitsPerDeg ?? VISCA_UNITS_PER_DEG;
   }
+
+  /**
+   * Eased preset recall streams absolute positions at this interval. One
+   * HTTP request (Sony) or one TCP connection (VISCA on 5678) per frame does
+   * not keep up with 20 Hz; 10 Hz plus the queue's newest-wins rule does.
+   */
+  readonly poseStream = { intervalMs: 100 };
 
   get isConnected(): boolean {
     return this.connected;
@@ -237,15 +244,19 @@ export class HttpCgiClient extends EventEmitter {
         // The PTZOptics-style CGI has no absolute verb; those heads take VISCA
         // over TCP 5678 (measured on the installation) — the same packets
         // ViscaClient sends over UDP. Sony's CGI has AbsolutePanTilt.
+        // A frame of an eased preset recall (`stream`) carries a speed and
+        // replaces a frame still waiting in the queue: a slow camera gets the
+        // newest waypoint, not a backlog.
         const pan = num('pan');
         const tilt = num('tilt');
         const zoom = params['zoom'] !== undefined ? num('zoom') : undefined;
-        await this.enqueue('other', async () => {
+        const s = params['speed'] !== undefined ? Math.min(1, Math.max(0, num('speed'))) : 1;
+        await this.enqueue(params['stream'] ? 'pose' : 'other', async () => {
           if (this.family === 'sony') {
-            await this.request(sonyCgiAbsolutePanTilt(pan, tilt, 24, this.unitsPerDeg));
+            await this.request(sonyCgiAbsolutePanTilt(pan, tilt, Math.max(1, s * 24), this.unitsPerDeg));
             if (zoom !== undefined) await this.request(sonyCgiAbsoluteZoom(zoom));
           } else {
-            await viscaTcp(this.host, this.viscaPort, hex(viscaAbsolutePanTilt(pan, tilt, this.unitsPerDeg)), 4000);
+            await viscaTcp(this.host, this.viscaPort, hex(viscaAbsolutePanTilt(pan, tilt, this.unitsPerDeg, s * 0x18, s * 0x14)), 4000);
             if (zoom !== undefined) await viscaTcp(this.host, this.viscaPort, hex(viscaZoomDirect(zoom)), 4000);
           }
         });
