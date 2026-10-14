@@ -26,7 +26,7 @@ const MODE_LABEL: Record<string, string> = {
   tcp: 'Sony CCU', serial: 'Sony RS-422', 'sony-usb': 'Sony USB', 'sony-ptpip': 'Sony Wi-Fi/LAN', 'sony-mnc': 'Sony WiFi',
   'lumix-http': 'Lumix', 'canon-ccapi': 'Canon', blackmagic: 'Blackmagic', zcam: 'Z CAM',
   'panasonic-ptz': 'Pana PTZ', visca: 'VISCA', 'visca-serial': 'VISCA RS-232', jvc: 'JVC', birddog: 'BirdDog',
-  'http-cgi': 'HTTP-CGI', 'dji-osmo': 'DJI Osmo', 'dji-ronin': 'DJI Ronin', 'b4-lens': 'B4 lens', demo: 'Demo',
+  'http-cgi': 'HTTP-CGI', 'dji-osmo': 'DJI Osmo', 'dji-ronin': 'DJI Ronin', 'b4-lens': 'B4 lens', telemetrics: 'Telemetrics', demo: 'Demo',
 };
 
 export function SitePanel({ site, cameras, switchers, bridgeConnected, onSetName, onImport, onEditCamera, onAddSwitcher, onEditSwitcher }: Props) {
