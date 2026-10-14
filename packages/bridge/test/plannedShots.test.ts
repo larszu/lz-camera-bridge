@@ -53,7 +53,9 @@ test('drive, store and calibrate planned shots on the demo head; the offset surv
   const c = new Client(port);
   await c.open();
   try {
-    c.send({ type: 'setCameraConfig', cameraNumber: 1, config: { connectionMode: 'demo' } });
+    // The demo head moves one degree per `ptz` command; a speed ramp would turn
+    // three nudges into a different number of commands, so this test drives it raw.
+    c.send({ type: 'setCameraConfig', cameraNumber: 1, config: { connectionMode: 'demo', ease: { attackMs: 0, releaseMs: 0 } } });
     c.send({ type: 'connectCamera', cameraNumber: 1 });
     await c.waitFor((m) => m.type === 'cameraConnected');
     c.send({ type: 'assignPlanCamera', cameraNumber: 1, plan: PLAN, planCameraId: 'c1' });

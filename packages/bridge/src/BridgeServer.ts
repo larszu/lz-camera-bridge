@@ -105,6 +105,8 @@ import { WiznetDiscovery, WiznetDeviceConfig } from './discovery/WiznetDiscovery
 import { CompanionServer, TallyState } from './companion/CompanionServer.js';
 import { HidControlSurface, HidSurfaceConfig } from './input/HidControlSurface.js';
 import { DemandSource, conflictingCommands, type DemandConfig } from './input/DemandSource.js';
+import { EasedDrive, isRamped } from './motion/EasedDrive.js';
+import { DEFAULT_RAMP } from './motion/Easing.js';
 import {
   matchCameraPlan, parseCameraPlan,
   type CameraPlan, type PlanCamera, type SlotFacts,
@@ -141,6 +143,8 @@ interface CameraSlot {
   plan?: PlanCamera;
   /** Womit die Zuordnung belegt ist. Siehe `plan/cameraPlan.ts`. */
   planMatchedBy?: 'model' | 'number' | 'manual';
+  /** Ease-in/out for pan/tilt, zoom and focus speed demands (motion/EasedDrive.ts). */
+  eased?: EasedDrive;
 }
 
 interface SwitcherSlot {
@@ -702,6 +706,8 @@ export class BridgeServer {
 
     // Reconnecting? drop this slot's previous backend only (others stay up).
     if (slot.backend) {
+      slot.eased?.dispose();
+      slot.eased = undefined;
       try { await slot.backend.disconnect(); } catch { /* ignore */ }
       slot.backend = null;
       slot.connected = false;
@@ -743,6 +749,8 @@ export class BridgeServer {
   private async disconnectCamera(num: number): Promise<void> {
     const slot = this.cameras.get(num);
     if (!slot?.backend) return;
+    slot.eased?.dispose();
+    slot.eased = undefined;
     try { await slot.backend.disconnect(); } catch { /* ignore */ }
     slot.backend = null;
     slot.connected = false;
@@ -810,7 +818,13 @@ export class BridgeServer {
     });
   }
 
-  private async dispatchCommand(ws: WebSocket, num: number, cmd: string, params: Record<string, unknown>): Promise<void> {
+  private async dispatchCommand(
+    ws: WebSocket,
+    num: number,
+    cmd: string,
+    params: Record<string, unknown>,
+    opts: { raw?: boolean } = {},
+  ): Promise<void> {
     const slot = this.cameras.get(num);
     if (!slot?.backend || !slot.connected) {
       this.sendError(ws, `Kamera ${num} ist nicht verbunden`, num);
@@ -839,7 +853,17 @@ export class BridgeServer {
       return;
     }
 
-    const handled = await slot.backend.handleRcpCommand(cmd, { ...params, cameraNumber: num });
+    // Speed demands glide (ease in / ease out) unless the source shapes the
+    // motion itself (a physical demand) or the camera's ease is switched off.
+    let handled: boolean;
+    if (isRamped(cmd) && !opts.raw) {
+      const backend = slot.backend;
+      slot.eased ??= new EasedDrive((c, p) => backend.handleRcpCommand(c, { ...p, cameraNumber: num }));
+      slot.eased.setOptions(slot.config.ease ?? DEFAULT_RAMP);
+      handled = await slot.eased.demand(cmd, params);
+    } else {
+      handled = await slot.backend.handleRcpCommand(cmd, { ...params, cameraNumber: num });
+    }
     if (!handled) {
       // `return` — nicht bloss melden. Ohne ihn lief der optimistische Echo
       // unten TROTZDEM: Der Client bekam eine Fehlermeldung UND einen
@@ -1008,7 +1032,7 @@ export class BridgeServer {
       const slot = this.cameras.get(cameraNumber);
       if (!slot?.connected) return; // nothing to drive; the broadcast still shows the demand
       const quietWs = { readyState: WebSocket.OPEN, send: () => {} } as unknown as WebSocket;
-      void this.dispatchCommand(quietWs, cameraNumber, cmd, params);
+      void this.dispatchCommand(quietWs, cameraNumber, cmd, params, { raw: true });
     });
     src.on('demand', (ev) => this.broadcast({ type: 'demand', ...ev }));
     src.on('error', (err: Error) => this.broadcast({ type: 'error', message: `Demand: ${err.message}` }));
