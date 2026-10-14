@@ -62,6 +62,10 @@
  *       Bildwinkel je Zoomstellung messen (kleiner Schwenk, Bildverschiebung);
  *       Fortschritt als { type: 'fovProgress', … }, Ergebnis in `fovTable`.
  *   { type: 'getSite' } | { type: 'importSite', site } | { type: 'setSiteName', name }
+ *   FreeD tracking (transport/FreeDOutput.ts, docs/freed-tracking.md):
+ *   { type: 'getFreeD' } | { type: 'setFreeD', freed: { targets, rateHz, pollMs? } | null }
+ *   { type: 'setCameraFreeD', cameraNumber, freed: FreeDCameraConfig | null }
+ *       -> { type: 'freed', config, status }  on change and once a second while streaming
  *   Studio shots (motion/studioShots.ts) -- shot sets, seat shots, moves:
  *   { type: 'setStudioShots', shots }                        replaces all of them, kept in the site
  *   { type: 'recallShot', cameraNumber, presetNumber, source?, mode?, timeMs?, force? }
@@ -119,7 +123,9 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'http';
 import { networkInterfaces } from 'os';
 import { Rs422Transport } from './transport/Rs422Transport.js';
 import { CameraState } from './protocol/CcuClient.js';
-import { makeBackend, presetRecallFor, CameraBackend, CameraConfig } from './cameras/backendFactory.js';
+import { makeBackend, presetRecallFor, POSE_READ_MODES, CameraBackend, CameraConfig } from './cameras/backendFactory.js';
+import { FreeDOutput } from './transport/FreeDOutput.js';
+import { normaliseFreeDSite, type FreeDCameraConfig } from './protocol/freeDPose.js';
 import {
   buildGo2rtcConfig,
   buildLaunchScript,
@@ -226,6 +232,7 @@ interface ClientMessage {
     | 'listSwitchers' | 'setSwitcherConfig' | 'connectSwitcher' | 'disconnectSwitcher' | 'removeSwitcher'
     | 'switcherCommand'
     | 'getSite' | 'importSite' | 'setSiteName'
+    | 'getFreeD' | 'setFreeD' | 'setCameraFreeD'
     | 'readPose' | 'drivePlannedPreset' | 'storePlannedPresets' | 'calibratePose' | 'setPoseOffset'
     | 'zoomTo' | 'captureZoomPoint' | 'clearZoomTable' | 'setPresetMotion'
     | 'aimFrame' | 'scanPanorama' | 'cancelPanorama' | 'getPanorama' | 'calibrateFov'
@@ -268,6 +275,8 @@ interface ClientMessage {
   /** Move a camera that is on air anyway. */
   force?: boolean;
   cameras?: number[];
+  /** setFreeD: site settings; setCameraFreeD: this camera's. */
+  freed?: unknown;
 }
 
 export class BridgeServer {
@@ -307,6 +316,9 @@ export class BridgeServer {
   private readonly panoramas: PanoramaStore;
   /** One head job (panorama scan, field-of-view calibration) per camera at a time. */
   private readonly jobs = new Map<number, { kind: 'scan' | 'calibration'; cancel: boolean }>();
+  /** FreeD tracking out of every enabled camera that reports its pose. */
+  private readonly freed = new FreeDOutput();
+  private freedTimer: ReturnType<typeof setInterval> | null = null;
 
   /**
    * `companionPorts` ist da, damit eine zweite Bruecke im selben Prozess
@@ -387,6 +399,8 @@ export class BridgeServer {
   }
 
   stop(): void {
+    this.freed.stop();
+    if (this.freedTimer) { clearInterval(this.freedTimer); this.freedTimer = null; }
     this.disableControlSurface();
     this.disableDemand();
     for (const slot of this.cameras.values()) void slot.backend?.disconnect();
@@ -410,6 +424,7 @@ export class BridgeServer {
     ws.send(JSON.stringify({ type: 'cameraTally', tally: this.cameraTally() }));
     ws.send(JSON.stringify({ type: 'studioShots', shots: this.studioShots }));
     this.sendSite(ws);
+    ws.send(this.freedMessage());
     for (const [cameraNumber, state] of this.cameraStates.entries()) {
       ws.send(
         JSON.stringify({
@@ -447,6 +462,7 @@ export class BridgeServer {
         const slot = this.getOrCreateSlot(num);
         slot.config = { ...slot.config, ...(msg.config ?? {}) };
         this.broadcastCameras();
+        this.syncFreeD();
         this.siteChanged();
         break;
       }
@@ -662,6 +678,31 @@ export class BridgeServer {
         this.sendSite();
         this.siteChanged();
         break;
+
+      case 'getFreeD':
+        ws.send(this.freedMessage());
+        break;
+
+      case 'setFreeD': {
+        const cfg = msg.freed === null ? null : normaliseFreeDSite(msg.freed);
+        if (msg.freed !== null && !cfg) { this.sendError(ws, 'FreeD: settings unreadable'); break; }
+        this.freed.configure(cfg);
+        this.syncFreeD();
+        this.siteChanged();
+        break;
+      }
+
+      case 'setCameraFreeD': {
+        const num = msg.cameraNumber ?? 0;
+        const slot = this.cameras.get(num);
+        if (!slot) { this.sendError(ws, `Camera ${num} is not configured`, num); break; }
+        if (msg.freed && typeof msg.freed === 'object') slot.config.freed = msg.freed as FreeDCameraConfig;
+        else delete slot.config.freed;
+        this.broadcastCameras();
+        this.syncFreeD();
+        this.siteChanged();
+        break;
+      }
 
       case 'importSite': {
         const text = typeof msg.site === 'string' ? msg.site : JSON.stringify(msg.site ?? null);
@@ -930,6 +971,7 @@ export class BridgeServer {
     this.broadcast({ type: 'cameraDisconnected', cameraNumber: num });
     this.companion.setConnected(this.anyConnected());
     this.broadcastCameras();
+    this.syncFreeD();
   }
 
   private wireSlot(slot: CameraSlot): void {
@@ -943,6 +985,7 @@ export class BridgeServer {
       this.broadcast({ type: 'cameraConnected', cameraNumber: num, info });
       this.companion.setConnected(true);
       this.broadcastCameras();
+      this.syncFreeD();
     });
 
     backend.on('stateChanged', (raw: unknown) => {
@@ -982,6 +1025,7 @@ export class BridgeServer {
       this.broadcast({ type: 'cameraDisconnected', cameraNumber: num });
       this.companion.setConnected(this.anyConnected());
       this.broadcastCameras();
+      this.syncFreeD();
     });
 
     backend.on('error', (err: Error) => {
@@ -1223,6 +1267,8 @@ export class BridgeServer {
       // Wie ein Preset-Abruf faehrt: 'eased' (weich, Fahrzeit einstellbar)
       // oder 'camera' (das Preset der Kamera). Fertig von hier, wie oben.
       presetRecall: presetRecallFor(s.config?.connectionMode),
+      // Reports its pose → can feed the FreeD output.
+      freedCapable: POSE_READ_MODES.includes(s.config?.connectionMode ?? 'tcp'),
       // Der Plan geht mit, damit das Pult die Kamera so beschriften kann, wie
       // sie in der Show heisst -- samt Beleg, damit ein blosser Vorschlag
       // nicht wie eine Tatsache aussieht.
@@ -1873,6 +1919,8 @@ export class BridgeServer {
     }
     const sh = this.studioShots;
     if (sh.sets.length || sh.moves.length || sh.seats.seats.length || sh.seats.rows) site.shots = sh;
+    const freed = this.freed.siteConfig;
+    if (freed) site.freed = freed;
     return site;
   }
 
@@ -1917,6 +1965,8 @@ export class BridgeServer {
     }
     for (const s of site.switchers) this.getOrCreateSwitcher(s.switcherNumber).config = { ...s.config };
     this.studioShots = normaliseStudioShots(site.shots);
+    this.freed.configure(site.freed ?? null);
+    this.syncFreeD();
     this.broadcast({ type: 'studioShots', shots: this.studioShots });
     this.broadcastCameras();
     this.sendSwitchers();
@@ -1933,6 +1983,28 @@ export class BridgeServer {
       this.connectSwitcher(s.switcherNumber).catch((err) =>
         this.broadcast({ type: 'error', message: (err as Error).message, switcherNumber: s.switcherNumber }),
       );
+    }
+  }
+
+  // ─── FreeD tracking ───────────────────────────────────────────────────────
+
+  private freedMessage(): string {
+    return JSON.stringify({ type: 'freed', config: this.freed.siteConfig, status: this.freed.status() });
+  }
+
+  /** Hand the cameras to the FreeD output, announce, and keep the status ticking while it streams. */
+  private syncFreeD(): void {
+    this.freed.sync([...this.cameras.values()].map((s) => ({
+      cameraNumber: s.num, freed: s.config?.freed, connected: s.connected, backend: s.backend,
+    })));
+    this.broadcastRaw(this.freedMessage());
+    const active = this.freed.status().active;
+    if (active && !this.freedTimer) {
+      this.freedTimer = setInterval(() => this.broadcastRaw(this.freedMessage()), 1000);
+      this.freedTimer.unref?.();
+    } else if (!active && this.freedTimer) {
+      clearInterval(this.freedTimer);
+      this.freedTimer = null;
     }
   }
 

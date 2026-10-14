@@ -222,6 +222,13 @@ former `av-control-center` application (2026-09-28) and replaces it.
   settings export of the old av-control-center, so an existing room moves
   with one file. The file carries the camera logins; keep it out of
   repositories.
+- **FreeD tracking** — every camera that reports its pose (VISCA, Panasonic
+  AW, HTTP-CGI, robotic heads incl. elevation column) streams pan, tilt, zoom
+  and focus as FreeD D1 over UDP to one or more receivers, e.g. Unreal Live
+  Link: one switch per camera, targets and rate under *Site*, interpolated
+  between pose reads, silent when a camera stops answering. Not yet tested
+  against Unreal or real heads. Details in
+  [`docs/freed-tracking.md`](docs/freed-tracking.md).
 
 ### Screens
 

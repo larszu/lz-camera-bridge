@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import type { CameraSlot } from '../hooks/useBridge.ts';
 import { BRIDGE_HTTP } from '../hooks/useBridge.ts';
-import type { SiteInfo, SwitcherSlot } from '../types.ts';
+import type { FreeDCameraConfig, FreeDInfo, FreeDSiteConfig, SiteInfo, SwitcherSlot } from '../types.ts';
+import { FreeDPanel } from './FreeDPanel.tsx';
 
 /**
  * The room as one file. Export downloads what the bridge holds; import
@@ -20,6 +21,9 @@ interface Props {
   onEditCamera: (num: number) => void;
   onAddSwitcher: () => void;
   onEditSwitcher: () => void;
+  freed: FreeDInfo;
+  onSetFreeD: (cfg: FreeDSiteConfig | null) => void;
+  onSetCameraFreeD: (num: number, cfg: FreeDCameraConfig | null) => void;
 }
 
 const MODE_LABEL: Record<string, string> = {
@@ -29,7 +33,10 @@ const MODE_LABEL: Record<string, string> = {
   'http-cgi': 'HTTP-CGI', 'dji-osmo': 'DJI Osmo', 'dji-ronin': 'DJI Ronin', 'b4-lens': 'B4 lens', 'robotic-head': 'Robotic head', demo: 'Demo',
 };
 
-export function SitePanel({ site, cameras, switchers, bridgeConnected, onSetName, onImport, onEditCamera, onAddSwitcher, onEditSwitcher }: Props) {
+export function SitePanel({
+  site, cameras, switchers, bridgeConnected, onSetName, onImport, onEditCamera, onAddSwitcher, onEditSwitcher,
+  freed, onSetFreeD, onSetCameraFreeD,
+}: Props) {
   const [name, setName] = useState(site.name);
   useEffect(() => setName(site.name), [site.name]);
   const [clearArmed, setClearArmed] = useState(false);
@@ -108,6 +115,8 @@ export function SitePanel({ site, cameras, switchers, bridgeConnected, onSetName
               {swNums.length === 0 && <button className="btn btn--sm" onClick={onAddSwitcher}>+ Switcher</button>}
             </div>
           </div>
+
+          <FreeDPanel freed={freed} cameras={cameras} onSetSite={onSetFreeD} onSetCamera={onSetCameraFreeD} />
         </div>
 
         <div className="stack">

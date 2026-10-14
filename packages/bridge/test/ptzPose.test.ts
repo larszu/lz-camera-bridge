@@ -66,7 +66,7 @@ test('VISCA: absolute drive nibbles and the position reply, 14.4 units per degre
 test('Sony CGI: AbsolutePanTilt/AbsoluteZoom and the inquiry answer', () => {
   assert.equal(sonyCgiAbsolutePanTilt(170, -10), '/command/ptzf.cgi?AbsolutePanTilt=0990,FF70,24');
   assert.equal(sonyCgiAbsoluteZoom(1), '/command/ptzf.cgi?AbsoluteZoom=4000');
-  assert.deepEqual(parseSonyCgiPose('PanTiltMove=stop&AbsolutePTZF=0990,FF70,2000,1234&FocusMode=auto'), { pan: 170, tilt: -10, zoom: 0.5 });
+  assert.deepEqual(parseSonyCgiPose('PanTiltMove=stop&AbsolutePTZF=0990,FF70,2000,1234&FocusMode=auto'), { pan: 170, tilt: -10, zoom: 0.5, focus: 0.0711 });
   assert.equal(parseSonyCgiPose('Power=on'), null);
 });
 
@@ -79,7 +79,7 @@ test('Panasonic AW: pan 0x2D09..0xD2F5, tilt inverted (0x5555 = +90° up), zoom 
   assert.deepEqual(parseAwPanTilt('aPC2D095555'), { pan: -175, tilt: 90 });
   assert.deepEqual(parseAwPanTilt('aPCD2F58E38'), { pan: 175, tilt: -30 });
   assert.equal(parseAwPanTilt('aPC80001C71')?.tilt, 210);
-  assert.deepEqual(parseAwPtv('pTV80008000FFF555555'), { pan: 0, tilt: 0, zoom: 1 });
+  assert.deepEqual(parseAwPtv('pTV80008000FFF555555'), { pan: 0, tilt: 0, zoom: 1, focus: 0 });
   assert.equal(parseAwZoom('gz555'), 0);
   assert.equal(parseAwZoom('axzFFF'), 1);
 });

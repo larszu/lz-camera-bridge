@@ -43,6 +43,8 @@ export type ConnectionMode =
 
 export interface BridgeConfig {
   connectionMode?: ConnectionMode;
+  /** FreeD tracking out of this camera's pose. Mirrors the bridge's `protocol/freeDPose.ts`. */
+  freed?: FreeDCameraConfig;
   tcpHost?: string;
   tcpPort?: number;
   serialPath?: string;
@@ -233,6 +235,23 @@ export interface SwitcherSlot {
 
 export type SourceTally = 'program' | 'preview' | 'off';
 export type CameraTally = Record<number, SourceTally>;
+
+/** FreeD tracking — the wire shapes of the bridge's `protocol/freeDPose.ts` and `transport/FreeDOutput.ts`. */
+export interface FreeDTarget { host: string; port: number }
+export interface FreeDSiteConfig { targets: FreeDTarget[]; rateHz: number; pollMs?: number }
+export interface FreeDCameraConfig {
+  enabled: boolean;
+  cameraId?: number;
+  positionMm?: { x: number; y: number; z: number };
+  columnMmPerCount?: number;
+  invert?: { pan?: boolean; tilt?: boolean; zoom?: boolean; focus?: boolean };
+  offsetDeg?: { pan?: number; tilt?: number; roll?: number };
+}
+export interface FreeDCameraStatus {
+  cameraNumber: number; cameraId: number; sent: number; silent: number; errors: number;
+  readAgeMs: number | null; unread: ('zoom' | 'focus')[]; lastError?: string;
+}
+export interface FreeDInfo { config: FreeDSiteConfig | null; status: { active: boolean; cameras: FreeDCameraStatus[] } }
 
 export interface SiteInfo {
   name: string;

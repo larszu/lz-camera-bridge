@@ -121,7 +121,7 @@ export default function App() {
     listHidDevices, enableControlSurface, disableControlSurface, setTally,
     matchCameraPlan, applyCameraPlan,
     setSwitcherConfig, connectSwitcher, disconnectSwitcher, removeSwitcher, switcherCommand,
-    importSite, setSiteName, clearError,
+    importSite, setSiteName, clearError, freed, setFreeD, setCameraFreeD,
     poses, plannedProgress, readPose, drivePlannedPreset, storePlannedPresets, calibratePose, setPoseOffset,
     zoomTo, captureZoomPoint, clearZoomTable, setPresetMotion,
     panoramas, panoramaProgress, fovProgress, aimFrame, scanPanorama, cancelPanorama, getPanorama, calibrateFov,
@@ -405,6 +405,9 @@ export default function App() {
             onEditCamera={(num) => { if (num === 0) addCamera(); else { setSelected(num); setViewMode('single'); } }}
             onAddSwitcher={addSwitcher}
             onEditSwitcher={() => setViewMode('switcher')}
+            freed={freed}
+            onSetFreeD={setFreeD}
+            onSetCameraFreeD={setCameraFreeD}
           />
         </main>
       )}

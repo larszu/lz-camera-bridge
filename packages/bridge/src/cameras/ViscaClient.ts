@@ -22,7 +22,7 @@ import { EventEmitter } from 'events';
 import dgram from 'dgram';
 import { CameraState } from '../protocol/CcuClient.js';
 import {
-  VISCA_INQ_PAN_TILT, VISCA_INQ_ZOOM, parseViscaPanTilt, parseViscaZoom,
+  VISCA_INQ_PAN_TILT, VISCA_INQ_ZOOM, VISCA_INQ_FOCUS, parseViscaPanTilt, parseViscaZoom, parseViscaFocus,
   viscaAbsolutePanTilt, viscaZoomDirect, VISCA_UNITS_PER_DEG, type Pose,
 } from '../protocol/ptzPose.js';
 import { GenericCameraClient } from './GenericCameraClient.js';
@@ -178,8 +178,22 @@ export class ViscaClient extends EventEmitter implements GenericCameraClient {
     }
   }
 
+  /**
+   * Inquiries one at a time. There is one answer slot (`pendingInquiry`); a
+   * second inquiry started while the first waits would take its slot, and the
+   * first would time out. Two callers asking at once is normal now — a preset
+   * glide reads the start pose while the FreeD output polls the same head.
+   */
+  private inquiryChain: Promise<unknown> = Promise.resolve();
+
   /** Send an inquiry and wait for its answer frame. */
   private inquire(bytes: number[], timeoutMs = 1500): Promise<Buffer> {
+    const run = this.inquiryChain.then(() => this.inquireNow(bytes, timeoutMs));
+    this.inquiryChain = run.catch(() => undefined);
+    return run;
+  }
+
+  private inquireNow(bytes: number[], timeoutMs: number): Promise<Buffer> {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         if (this.pendingInquiry === claim) this.pendingInquiry = null;
@@ -198,8 +212,11 @@ export class ViscaClient extends EventEmitter implements GenericCameraClient {
     });
   }
 
-  /** Where the head is: pan/tilt in degrees, zoom 0..1. Two inquiries, one answer each. */
-  async readPose(): Promise<Pose> {
+  /**
+   * Where the head is: pan/tilt in degrees, zoom 0..1. Two inquiries, one
+   * answer each; with `focus` a third (the focus counter, 0..1).
+   */
+  async readPose(opts: { focus?: boolean } = {}): Promise<Pose> {
     const pt = parseViscaPanTilt(await this.inquire(VISCA_INQ_PAN_TILT), this.unitsPerDeg);
     if (!pt) throw new Error('VISCA: pan/tilt answer unreadable');
     let zoom: number | undefined;
@@ -208,7 +225,15 @@ export class ViscaClient extends EventEmitter implements GenericCameraClient {
     } catch {
       /* a head without zoom readback still has a pose */
     }
-    return { ...pt, ...(zoom !== undefined ? { zoom } : {}) };
+    let focus: number | undefined;
+    if (opts.focus) {
+      try {
+        focus = parseViscaFocus(await this.inquire(VISCA_INQ_FOCUS)) ?? undefined;
+      } catch {
+        /* no focus readback: the axis stays unknown */
+      }
+    }
+    return { ...pt, ...(zoom !== undefined ? { zoom } : {}), ...(focus !== undefined ? { focus } : {}) };
   }
 
   private sendRaw(buf: Buffer): Promise<void> {

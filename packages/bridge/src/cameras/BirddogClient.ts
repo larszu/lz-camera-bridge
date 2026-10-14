@@ -44,8 +44,8 @@ export class BirddogClient extends EventEmitter implements GenericCameraClient {
   /** Pan/tilt/zoom positions ride the VISCA plane, so eased preset recall does too. */
   readonly poseStream = { intervalMs: 50 };
 
-  readPose(): ReturnType<ViscaClient['readPose']> {
-    return this.visca.readPose();
+  readPose(opts?: { focus?: boolean }): ReturnType<ViscaClient['readPose']> {
+    return this.visca.readPose(opts);
   }
 
   get isConnected(): boolean {
