@@ -11,6 +11,7 @@ import { SwitcherConfigPanel } from './components/SwitcherConfigPanel.tsx';
 import { VideoWall } from './components/VideoWall.tsx';
 import { SitePanel } from './components/SitePanel.tsx';
 import { PlannedShots } from './components/PlannedShots.tsx';
+import { AimPanel } from './components/AimPanel.tsx';
 import { FirstStartWizard, isWizardDone } from './components/FirstStartWizard.tsx';
 import { capabilitiesForMode, isPtzMode } from './capabilities.ts';
 import type { BridgeConfig, WiznetDevice } from './types.ts';
@@ -41,6 +42,9 @@ export const MODE_LABEL: Record<string, string> = {
   'panasonic-ptz': 'Pana PTZ', visca: 'VISCA', 'visca-serial': 'VISCA RS-232', jvc: 'JVC', birddog: 'BirdDog',
   'http-cgi': 'HTTP-CGI', 'dji-osmo': 'DJI Osmo', 'dji-ronin': 'DJI Ronin', 'b4-lens': 'B4 lens', 'robotic-head': 'Robotic head', demo: 'Demo',
 };
+
+/** Heads that report their pose — the ones a frame can be measured from (backend `readPose`). */
+const POSE_MODES = new Set(['visca', 'visca-serial', 'http-cgi', 'panasonic-ptz', 'robotic-head', 'demo']);
 
 const newCameraConfig = (num: number): BridgeConfig => ({
   connectionMode: 'tcp', tcpHost: '192.168.1.10', tcpPort: 7700, ccuId: num,
@@ -118,6 +122,7 @@ export default function App() {
     importSite, setSiteName, clearError,
     poses, plannedProgress, readPose, drivePlannedPreset, storePlannedPresets, calibratePose, setPoseOffset,
     zoomTo, captureZoomPoint, clearZoomTable, setPresetMotion,
+    panoramas, panoramaProgress, fovProgress, aimFrame, scanPanorama, cancelPanorama, getPanorama, calibrateFov,
   } = bridge;
 
   const camNumbers = useMemo(
@@ -475,6 +480,24 @@ export default function App() {
                     softSwitch={config.connectionMode !== 'robotic-head'}
                     onPresetMotion={(n, change) => setPresetMotion(selected, n, change)}
                   />
+                  {cam && POSE_MODES.has(config.connectionMode ?? '') && (
+                    <AimPanel
+                      key={selected}
+                      cam={cam}
+                      connected={connected}
+                      pose={poses[selected]}
+                      panorama={panoramas[selected]}
+                      panoramaProgress={panoramaProgress[selected]}
+                      fovProgress={fovProgress[selected]}
+                      onAim={(source, frame, aspect) => aimFrame(selected, source, frame, aspect)}
+                      onScan={() => scanPanorama(selected)}
+                      onCancel={() => cancelPanorama(selected)}
+                      onGetPanorama={() => getPanorama(selected)}
+                      onReadPose={() => readPose(selected)}
+                      onCalibrate={() => calibrateFov(selected)}
+                      onSetConfig={(cfg) => setCameraConfig(selected, cfg)}
+                    />
+                  )}
                   {cam && (
                     <PlannedShots
                       cam={cam}

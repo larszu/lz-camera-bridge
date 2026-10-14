@@ -47,7 +47,46 @@ export interface PlanCamera {
   presets?: PlanPreset[];
 }
 
-export interface Pose { pan: number; tilt: number; zoom?: number }
+export interface Pose {
+  pan: number;
+  tilt: number;
+  zoom?: number;
+  /** Field of view at that zoom, when the bridge can name it, and where the number comes from. */
+  hfovDeg?: number;
+  fovFit?: string;
+}
+
+/** A panorama map the bridge holds for a camera (#138): the pan/tilt range it covers. */
+export interface PanoramaMeta {
+  cameraNumber: number;
+  panMin: number;
+  panMax: number;
+  tiltMin: number;
+  tiltMax: number;
+  width: number;
+  height: number;
+  zoom: number;
+  hfovDeg: number;
+  fit: string;
+  aspect: number;
+  pictures: number;
+  createdAt: string;
+}
+
+/** Progress of a head job: the panorama scan or the field-of-view calibration. */
+export interface JobProgress {
+  step: string;
+  index?: number;
+  total?: number;
+  zoom?: number;
+  hfovDeg?: number;
+  reason?: string;
+  message?: string;
+  at: number;
+}
+
+export const panoramaUrl = (cameraNumber: number, version = '') =>
+  `${BRIDGE_HTTP}/panorama/${cameraNumber}.jpg?v=${encodeURIComponent(version)}`;
 
 export interface PlannedProgress {
   cameraNumber: number;
@@ -134,6 +173,9 @@ export function useBridge() {
   const [site, setSite] = useState<SiteInfo>({ name: '', path: null, cameras: 0, switchers: 0 });
   const [poses, setPoses] = useState<Record<number, Pose>>({});
   const [plannedProgress, setPlannedProgress] = useState<Record<number, PlannedProgress>>({});
+  const [panoramas, setPanoramas] = useState<Record<number, PanoramaMeta | null>>({});
+  const [panoramaProgress, setPanoramaProgress] = useState<Record<number, JobProgress>>({});
+  const [fovProgress, setFovProgress] = useState<Record<number, JobProgress>>({});
 
   const connect = useCallback(() => {
     if (ws.current?.readyState === WebSocket.OPEN) return;
@@ -273,7 +315,19 @@ export function useBridge() {
             setCameraTally(msg.tally as CameraTally);
             break;
           case 'pose':
-            setPoses((prev) => ({ ...prev, [msg.cameraNumber as number]: msg.pose as Pose }));
+            setPoses((prev) => ({
+              ...prev,
+              [msg.cameraNumber as number]: { ...(msg.pose as Pose), hfovDeg: msg.hfovDeg as number | undefined, fovFit: msg.fit as string | undefined },
+            }));
+            break;
+          case 'panorama':
+            setPanoramas((prev) => ({ ...prev, [msg.cameraNumber as number]: (msg.meta ?? null) as PanoramaMeta | null }));
+            break;
+          case 'panoramaProgress':
+            setPanoramaProgress((prev) => ({ ...prev, [msg.cameraNumber as number]: { ...(msg as JobProgress), at: Date.now() } }));
+            break;
+          case 'fovProgress':
+            setFovProgress((prev) => ({ ...prev, [msg.cameraNumber as number]: { ...(msg as JobProgress), at: Date.now() } }));
             break;
           case 'plannedProgress':
             setPlannedProgress((prev) => ({
@@ -369,6 +423,15 @@ export function useBridge() {
   const clearZoomTable = useCallback((cameraNumber: number) => send('clearZoomTable', { cameraNumber }), [send]);
   const setPresetMotion = useCallback((cameraNumber: number, presetNumber: number, change: { timeMs?: number; soft?: boolean }) =>
     send('setPresetMotion', { cameraNumber, presetNumber, ...change }), [send]);
+  const aimFrame = useCallback(
+    (cameraNumber: number, source: 'picture' | 'panorama', frame: { x: number; y: number; w: number; h: number }, aspect?: number) =>
+      send('aimFrame', { cameraNumber, source, frame, aspect }),
+    [send],
+  );
+  const scanPanorama = useCallback((cameraNumber: number, scan?: Record<string, number>) => send('scanPanorama', { cameraNumber, scan }), [send]);
+  const cancelPanorama = useCallback((cameraNumber: number) => send('cancelPanorama', { cameraNumber }), [send]);
+  const getPanorama = useCallback((cameraNumber: number) => send('getPanorama', { cameraNumber }), [send]);
+  const calibrateFov = useCallback((cameraNumber: number) => send('calibrateFov', { cameraNumber }), [send]);
   const setPoseOffset = useCallback((cameraNumber: number, offset: { pan: number; tilt: number } | null) => send('setPoseOffset', { cameraNumber, offset }), [send]);
 
   return {
@@ -383,5 +446,6 @@ export function useBridge() {
     importSite, setSiteName, clearError,
     poses, plannedProgress, readPose, drivePlannedPreset, storePlannedPresets, calibratePose, setPoseOffset,
     zoomTo, captureZoomPoint, clearZoomTable, setPresetMotion,
+    panoramas, panoramaProgress, fovProgress, aimFrame, scanPanorama, cancelPanorama, getPanorama, calibrateFov,
   };
 }

@@ -82,6 +82,11 @@ export interface BridgeConfig {
   bridgePresets?: Record<string, { pan?: number; tilt?: number; zoom?: number; timeMs?: number; soft?: boolean }>;
   /** Vorgaben fuer diese Fahrten: Zeit (ms), Kurve, Hoechstgeschwindigkeit des Kopfs (°/s). */
   presetMove?: { timeMs?: number; curve?: 'linear' | 'sine' | 'cubic' | 'quint'; maxDegPerSec?: number };
+  /** Bildwinkel je Zoomstellung (gemessen), Datenblatt-Enden, Sensorbreite — fuer "Rahmen ziehen" und das Panorama. */
+  fovTable?: { position: number; hfovDeg: number }[];
+  hfovWideDeg?: number;
+  hfovTeleDeg?: number;
+  sensorWidthMm?: number;
   /** VISCA ueber RS-232: Geraetepfad, Baudrate, Adresse in der Kette (1..7). */
   viscaSerialPath?: string;
   viscaBaudRate?: number;
