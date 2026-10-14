@@ -6,7 +6,7 @@ AW‑RP150 — plus a normalizing **command bus** that drives cameras from many
 vendors over their native protocols. The same commands also reach every camera
 from a Bitfocus **Companion** surface or a USB **control panel**.
 
-![LZ Camera Bridge — PTZ panel with the planned shots of a camera, light theme](docs/screenshots/ptz-planned-shots.png)
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/ptz-planned-shots-dark.png"><img src="docs/screenshots/ptz-planned-shots.png" alt="LZ Camera Bridge — PTZ panel with the planned shots of a camera"></picture>
 
 > **Status:** the bridge, protocols and UI are real and build clean; a
 > committed unit-test suite covers the protocol framing. Where a family was
@@ -179,14 +179,15 @@ former `av-control-center` application (2026-09-28) and replaces it.
 
 | | |
 |---|---|
-| ![Switcher view: programme row over preview row, CUT, the twelve layouts](docs/screenshots/switcher.png) | ![Video view: live tiles with programme and preview tally](docs/screenshots/video.png) |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/switcher-dark.png"><img src="docs/screenshots/switcher.png" alt="Switcher view: programme row over preview row, CUT, the twelve layouts"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/video-dark.png"><img src="docs/screenshots/video.png" alt="Video view: live tiles with programme and preview tally"></picture> |
 | **Switcher** — PGM over PVW, CUT, layouts, audio | **Video** — live tiles from RTSP/RTMP/SRT, tally on the top edge |
-| ![Wall view: every camera's panel at once](docs/screenshots/wall.png) | ![Site view: cameras and switcher of the room, export and import](docs/screenshots/site.png) |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/wall-dark.png"><img src="docs/screenshots/wall.png" alt="Wall view: every camera's panel at once"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/site-dark.png"><img src="docs/screenshots/site.png" alt="Site view: cameras and switcher of the room, export and import"></picture> |
 | **Wall** — every camera's panel at once | **Site** — the room as one file |
 
 Taken 2026-10-14 against demo cameras, a switcher with no device behind it
 and ffmpeg test patterns streamed over RTMP — no real room, so nothing to
-blank out. Switcher and Wall in the dark theme, the others in the light one.
+blank out. Light theme; GitHub shows the dark captures (`*-dark.png`) when
+your system is dark.
 
 ### Interface
 
