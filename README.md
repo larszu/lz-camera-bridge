@@ -6,7 +6,7 @@ AW‑RP150 — plus a normalizing **command bus** that drives cameras from many
 vendors over their native protocols. The same commands also reach every camera
 from a Bitfocus **Companion** surface or a USB **control panel**.
 
-![LZ Camera Bridge — PTZ panel with the planned shots of a camera and its zoom curve](docs/screenshots/ptz-planned-shots.png)
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/ptz-planned-shots-dark.png"><img src="docs/screenshots/ptz-planned-shots.png" alt="LZ Camera Bridge — PTZ panel with the planned shots of a camera"></picture>
 
 > **Status:** the bridge, protocols and UI are real and build clean; a
 > committed unit-test suite covers the protocol framing. Where a family was
@@ -179,13 +179,32 @@ former `av-control-center` application (2026-09-28) and replaces it.
 
 | | |
 |---|---|
-| ![Switcher view: programme row over preview row, CUT, the twelve layouts](docs/screenshots/switcher.png) | ![Video view: live tiles with programme and preview tally](docs/screenshots/video.png) |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/switcher-dark.png"><img src="docs/screenshots/switcher.png" alt="Switcher view: programme row over preview row, CUT, the twelve layouts"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/video-dark.png"><img src="docs/screenshots/video.png" alt="Video view: live tiles with programme and preview tally"></picture> |
 | **Switcher** — PGM over PVW, CUT, layouts, audio | **Video** — live tiles from RTSP/RTMP/SRT, tally on the top edge |
-| ![Wall view: every camera's panel at once](docs/screenshots/wall.png) | ![Site view: cameras and switcher of the room, export and import](docs/screenshots/site.png) |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/wall-dark.png"><img src="docs/screenshots/wall.png" alt="Wall view: every camera's panel at once"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/site-dark.png"><img src="docs/screenshots/site.png" alt="Site view: cameras and switcher of the room, export and import"></picture> |
 | **Wall** — every camera's panel at once | **Site** — the room as one file |
 
-Taken 2026-09-29 against demo cameras, a switcher stand-in and ffmpeg test
-patterns streamed over RTMP — no real room, so nothing to blank out.
+Taken 2026-10-14 against demo cameras, a switcher with no device behind it
+and ffmpeg test patterns streamed over RTMP — no real room, so nothing to
+blank out. Light theme; GitHub shows the dark captures (`*-dark.png`) when
+your system is dark.
+
+### Interface
+
+Light and dark theme with a visible switch in the header — **Auto · Light ·
+Dark**; Auto follows the system, the choice is remembered per browser. Dark is
+anthracite, not navy. Surfaces are neutral; the brand blue is only the accent
+(main action, selection, progress), the "lz." signet stays in the kit colours.
+Cards, pill buttons and a glass header; every control is at least 40 px with
+a mouse and 44 px on a touch screen, because the panel is normally a tablet
+on set. Tally red appears only where it means something: programme tally,
+live and the keyboard focus ring.
+
+The two instrument replicas — the Sony RCP software and the AW-RP150 PTZ
+panel — keep their own colours in both themes; whoever knows the device finds
+the button blind. `npm run brand:check` holds the tokens of both themes, the
+signal red defined exactly once, radius and shadow only through tokens and the
+theme switch (ADR-007 of the lz-planner-suite, changed 2026-10-13).
 
 ## Architecture
 
