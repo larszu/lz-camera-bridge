@@ -20,6 +20,12 @@
  *          | 'discoverSonyUsb' | 'discoverSonyMnc' | 'discoverSonyNet'
  *          | 'listHidDevices' | 'enableControlSurface' | 'disableControlSurface'
  *          | 'setTally' | 'getTally' }
+ *   { type: 'startInputCalibration' } | { type: 'captureInputRest' } | { type: 'cancelInputCalibration' }
+ *       Kalibrier-Assistent fuer das aktive Pult (input/axisCalibration.ts):
+ *       erst alle Achsen an die Enden, dann loslassen. Waehrenddessen faehrt
+ *       das Pult nichts. Ergebnis landet in der Anlage unter `input`.
+ *   { type: 'tuneInputAxis', axis, tuning: { curve?, expo?, invert?, deadzone? } }
+ *   { type: 'resetInputCalibration' }
  *   { type: 'enableDemand', demand } | { type: 'disableDemand' }
  *       Zoom-/Fokus-Demand an einem firmware-b4-Geraet als Quelle von
  *       setZoom/setFocus; siehe input/DemandSource.ts und docs/b4/demand.md.
@@ -108,6 +114,9 @@
  *   { type: 'demand', axis, cameraNumber, command, raw, value, present,
  *                     origin: 'commanded' }   nur wenn etwas gesendet wurde
  *   { type: 'demandSource', active, bindings? }
+ *   { type: 'inputCalibration', device, axes: [{ key, label, twoSided, calibration? }] }
+ *       die Achsen des aktiven Pults und ihre Kalibrierung; device null = kein Pult
+ *   { type: 'inputCalibrationLive', phase: 'sweep' | 'rest' | 'idle', axes?, skipped? }
  *   { type: 'tally' | 'ports' | 'wiznetDevices' | 'sonyUsbDevices'
  *          | 'sonyMncDevices' | 'hidDevices' | 'controlSurface' | 'wiznetConfigResult' }
  *   { type: 'switchers', switchers: [{ switcherNumber, config, connected, state, inputLabels }] }
@@ -140,13 +149,15 @@ import { SitePersistence } from './site/persistence.js';
 import { emptySite, parseSite, type SiteFile } from './site/siteFile.js';
 import { WiznetDiscovery, WiznetDeviceConfig } from './discovery/WiznetDiscovery.js';
 import { CompanionServer, TallyState } from './companion/CompanionServer.js';
-import { HidControlSurface, HidSurfaceConfig } from './input/HidControlSurface.js';
+import { HidControlSurface, HidSurfaceConfig, kalibrierAchsen } from './input/HidControlSurface.js';
+import { normaliseInputCalibration, tuneAxis, type AxisTuning, type InputCalibration } from './input/axisCalibration.js';
+import { isMoveTimeCommand, panelMoveTime } from './input/panelMoveTime.js';
 import { DemandSource, conflictingCommands, type DemandConfig } from './input/DemandSource.js';
 import { EasedDrive, isRamped } from './motion/EasedDrive.js';
 import { DEFAULT_RAMP } from './motion/Easing.js';
 import { DEFAULT_GLIDE, PresetGlide, clampGlideTime, glideFrames, type BridgePreset } from './motion/PresetGlide.js';
 import {
-  clampTime, emptyStudioShots, heldByOnAir, normaliseStudioShots, pickSeatShot,
+  DEFAULT_TIME_MS, clampTime, emptyStudioShots, heldByOnAir, normaliseStudioShots, pickSeatShot,
   type RecallMode, type ShotRef, type ShotSource, type StudioShots,
 } from './motion/studioShots.js';
 import {
@@ -235,6 +246,7 @@ interface ClientMessage {
     | 'command' | 'listPorts' | 'discoverWiznet' | 'configureWiznet' | 'discoverSonyUsb'
     | 'discoverSonyMnc' | 'discoverSonyNet' | 'listHidDevices' | 'enableControlSurface' | 'disableControlSurface'
     | 'setTally' | 'getTally' | 'enableDemand' | 'disableDemand'
+    | 'startInputCalibration' | 'captureInputRest' | 'cancelInputCalibration' | 'tuneInputAxis' | 'resetInputCalibration'
     | 'matchCameraPlan' | 'applyCameraPlan' | 'assignPlanCamera'
     | 'getMultiview'
     | 'listSwitchers' | 'setSwitcherConfig' | 'connectSwitcher' | 'disconnectSwitcher' | 'removeSwitcher'
@@ -271,6 +283,9 @@ interface ClientMessage {
   deviceConfig?: WiznetDeviceConfig;
   surface?: HidSurfaceConfig;
   demand?: DemandConfig;
+  /** tuneInputAxis: the axis key (report byte offset) and what to change. */
+  axis?: string;
+  tuning?: AxisTuning;
   tally?: Partial<TallyState>;
   /** Kamera-Plan als Text ODER als Objekt — beides, siehe `handleClientMessage`. */
   plan?: string | Record<string, unknown>;
@@ -314,6 +329,8 @@ export class BridgeServer {
   private companion: CompanionServer;
   private hidSurface: HidControlSurface | null = null;
   private hidSurfaceConfig: HidSurfaceConfig | null = null;
+  /** Measured joystick calibration per panel device, kept in the site. */
+  private inputCalibration: InputCalibration = { devices: {} };
   private demandSource: DemandSource | null = null;
   private tally: TallyState = { program: false, preview: false, isoRec: false };
   private switchers = new Map<number, SwitcherSlot>();
@@ -432,6 +449,7 @@ export class BridgeServer {
     ws.send(JSON.stringify({ type: 'tally', tally: this.tally }));
     ws.send(JSON.stringify({ type: 'cameraTally', tally: this.cameraTally() }));
     ws.send(JSON.stringify({ type: 'studioShots', shots: this.studioShots }));
+    ws.send(this.inputCalibrationMessage());
     this.sendSite(ws);
     ws.send(this.freedMessage());
     for (const [cameraNumber, state] of this.cameraStates.entries()) {
@@ -834,6 +852,49 @@ export class BridgeServer {
 
       case 'disableControlSurface':
         this.disableControlSurface();
+        break;
+
+      case 'startInputCalibration':
+        if (!this.hidSurface) { this.sendError(ws, 'No control panel is active — enable it first'); break; }
+        this.hidSurface.beginCalibration();
+        break;
+
+      case 'captureInputRest': {
+        const hid = this.hidSurface;
+        if (!hid?.calibrating) { this.sendError(ws, 'No calibration is running'); break; }
+        const result = await hid.captureRest();
+        if (!result) break; // cancelled while measuring the rest
+        this.inputCalibration.devices[hid.key] = result.calibration;
+        this.broadcast({ type: 'inputCalibrationLive', phase: 'idle', skipped: result.skipped });
+        this.broadcastRaw(this.inputCalibrationMessage());
+        this.siteChanged();
+        break;
+      }
+
+      case 'cancelInputCalibration':
+        this.hidSurface?.cancelCalibration();
+        this.broadcast({ type: 'inputCalibrationLive', phase: 'idle' });
+        break;
+
+      case 'tuneInputAxis': {
+        const hid = this.hidSurface;
+        const dev = hid ? this.inputCalibration.devices[hid.key] : undefined;
+        const cal = msg.axis !== undefined ? dev?.axes[String(msg.axis)] : undefined;
+        if (!hid || !dev || !cal) { this.sendError(ws, 'This axis is not calibrated yet — run the calibration first'); break; }
+        dev.axes[String(msg.axis)] = tuneAxis(cal, msg.tuning ?? {});
+        hid.setCalibration(dev);
+        this.broadcastRaw(this.inputCalibrationMessage());
+        this.siteChanged();
+        break;
+      }
+
+      case 'resetInputCalibration':
+        if (this.hidSurface) {
+          delete this.inputCalibration.devices[this.hidSurface.key];
+          this.hidSurface.setCalibration(undefined);
+          this.broadcastRaw(this.inputCalibrationMessage());
+          this.siteChanged();
+        }
         break;
 
       case 'enableDemand':
@@ -1327,7 +1388,10 @@ export class BridgeServer {
 
   // ─── HID control surface ────────────────────────────────────────────────
 
-  private async enableControlSurface(surface: HidSurfaceConfig): Promise<void> {
+  private async enableControlSurface(
+    surface: HidSurfaceConfig,
+    make: (cfg: HidSurfaceConfig) => HidControlSurface = (cfg) => new HidControlSurface(cfg),
+  ): Promise<void> {
     this.disableControlSurface();
     const clash = this.demandSource ? conflictingCommands(this.demandSource.bindings, surface.bindings) : [];
     if (clash.length > 0) {
@@ -1337,9 +1401,26 @@ export class BridgeServer {
       );
     }
     this.hidSurfaceConfig = surface;
-    const hid = new HidControlSurface(surface);
+    const hid = make(surface);
+    // The measured calibration of this device, from the site — a client never has to send it.
+    hid.setCalibration(this.inputCalibration.devices[hid.key]);
     this.hidSurface = hid;
+    const hasMoveTime = hid.aktiveBindungen.some((b) => isMoveTimeCommand(b.command));
     hid.on('command', ({ cmd, params }: { cmd: string; params: Record<string, unknown> }) => {
+      // Move time is the bridge's, not a camera's: handled here, never dispatched.
+      if (isMoveTimeCommand(cmd)) {
+        const ms = panelMoveTime(cmd, params, this.studioShots.defaultTimeMs);
+        if (ms !== null && ms !== this.studioShots.defaultTimeMs) {
+          this.studioShots = { ...this.studioShots, defaultTimeMs: ms };
+          this.broadcast({ type: 'studioShots', shots: this.studioShots });
+          this.siteChanged();
+        }
+        return;
+      }
+      // A panel with its own move-time control recalls presets with that time.
+      if (hasMoveTime && cmd === 'recallPreset' && params.timeMs === undefined) {
+        params = { ...params, timeMs: this.studioShots.defaultTimeMs };
+      }
       // Panel drives the lowest-numbered connected camera by default.
       const target = [...this.cameras.values()].find((s) => s.connected)?.num
         ?? (params.cameraNumber as number | undefined) ?? 0;
@@ -1354,15 +1435,31 @@ export class BridgeServer {
     hid.on('started', (info) => this.broadcast({ type: 'controlSurface', active: true, info }));
     hid.on('stopped', () => this.broadcast({ type: 'controlSurface', active: false }));
     hid.on('error', (err: Error) => this.broadcast({ type: 'error', message: `Control surface: ${err.message}` }));
+    hid.on('calibration', (live: Record<string, unknown>) => this.broadcast({ type: 'inputCalibrationLive', ...live }));
     await hid.start();
+    this.broadcastRaw(this.inputCalibrationMessage());
   }
 
   private disableControlSurface(): void {
+    const had = this.hidSurface !== null;
     if (this.hidSurface) {
       this.hidSurface.stop();
       this.hidSurface = null;
     }
     this.hidSurfaceConfig = null;
+    if (had) this.broadcastRaw(this.inputCalibrationMessage());
+  }
+
+  /** The active panel's axes with their calibration — what the assistant shows. */
+  private inputCalibrationMessage(): string {
+    const hid = this.hidSurface;
+    if (!hid) return JSON.stringify({ type: 'inputCalibration', device: null, axes: [] });
+    const dev = this.inputCalibration.devices[hid.key];
+    const seen = new Set<string>();
+    const axes = kalibrierAchsen(hid.aktiveBindungen)
+      .filter((a) => (seen.has(a.key) ? false : (seen.add(a.key), true)))
+      .map((a) => ({ key: a.key, label: a.label, twoSided: a.twoSided, ...(dev?.axes[a.key] ? { calibration: dev.axes[a.key] } : {}) }));
+    return JSON.stringify({ type: 'inputCalibration', device: hid.key, axes });
   }
 
   // ─── Demand source (phase 4) ────────────────────────────────────────────
@@ -1959,9 +2056,12 @@ export class BridgeServer {
       site.switchers.push({ switcherNumber: s.num, config: s.config, autoConnect: s.connected || Boolean(s.client) });
     }
     const sh = this.studioShots;
-    if (sh.sets.length || sh.moves.length || sh.seats.seats.length || sh.seats.rows) site.shots = sh;
+    // The default move time counts too: it can be set from the panel alone.
+    if (sh.sets.length || sh.moves.length || sh.seats.seats.length || sh.seats.rows || sh.defaultTimeMs !== DEFAULT_TIME_MS) site.shots = sh;
     const freed = this.freed.siteConfig;
     if (freed) site.freed = freed;
+    const input = normaliseInputCalibration(this.inputCalibration);
+    if (input) site.input = input;
     return site;
   }
 
@@ -2008,6 +2108,9 @@ export class BridgeServer {
     this.studioShots = normaliseStudioShots(site.shots);
     this.freed.configure(site.freed ?? null);
     this.syncFreeD();
+    this.inputCalibration = site.input ? structuredClone(site.input) : { devices: {} };
+    this.hidSurface?.setCalibration(this.inputCalibration.devices[this.hidSurface.key]);
+    this.broadcastRaw(this.inputCalibrationMessage());
     this.broadcast({ type: 'studioShots', shots: this.studioShots });
     this.broadcastCameras();
     this.sendSwitchers();

@@ -12,6 +12,7 @@ import type {
   SonyUsbDevice, SonyMncDevice, SonyNetDevice, HidDevice, TallyState,
   SwitcherSlot, SwitcherState, SwitcherConfig, CameraTally, SiteInfo,
   FreeDInfo, FreeDSiteConfig, FreeDCameraConfig,
+  InputCalibrationInfo, InputCalibrationLive, AxisCalibration,
 } from '../types.ts';
 import type {
   CameraConfirmationsByNumber,
@@ -191,6 +192,8 @@ export function useBridge() {
   const [sonyNetDevices, setSonyNetDevices] = useState<SonyNetDevice[]>([]);
   const [hidDevices, setHidDevices] = useState<HidDevice[]>([]);
   const [controlSurfaceActive, setControlSurfaceActive] = useState(false);
+  const [inputCalibration, setInputCalibration] = useState<InputCalibrationInfo>({ device: null, axes: [] });
+  const [calibrationLive, setCalibrationLive] = useState<InputCalibrationLive>({ phase: 'idle' });
   const [tally, setTallyState] = useState<TallyState>({ program: false, preview: false, isoRec: false });
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [switchers, setSwitchers] = useState<Record<number, SwitcherSlot>>({});
@@ -316,6 +319,12 @@ export function useBridge() {
           case 'controlSurface':
             setControlSurfaceActive(Boolean(msg.active));
             break;
+          case 'inputCalibration':
+            setInputCalibration({ device: (msg.device as string | null) ?? null, axes: (msg.axes ?? []) as InputCalibrationInfo['axes'] });
+            break;
+          case 'inputCalibrationLive':
+            setCalibrationLive({ phase: msg.phase as InputCalibrationLive['phase'], axes: msg.axes as InputCalibrationLive['axes'], skipped: msg.skipped as string[] | undefined });
+            break;
           case 'wiznetConfigResult':
             setErrorMsg(msg.success ? null : `Failed to configure WIZ108SR at ${msg.ip}`);
             break;
@@ -433,6 +442,14 @@ export function useBridge() {
   const listHidDevices = useCallback(() => send('listHidDevices'), [send]);
   const enableControlSurface = useCallback((surface: Record<string, unknown>) => send('enableControlSurface', { surface }), [send]);
   const disableControlSurface = useCallback(() => send('disableControlSurface'), [send]);
+  const startInputCalibration = useCallback(() => send('startInputCalibration'), [send]);
+  const captureInputRest = useCallback(() => send('captureInputRest'), [send]);
+  const cancelInputCalibration = useCallback(() => send('cancelInputCalibration'), [send]);
+  const tuneInputAxis = useCallback(
+    (axis: string, tuning: Partial<Pick<AxisCalibration, 'curve' | 'expo' | 'invert' | 'deadzone'>>) => send('tuneInputAxis', { axis, tuning }),
+    [send],
+  );
+  const resetInputCalibration = useCallback(() => send('resetInputCalibration'), [send]);
   const setTally = useCallback((t: Partial<TallyState>) => send('setTally', { tally: t }), [send]);
 
   // ── Kamera-Plan (B-41.1) ────────────────────────────────────────────────
@@ -505,6 +522,7 @@ export function useBridge() {
     setStudioShots, recallShotSet, recallSeat, playMove, stopMove, moveAnyway, dismissHeld,
     status, cameras, cameraStates, cameraOrigins, cameraConfirmations, ports, wiznetDevices, sonyUsbDevices, sonyMncDevices, sonyNetDevices,
     hidDevices, controlSurfaceActive, tally, errorMsg, planMatch,
+    inputCalibration, calibrationLive, startInputCalibration, captureInputRest, cancelInputCalibration, tuneInputAxis, resetInputCalibration,
     switchers, cameraTally, site,
     send, setCameraConfig, connectCamera, disconnectCamera, removeCamera, sendCommand,
     listPorts, discoverWiznet, configureWiznet, discoverSonyUsb, discoverSonyMnc, discoverSonyNet,

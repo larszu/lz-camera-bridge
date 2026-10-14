@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useBridge } from './hooks/useBridge.ts';
 import { ConnectionPanel } from './components/ConnectionPanel.tsx';
+import { InputCalibrationPanel } from './components/InputCalibrationPanel.tsx';
 import { SonyRcpPanel } from './components/SonyRcpPanel.tsx';
 import { PtzPanel, type PtzExtras } from './components/PtzPanel.tsx';
 import { MultiCamPanel } from './components/MultiCamPanel.tsx';
@@ -115,6 +116,7 @@ export default function App() {
   const {
     status, cameras, cameraStates, cameraOrigins, cameraConfirmations, ports, wiznetDevices, sonyUsbDevices, sonyMncDevices, sonyNetDevices,
     hidDevices, controlSurfaceActive, tally, errorMsg, planMatch,
+    inputCalibration, calibrationLive, startInputCalibration, captureInputRest, cancelInputCalibration, tuneInputAxis, resetInputCalibration,
     switchers, cameraTally, site,
     setCameraConfig, connectCamera, disconnectCamera, removeCamera, sendCommand,
     listPorts, discoverWiznet, configureWiznet, discoverSonyUsb, discoverSonyMnc, discoverSonyNet,
@@ -469,6 +471,17 @@ export default function App() {
               onListHidDevices={listHidDevices}
               onEnableControlSurface={enableControlSurface}
               onDisableControlSurface={disableControlSurface}
+              surfaceExtra={
+                <InputCalibrationPanel
+                  info={inputCalibration}
+                  live={calibrationLive}
+                  onStart={startInputCalibration}
+                  onCaptureRest={captureInputRest}
+                  onCancel={cancelInputCalibration}
+                  onTune={tuneInputAxis}
+                  onReset={resetInputCalibration}
+                />
+              }
               onConnect={() => connectCamera(selected)}
               onDisconnect={() => disconnectCamera(selected)}
               cameraConnected={connected}
