@@ -1,5 +1,5 @@
-// Line icons in the brand set (lzm-web): 1.5 px stroke, square caps,
-// monochrome in the text colour. Paths after Lucide (ISC), corners squared.
+// Line icons (lzm-web): Lucide-style, 1.75 px stroke, round caps,
+// monochrome in the text colour. Paths after Lucide (ISC).
 
 const PATHS = {
   video: 'M16 13l6 4V7l-6 4M2 6h14v12H2z',
@@ -24,9 +24,9 @@ export function Icon({ name, size = 18, label }: { name: IconName; size?: number
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth={1.5}
-      strokeLinecap="square"
-      strokeLinejoin="miter"
+      strokeWidth={1.75}
+      strokeLinecap="round"
+      strokeLinejoin="round"
       role={label ? 'img' : undefined}
       aria-label={label}
       aria-hidden={label ? undefined : true}

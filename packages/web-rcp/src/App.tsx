@@ -21,6 +21,7 @@ import './styles/ptz-panel.css';
 import './styles/regie.css';
 import './styles/dashboard.css';
 import { Icon, type IconName } from './components/Icon.tsx';
+import { Logo } from './components/Logo.tsx';
 
 type PanelView = 'rcp' | 'ptz';
 /** The five views. `single`/`multi` are the panel; the other three came with the control room. */
@@ -65,8 +66,11 @@ function initialView(): { view: ViewMode; bare: boolean } {
 
 type Theme = 'auto' | 'dark' | 'light';
 const THEME_KEY = 'lzcb.theme';
-const THEME_NEXT: Record<Theme, Theme> = { auto: 'dark', dark: 'light', light: 'auto' };
-const THEME_ICON: Record<Theme, IconName> = { auto: 'auto', dark: 'moon', light: 'sun' };
+const THEMES: { id: Theme; label: string; icon: IconName }[] = [
+  { id: 'auto', label: 'Like system', icon: 'auto' },
+  { id: 'light', label: 'Light', icon: 'sun' },
+  { id: 'dark', label: 'Dark', icon: 'moon' },
+];
 
 function readTheme(): Theme {
   try {
@@ -78,7 +82,7 @@ function readTheme(): Theme {
 }
 
 /** Light/dark follows the system; the choice in the header overrides it. */
-function useTheme(): [Theme, () => void] {
+function useTheme(): [Theme, (t: Theme) => void] {
   const [theme, setTheme] = useState<Theme>(readTheme);
   useEffect(() => {
     const root = document.documentElement;
@@ -89,11 +93,11 @@ function useTheme(): [Theme, () => void] {
       else localStorage.setItem(THEME_KEY, theme);
     } catch { /* private window: the choice lasts for this session */ }
   }, [theme]);
-  return [theme, () => setTheme((t) => THEME_NEXT[t])];
+  return [theme, setTheme];
 }
 
 export default function App() {
-  const [theme, cycleTheme] = useTheme();
+  const [theme, setTheme] = useTheme();
   const [{ view: firstView, bare }] = useState(initialView);
   const [panelView, setPanelView] = useState<PanelView>('rcp');
   const [viewMode, setViewModeState] = useState<ViewMode>(firstView);
@@ -255,7 +259,10 @@ export default function App() {
     <div className="app">
       {showWizard && <FirstStartWizard onComplete={handleWizardComplete} />}
       <header className="app__header">
-        <span className="app__title">LZ Camera Bridge</span>
+        <span className="app__brand">
+          <Logo />
+          <span className="app__title">Camera Bridge</span>
+        </span>
         <span className={`app__ws status-dot status-dot--${status === 'connected' ? 'ok' : 'err'}`} title={`Bridge: ${status}`} />
         {site.name && <span className="app__site" title="Site">{site.name}</span>}
         <nav className="nav" aria-label="Views">
@@ -273,14 +280,20 @@ export default function App() {
             </button>
           ))}
         </nav>
-        <button
-          className="btn btn--sm theme-toggle"
-          onClick={cycleTheme}
-          title={`Theme: ${theme} (click to change)`}
-          aria-label={`Theme: ${theme}`}
-        >
-          <Icon name={THEME_ICON[theme]} size={16} />
-        </button>
+        <div className="themes" role="group" aria-label="Appearance">
+          {THEMES.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              aria-pressed={theme === t.id}
+              aria-label={t.label}
+              title={t.label}
+              onClick={() => setTheme(t.id)}
+            >
+              <Icon name={t.icon} size={16} />
+            </button>
+          ))}
+        </div>
       </header>
 
       {errorMsg && viewMode !== 'single' && (
@@ -383,6 +396,7 @@ export default function App() {
             {camNumbers.length === 0 && (
               <p className="camera-list__empty">No cameras yet. "+ Camera" adds one.</p>
             )}
+            <div className="camera-list__items">
             {camNumbers.map((n) => {
               const c = cameras[n];
               const t = cameraTally[n];
@@ -407,6 +421,7 @@ export default function App() {
                 </div>
               );
             })}
+            </div>
           </div>
 
           {selected !== null && (
@@ -450,11 +465,11 @@ export default function App() {
             <div className="app__empty">Add a camera on the left to control it.</div>
           ) : (
             <>
-              <div className="panel-view-tabs">
-                <button className={`rcp-btn ${panelView === 'rcp' ? 'rcp-btn--primary' : 'rcp-btn--secondary'}`} onClick={() => setPanelView('rcp')}>
+              <div className="seg" role="group" aria-label="Panel">
+                <button type="button" className="seg__btn" aria-pressed={panelView === 'rcp'} onClick={() => setPanelView('rcp')}>
                   RCP (paint)
                 </button>
-                <button className={`rcp-btn ${panelView === 'ptz' ? 'rcp-btn--primary' : 'rcp-btn--secondary'}`} onClick={() => setPanelView('ptz')}>
+                <button type="button" className="seg__btn" aria-pressed={panelView === 'ptz'} onClick={() => setPanelView('ptz')}>
                   PTZ (joystick)
                 </button>
               </div>

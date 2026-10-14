@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Logo } from './Logo.tsx';
 import type { BridgeConfig } from '../types.ts';
 import { Icon } from './Icon.tsx';
 
@@ -103,7 +104,8 @@ export function FirstStartWizard({ onComplete }: Props) {
         {/* Header */}
         <div className="wizard-header">
           <div className="wizard-logo">
-            <span className="wizard-logo-text">LZ Camera Bridge</span>
+            <Logo height={28} />
+            <span className="wizard-logo-text">Camera Bridge</span>
           </div>
           <div className="wizard-steps">
             {STEPS.map((s, i) => (
