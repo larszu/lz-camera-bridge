@@ -89,6 +89,41 @@
   border-color: #e5534b;
 }
 
+/* A preset the bridge recalls as a soft move: a small dot, not a second colour. */
+.ptz-preset--eased {
+  position: relative;
+}
+
+.ptz-preset--eased::after {
+  content: '';
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #4da3ff;
+}
+
+.ptz-presets__motion {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.6rem;
+  margin-top: 0.6rem;
+}
+
+.ptz-presets__motion .ptz-speed input {
+  width: 110px;
+}
+
+.ptz-presets__note {
+  display: block;
+  margin-top: 0.4rem;
+  font-size: 0.7rem;
+  color: var(--text-muted, #9aa0a6);
+}
+
 /* ── Buttons ── */
 .ptz-btn {
   background: #26292f;
@@ -109,6 +144,11 @@
 .ptz-btn--sm {
   padding: 0.25rem 0.6rem;
   min-width: 40px;
+}
+
+.ptz-btn--on {
+  border-color: #4da3ff;
+  color: #4da3ff;
 }
 
 .ptz-btn--store {

@@ -65,6 +65,9 @@ export class DemoCameraClient extends EventEmitter {
   /** The head's pose, held here like the paint state: absolute drives land, relative jogs move it a little. */
   readonly pose = { pan: 0, tilt: 0, zoom: 0 };
 
+  /** Takes eased preset recall like a real positioning head, so the panel can show it without one. */
+  readonly poseStream = { intervalMs: 50 };
+
   /** The demo reports its pose — the one "camera" whose pose is by definition what was commanded. */
   async readPose(): Promise<{ pan: number; tilt: number; zoom: number }> {
     if (!this.connected) throw new Error('demo camera not connected');

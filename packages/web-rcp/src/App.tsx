@@ -117,7 +117,7 @@ export default function App() {
     setSwitcherConfig, connectSwitcher, disconnectSwitcher, removeSwitcher, switcherCommand,
     importSite, setSiteName, clearError,
     poses, plannedProgress, readPose, drivePlannedPreset, storePlannedPresets, calibratePose, setPoseOffset,
-    zoomTo, captureZoomPoint, clearZoomTable,
+    zoomTo, captureZoomPoint, clearZoomTable, setPresetMotion,
   } = bridge;
 
   const camNumbers = useMemo(
@@ -469,6 +469,11 @@ export default function App() {
                     extras={ptzExtrasFor(config)}
                     power={shownState.cameraPower}
                     tally={cameraTally[selected]}
+                    presetRecall={cam?.presetRecall}
+                    presetMotion={config.bridgePresets}
+                    defaultMoveMs={config.presetMove?.timeMs}
+                    softSwitch={config.connectionMode !== 'robotic-head'}
+                    onPresetMotion={(n, change) => setPresetMotion(selected, n, change)}
                   />
                   {cam && (
                     <PlannedShots

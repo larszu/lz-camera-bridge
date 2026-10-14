@@ -78,6 +78,10 @@ export interface BridgeConfig {
   homeHeading?: number;
   zoomTable?: { position: number; focalMm: number }[];
   unitsPerDeg?: number;
+  /** Presets in der Bruecke: gelesene Pose, Fahrzeit (ms), Weich-Schalter — je Preset-Nummer. */
+  bridgePresets?: Record<string, { pan?: number; tilt?: number; zoom?: number; timeMs?: number; soft?: boolean }>;
+  /** Vorgaben fuer diese Fahrten: Zeit (ms), Kurve, Hoechstgeschwindigkeit des Kopfs (°/s). */
+  presetMove?: { timeMs?: number; curve?: 'linear' | 'sine' | 'cubic' | 'quint'; maxDegPerSec?: number };
   /** VISCA ueber RS-232: Geraetepfad, Baudrate, Adresse in der Kette (1..7). */
   viscaSerialPath?: string;
   viscaBaudRate?: number;

@@ -114,6 +114,12 @@ device stays silent, is in [`docs/dji-gimbal.md`](docs/dji-gimbal.md).
   unsupported functions are disabled, not silently failing.
 - **Touch PTZ panel** — AW‑RP150-style joystick (pan/tilt with speed),
   zoom/focus rockers, push‑AF, iris and a paged preset grid with a store mode.
+- **Soft presets** — on heads that position absolutely and report their pose
+  (VISCA IP/RS‑232, BirdDog, Panasonic AW, HTTP‑CGI, robotic heads) a stored
+  preset keeps the pose in the bridge, and a recall glides there with
+  ease‑in/out: all axes start and land together, move time per preset, *Soft*
+  switch per preset. Other paths recall the camera's own preset, and the
+  panel says so.
 - **Bitfocus Companion** — HTTP + WebSocket module; Streamdeck actions route to
   whichever camera is connected.
 - **USB HID control panel** — a data-driven adapter maps a hardware panel's

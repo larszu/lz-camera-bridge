@@ -44,6 +44,11 @@
  *       liest die Zoomstellung des Kopfs und merkt sie mit der abgelesenen
  *       Brennweite in `zoomTable` — die gemessene Kurve dieses Modells.
  *   { type: 'clearZoomTable', cameraNumber }
+ *   { type: 'setPresetMotion', cameraNumber, presetNumber, timeMs?, soft? }
+ *       Fahrzeit und Weich-Schalter eines Presets (motion/PresetGlide.ts).
+ *       `storePreset`/`recallPreset` als `command` laufen ueber die Bruecke:
+ *       wo der Kopf absolut positioniert und seine Pose meldet, wird die Pose
+ *       gemerkt und weich angefahren; sonst das Preset der Kamera.
  *   { type: 'getSite' } | { type: 'importSite', site } | { type: 'setSiteName', name }
  *       Die Anlage als Datei (site/siteFile.ts): Kameras + Mischer. Wird
  *       bei eingeschalteter Persistenz (index.ts, Electron) auf Platte
@@ -88,7 +93,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'http';
 import { networkInterfaces } from 'os';
 import { Rs422Transport } from './transport/Rs422Transport.js';
 import { CameraState } from './protocol/CcuClient.js';
-import { makeBackend, CameraBackend, CameraConfig } from './cameras/backendFactory.js';
+import { makeBackend, presetRecallFor, CameraBackend, CameraConfig } from './cameras/backendFactory.js';
 import {
   buildGo2rtcConfig,
   buildLaunchScript,
@@ -107,6 +112,7 @@ import { HidControlSurface, HidSurfaceConfig } from './input/HidControlSurface.j
 import { DemandSource, conflictingCommands, type DemandConfig } from './input/DemandSource.js';
 import { EasedDrive, isRamped } from './motion/EasedDrive.js';
 import { DEFAULT_RAMP } from './motion/Easing.js';
+import { DEFAULT_GLIDE, PresetGlide, clampGlideTime, glideFrames, type BridgePreset } from './motion/PresetGlide.js';
 import {
   matchCameraPlan, parseCameraPlan,
   type CameraPlan, type PlanCamera, type SlotFacts,
@@ -123,6 +129,9 @@ import {
   freshnessLimits,
   type Origins,
 } from './protocol/valueOrigin.js';
+
+/** Commands that take the head over from a running preset glide. */
+const GLIDE_BREAKERS = new Set(['ptz', 'setZoom', 'home', 'ptzAbsolute', 'zoomAbsolute', 'stop', 'gotoAngle', 'recenter']);
 
 /** Was der Nutzer liest, wenn die Datei kein Kamera-Plan ist. */
 const PLAN_FEHLER =
@@ -145,6 +154,8 @@ interface CameraSlot {
   planMatchedBy?: 'model' | 'number' | 'manual';
   /** Ease-in/out for pan/tilt, zoom and focus speed demands (motion/EasedDrive.ts). */
   eased?: EasedDrive;
+  /** The running eased preset recall, if any (motion/PresetGlide.ts). */
+  glide?: PresetGlide;
 }
 
 interface SwitcherSlot {
@@ -174,7 +185,7 @@ interface ClientMessage {
     | 'switcherCommand'
     | 'getSite' | 'importSite' | 'setSiteName'
     | 'readPose' | 'drivePlannedPreset' | 'storePlannedPresets' | 'calibratePose' | 'setPoseOffset'
-    | 'zoomTo' | 'captureZoomPoint' | 'clearZoomTable';
+    | 'zoomTo' | 'captureZoomPoint' | 'clearZoomTable' | 'setPresetMotion';
   cameraNumber?: number;
   presetNumber?: number;
   presetNumbers?: number[];
@@ -182,6 +193,8 @@ interface ClientMessage {
   offset?: { pan: number; tilt: number } | null;
   zoom?: number;
   focalMm?: number;
+  timeMs?: number;
+  soft?: boolean;
   config?: CameraConfig;
   switcherNumber?: number;
   switcherConfig?: SwitcherConfig;
@@ -267,6 +280,9 @@ export class BridgeServer {
     this.companion.on('command', (cmd: { action: string; params?: Record<string, unknown> }) => {
       this.handleCompanionCommand(cmd.action, cmd.params ?? {});
     });
+    this.companion.on('portError', (e: { what: string; port: number; busy: boolean }) => {
+      this.broadcast({ type: 'error', message: `Companion ${e.what}: port ${e.port} ${e.busy ? 'is in use by another program' : 'failed'}` });
+    });
     this.companion.on('tallyChanged', (t: TallyState) => {
       this.tally = t;
       this.broadcast({ type: 'tally', tally: this.tally });
@@ -275,6 +291,15 @@ export class BridgeServer {
 
   start(): void {
     this.restoreSite();
+    // Without a listener a busy port is an uncaught exception that takes the
+    // whole app down (issue #143) — here it is a sentence in the log.
+    this.httpServer.on('error', (err: NodeJS.ErrnoException) => {
+      console.error(
+        err.code === 'EADDRINUSE'
+          ? `[BridgeServer] Port ${this.wsPort} is in use — is another LZ Camera Bridge running? The panel talks to that one.`
+          : `[BridgeServer] ${err.message}`,
+      );
+    });
     this.httpServer.listen(this.wsPort, () => {
       console.log(`[BridgeServer] WebSocket listening on ws://localhost:${this.wsPort}`);
       // AND the addresses somebody can actually hand out.
@@ -468,6 +493,21 @@ export class BridgeServer {
         const slot = this.cameras.get(num);
         if (!slot) { this.sendError(ws, `Camera ${num} is not configured`, num); break; }
         delete slot.config.zoomTable;
+        this.broadcastCameras();
+        this.siteChanged();
+        break;
+      }
+
+      case 'setPresetMotion': {
+        const num = msg.cameraNumber ?? 0;
+        const slot = this.cameras.get(num);
+        const n = Number(msg.presetNumber);
+        if (!slot) { this.sendError(ws, `Camera ${num} is not configured`, num); break; }
+        if (!Number.isInteger(n) || n < 0) { this.sendError(ws, 'setPresetMotion needs a preset number', num); break; }
+        const p: BridgePreset = { ...(slot.config.bridgePresets?.[n] ?? {}) };
+        if (msg.timeMs !== undefined && Number.isFinite(Number(msg.timeMs))) p.timeMs = clampGlideTime(Number(msg.timeMs));
+        if (typeof msg.soft === 'boolean') p.soft = msg.soft;
+        slot.config.bridgePresets = { ...(slot.config.bridgePresets ?? {}), [n]: p };
         this.broadcastCameras();
         this.siteChanged();
         break;
@@ -708,6 +748,7 @@ export class BridgeServer {
     if (slot.backend) {
       slot.eased?.dispose();
       slot.eased = undefined;
+      slot.glide?.cancel();
       try { await slot.backend.disconnect(); } catch { /* ignore */ }
       slot.backend = null;
       slot.connected = false;
@@ -751,6 +792,7 @@ export class BridgeServer {
     if (!slot?.backend) return;
     slot.eased?.dispose();
     slot.eased = undefined;
+    slot.glide?.cancel();
     try { await slot.backend.disconnect(); } catch { /* ignore */ }
     slot.backend = null;
     slot.connected = false;
@@ -853,6 +895,15 @@ export class BridgeServer {
       return;
     }
 
+    // Presets go through the bridge: a stored pose is recalled as an eased
+    // move, the camera's own preset is the fallback (motion/PresetGlide.ts).
+    if (cmd === 'storePreset' || cmd === 'recallPreset') {
+      await this.presetCommand(ws, slot, cmd, params);
+      return;
+    }
+    // Any other move takes the head over from a running preset glide.
+    if (GLIDE_BREAKERS.has(cmd)) slot.glide?.cancel();
+
     // Speed demands glide (ease in / ease out) unless the source shapes the
     // motion itself (a physical demand) or the camera's ease is switched off.
     let handled: boolean;
@@ -916,6 +967,79 @@ export class BridgeServer {
     }
   }
 
+  /**
+   * `storePreset` / `recallPreset` for one camera.
+   *
+   * Store: always into the camera as well — its own preset is the fallback
+   * for a recall the bridge cannot glide (pose unreadable, soft switched
+   * off, bridge bypassed). On a positioning head the pose is read back and
+   * kept in the site file.
+   * Recall: with a stored pose and `soft` not off, an eased stream of
+   * absolute positions from where the head IS (read, not assumed) to the
+   * pose. Otherwise the camera's own preset; the robotic head plays its own
+   * eased keyframes and only gets the move time.
+   */
+  private async presetCommand(ws: WebSocket, slot: CameraSlot, cmd: 'storePreset' | 'recallPreset', params: Record<string, unknown>): Promise<void> {
+    const num = slot.num;
+    const backend = slot.backend!;
+    const n = Number(params.value);
+    const key = String(n);
+    const stored = slot.config.bridgePresets?.[key];
+    const timeMs = params.timeMs !== undefined && Number.isFinite(Number(params.timeMs)) ? Number(params.timeMs) : stored?.timeMs;
+    const glides = Boolean(backend.poseStream && backend.readPose);
+    const forward = { ...params, cameraNumber: num, ...(timeMs !== undefined ? { timeMs } : {}) };
+
+    if (cmd === 'storePreset') {
+      const inCamera = await backend.handleRcpCommand('storePreset', forward);
+      if (!glides) {
+        if (!inCamera) this.sendError(ws, `'storePreset' wird von Kamera ${num} nicht unterstützt`, num);
+        return;
+      }
+      const meta: BridgePreset = { ...(stored ?? {}) };
+      delete meta.pan; delete meta.tilt; delete meta.zoom;
+      if (timeMs !== undefined) meta.timeMs = clampGlideTime(timeMs);
+      try {
+        const pose = await backend.readPose!();
+        Object.assign(meta, { pan: pose.pan, tilt: pose.tilt }, pose.zoom !== undefined ? { zoom: pose.zoom } : {});
+      } catch (err) {
+        // Kept without a pose: a recall then uses the camera's preset instead
+        // of gliding to an old pose that no longer is this preset.
+        this.sendError(ws, `Camera ${num}: preset ${n} stored in the camera, but the pose could not be read (${(err as Error).message}) — it recalls without easing`, num);
+      }
+      slot.config.bridgePresets = { ...(slot.config.bridgePresets ?? {}), [key]: meta };
+      this.broadcastCameras();
+      this.siteChanged();
+      return;
+    }
+
+    slot.glide?.cancel();
+    if (glides && stored && stored.pan !== undefined && stored.tilt !== undefined && stored.soft !== false) {
+      let from: { pan: number; tilt: number; zoom?: number } | null = null;
+      try {
+        from = await backend.readPose!();
+      } catch {
+        /* no start pose → the camera's own preset below */
+      }
+      if (from) {
+        const move = slot.config.presetMove ?? {};
+        const intervalMs = backend.poseStream!.intervalMs;
+        const frames = glideFrames(from, { pan: stored.pan, tilt: stored.tilt, zoom: stored.zoom }, {
+          timeMs: timeMs ?? move.timeMs ?? DEFAULT_GLIDE.timeMs,
+          curve: move.curve ?? DEFAULT_GLIDE.curve,
+          intervalMs,
+          maxDegPerSec: move.maxDegPerSec ?? DEFAULT_GLIDE.maxDegPerSec,
+        });
+        slot.glide ??= new PresetGlide();
+        const result = await slot.glide.run((c, p) => backend.handleRcpCommand(c, { ...p, cameraNumber: num }), frames, intervalMs);
+        if (result === 'failed') this.sendError(ws, `Camera ${num}: eased move to preset ${n} broke off`, num);
+        return;
+      }
+    }
+    if (!(await backend.handleRcpCommand('recallPreset', forward))) {
+      this.sendError(ws, `'recallPreset' wird von Kamera ${num} nicht unterstützt`, num);
+    }
+  }
+
   private echoState(cmd: string, params: Record<string, unknown>): Partial<CameraState> | null {
     const n = (k: string) => Number(params[k] ?? 0);
     switch (cmd) {
@@ -954,6 +1078,9 @@ export class BridgeServer {
       // `neverReadsBack`. Das Pult bekommt kein Duplikat der Tabelle;
       // eine zweite Tabelle waere die zweite Wahrheit.
       freshnessLimits: freshnessLimits(MODE_CADENCE[s.config?.connectionMode ?? 'tcp']),
+      // Wie ein Preset-Abruf faehrt: 'eased' (weich, Fahrzeit einstellbar)
+      // oder 'camera' (das Preset der Kamera). Fertig von hier, wie oben.
+      presetRecall: presetRecallFor(s.config?.connectionMode),
       // Der Plan geht mit, damit das Pult die Kamera so beschriften kann, wie
       // sie in der Show heisst -- samt Beleg, damit ein blosser Vorschlag
       // nicht wie eine Tatsache aussieht.

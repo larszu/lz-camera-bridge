@@ -82,6 +82,12 @@ export class ViscaClient extends EventEmitter implements GenericCameraClient {
    * und nicht in jedem Kommando fest hingeschrieben.
    */
   private readonly kopf: number;
+  /**
+   * Eased preset recall (motion/PresetGlide.ts) streams absolute positions at
+   * this interval. UDP and RS-232 both take 20 Hz; each frame replaces the
+   * previous pan-tilt target in the head.
+   */
+  readonly poseStream = { intervalMs: 50 };
   /** Position units per degree of this head; the slot config may override the 14.4 default. */
   unitsPerDeg = VISCA_UNITS_PER_DEG;
   /** Reply frames waiting to be claimed by an inquiry, newest last. */
@@ -303,11 +309,15 @@ export class ViscaClient extends EventEmitter implements GenericCameraClient {
       case 'recallPreset':
         await this.send([0x81, 0x01, 0x04, 0x3f, 0x02, num('value') & 0x7f, 0xff]);
         return true;
-      case 'ptzAbsolute':
-        // Pan-tiltDrive AbsolutePosition, degrees in the head frame.
-        await this.send(viscaAbsolutePanTilt(num('pan'), num('tilt'), this.unitsPerDeg));
+      case 'ptzAbsolute': {
+        // Pan-tiltDrive AbsolutePosition, degrees in the head frame. `speed`
+        // (0..1, from an eased preset recall) scales the VV/WW speed bytes;
+        // without it the head goes at full speed as before.
+        const s = params['speed'] !== undefined ? Math.min(1, Math.max(0, num('speed'))) : 1;
+        await this.send(viscaAbsolutePanTilt(num('pan'), num('tilt'), this.unitsPerDeg, s * 0x18, s * 0x14));
         if (params['zoom'] !== undefined) await this.send(viscaZoomDirect(num('zoom')));
         return true;
+      }
       case 'zoomAbsolute':
         await this.send(viscaZoomDirect(num('zoom')));
         return true;

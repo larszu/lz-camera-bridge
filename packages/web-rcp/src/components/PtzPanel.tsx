@@ -14,6 +14,10 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
  *   autoFocus    {}
  *   setIris      { value: 0..255 }
  *   recallPreset { value: n } / storePreset { value: n }
+ *
+ * Where the bridge eases preset recalls (`presetRecall: 'eased'`), the last
+ * pressed preset gets its own move time and a Soft switch; both live in the
+ * bridge (`setPresetMotion`), so every panel and Companion recall the same.
  */
 
 /**
@@ -43,13 +47,34 @@ interface PtzPanelProps {
   power?: boolean;
   /** Tally from the switcher. */
   tally?: 'program' | 'preview' | 'off';
+  /** How the bridge recalls presets on this camera; undefined = older bridge. */
+  presetRecall?: 'eased' | 'camera';
+  /** Per-preset motion as the bridge keeps it, keyed by preset number. */
+  presetMotion?: Record<string, PresetMotion>;
+  /** Move time of a preset without its own (ms). */
+  defaultMoveMs?: number;
+  /** Offer the Soft switch (false where the head always eases). */
+  softSwitch?: boolean;
+  onPresetMotion?: (presetNumber: number, change: { timeMs?: number; soft?: boolean }) => void;
 }
+
+export interface PresetMotion {
+  pan?: number;
+  timeMs?: number;
+  soft?: boolean;
+}
+
+const MOVE_MIN_S = 0.5;
+const MOVE_MAX_S = 15;
 
 const PRESETS_PER_PAGE = 12;
 const PRESET_PAGES = 9; // presets 1..108, AW-RP150-like "100 presets"
 const DRIVE_INTERVAL_MS = 120; // resend rate while joystick/rocker held
 
-export function PtzPanel({ cameraId = 1, label, disabled = false, onCommand, extras = {}, power, tally }: PtzPanelProps) {
+export function PtzPanel({
+  cameraId = 1, label, disabled = false, onCommand, extras = {}, power, tally,
+  presetRecall, presetMotion = {}, defaultMoveMs = 3000, softSwitch = true, onPresetMotion,
+}: PtzPanelProps) {
   const [ptSpeed, setPtSpeed] = useState(70); // % speed scale like the RP150 PT SPEED dial
   const [storeMode, setStoreMode] = useState(false);
   // Standby takes two clicks within four seconds: it is the one button on
@@ -63,6 +88,10 @@ export function PtzPanel({ cameraId = 1, label, disabled = false, onCommand, ext
   const [presetPage, setPresetPage] = useState(0);
   const [activePreset, setActivePreset] = useState<number | null>(null);
   const [iris, setIris] = useState(128);
+  // The move time is dragged locally and sent on release: one setPresetMotion
+  // per decision, not one per pixel.
+  const [moveDraft, setMoveDraft] = useState<number | null>(null);
+  useEffect(() => setMoveDraft(null), [activePreset, cameraId]);
 
   const cmd = useCallback(
     (c: string, params: Record<string, unknown> = {}) => {
@@ -235,7 +264,7 @@ export function PtzPanel({ cameraId = 1, label, disabled = false, onCommand, ext
               return (
                 <button
                   key={n}
-                  className={`ptz-preset ${activePreset === n ? 'ptz-preset--active' : ''} ${storeMode ? 'ptz-preset--store' : ''}`}
+                  className={`ptz-preset ${activePreset === n ? 'ptz-preset--active' : ''} ${storeMode ? 'ptz-preset--store' : ''} ${presetRecall === 'eased' && presetMotion[n]?.pan !== undefined && presetMotion[n]?.soft !== false ? 'ptz-preset--eased' : ''}`}
                   onClick={() => pressPreset(n)}
                   disabled={disabled}
                 >
@@ -251,6 +280,53 @@ export function PtzPanel({ cameraId = 1, label, disabled = false, onCommand, ext
           >
             {storeMode ? 'STORE: pick a slot…' : 'STORE'}
           </button>
+          {presetRecall === 'eased' && activePreset !== null && onPresetMotion && (() => {
+            const m = presetMotion[activePreset] ?? {};
+            const seconds = moveDraft ?? (m.timeMs ?? defaultMoveMs) / 1000;
+            const soft = m.soft !== false;
+            const commit = () => {
+              if (moveDraft !== null) onPresetMotion(activePreset, { timeMs: Math.round(moveDraft * 1000) });
+              setMoveDraft(null);
+            };
+            return (
+              <div className="ptz-presets__motion">
+                <span className="ptz-rocker__label">PRESET {activePreset}</span>
+                <label className="ptz-speed" title="How long the soft move to this preset takes">
+                  MOVE
+                  <input
+                    type="range"
+                    min={MOVE_MIN_S}
+                    max={MOVE_MAX_S}
+                    step={0.5}
+                    value={seconds}
+                    onChange={(e) => setMoveDraft(Number(e.target.value))}
+                    onPointerUp={commit}
+                    onKeyUp={commit}
+                    onBlur={commit}
+                    disabled={disabled || !soft}
+                  />
+                  <span>{seconds.toFixed(1)} s</span>
+                </label>
+                {softSwitch && (
+                  <button
+                    className={`ptz-btn ptz-btn--sm ${soft ? 'ptz-btn--on' : ''}`}
+                    aria-pressed={soft}
+                    onClick={() => onPresetMotion(activePreset, { soft: !soft })}
+                    disabled={disabled}
+                    title={soft ? 'Soft: eased move, all axes start and land together' : 'Off: the camera recalls its own preset'}
+                  >
+                    SOFT {soft ? 'ON' : 'OFF'}
+                  </button>
+                )}
+                {m.pan === undefined && softSwitch && (
+                  <span className="ptz-presets__note">Store this preset again to move it softly.</span>
+                )}
+              </div>
+            );
+          })()}
+          {presetRecall === 'camera' && (
+            <span className="ptz-presets__note">Presets are recalled by the camera (no soft move on this path).</span>
+          )}
         </div>
 
         {/* Center: joystick */}

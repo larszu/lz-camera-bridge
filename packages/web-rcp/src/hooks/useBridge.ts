@@ -90,6 +90,8 @@ export interface CameraSlot {
    *  ist, in Millisekunden. Kommt FERTIG GERECHNET von der Bruecke; das Pult
    *  fuehrt weder Takt-Tabelle noch Schwellen. `null`: keine Verfallsfrist. */
   freshnessLimits?: { agingAfterMs: number; staleAfterMs: number } | null;
+  /** Wie ein Preset-Abruf faehrt: weich ueber die Bruecke oder das Preset der Kamera. Fertig von der Bruecke. */
+  presetRecall?: 'eased' | 'camera';
   /** Die geplante Kamera auf diesem Slot, samt Beleg. */
   plan?: PlanCamera;
   planMatchedBy?: PlanMatchedBy;
@@ -365,6 +367,8 @@ export function useBridge() {
   const zoomTo = useCallback((cameraNumber: number, zoom: number) => send('zoomTo', { cameraNumber, zoom }), [send]);
   const captureZoomPoint = useCallback((cameraNumber: number, focalMm: number) => send('captureZoomPoint', { cameraNumber, focalMm }), [send]);
   const clearZoomTable = useCallback((cameraNumber: number) => send('clearZoomTable', { cameraNumber }), [send]);
+  const setPresetMotion = useCallback((cameraNumber: number, presetNumber: number, change: { timeMs?: number; soft?: boolean }) =>
+    send('setPresetMotion', { cameraNumber, presetNumber, ...change }), [send]);
   const setPoseOffset = useCallback((cameraNumber: number, offset: { pan: number; tilt: number } | null) => send('setPoseOffset', { cameraNumber, offset }), [send]);
 
   return {
@@ -378,6 +382,6 @@ export function useBridge() {
     setSwitcherConfig, connectSwitcher, disconnectSwitcher, removeSwitcher, switcherCommand,
     importSite, setSiteName, clearError,
     poses, plannedProgress, readPose, drivePlannedPreset, storePlannedPresets, calibratePose, setPoseOffset,
-    zoomTo, captureZoomPoint, clearZoomTable,
+    zoomTo, captureZoomPoint, clearZoomTable, setPresetMotion,
   };
 }

@@ -15,7 +15,7 @@
 import { EventEmitter } from 'events';
 import { CameraState } from '../protocol/CcuClient.js';
 import { GenericCameraClient, httpRequest } from './GenericCameraClient.js';
-import { awAbsolutePanTilt, awAbsoluteZoom, parseAwPanTilt, parseAwPtv, parseAwZoom, type Pose } from '../protocol/ptzPose.js';
+import { awAbsolutePanTilt, awAbsolutePanTiltSpeed, awAbsoluteZoom, parseAwPanTilt, parseAwPtv, parseAwZoom, type Pose } from '../protocol/ptzPose.js';
 
 export class PanasonicPtzClient extends EventEmitter implements GenericCameraClient {
   private base: string;
@@ -26,6 +26,13 @@ export class PanasonicPtzClient extends EventEmitter implements GenericCameraCli
     super();
     this.base = `http://${host}:${port}`;
   }
+
+  /**
+   * Eased preset recall streams absolute positions at this interval. The AW
+   * protocol asks for at least 130 ms between two commands, and a frame is
+   * two of them (#APS, #AXZ) — so ~3 frames per second, not 20.
+   */
+  readonly poseStream = { intervalMs: 300 };
 
   get isConnected(): boolean {
     return this.connected;
@@ -104,8 +111,11 @@ export class PanasonicPtzClient extends EventEmitter implements GenericCameraCli
         return true;
       }
       case 'ptzAbsolute':
-        // #APC[pan][tilt], #AXZ[zoom] — absolute, in the AW scale.
-        await this.ptz(awAbsolutePanTilt(num('pan'), num('tilt')));
+        // #APC[pan][tilt], #AXZ[zoom] — absolute, in the AW scale. With a
+        // `speed` (eased preset recall) #APS carries it along.
+        await this.ptz(params['speed'] !== undefined
+          ? awAbsolutePanTiltSpeed(num('pan'), num('tilt'), num('speed'))
+          : awAbsolutePanTilt(num('pan'), num('tilt')));
         if (params['zoom'] !== undefined) await this.ptz(awAbsoluteZoom(num('zoom')));
         return true;
       case 'zoomAbsolute':

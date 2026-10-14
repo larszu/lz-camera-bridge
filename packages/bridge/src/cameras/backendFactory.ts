@@ -26,6 +26,8 @@ import { DemoCameraClient } from './DemoCameraClient.js';
 import { B4LensClient } from './B4LensClient.js';
 import { DjiOsmoClient } from './DjiOsmoClient.js';
 import { DjiRoninClient } from './DjiRoninClient.js';
+import type { EaseCurve } from '../motion/Easing.js';
+import type { BridgePreset } from '../motion/PresetGlide.js';
 
 export type ConnectionMode =
   | 'tcp' | 'serial' | 'lumix-http' | 'sony-usb' | 'blackmagic' | 'sony-mnc' | 'canon-ccapi'
@@ -79,6 +81,15 @@ export interface CameraConfig {
    * `DEFAULT_RAMP` (motion/Easing.ts); `{ attackMs: 0, releaseMs: 0 }` switches it off.
    */
   ease?: { attackMs: number; releaseMs: number; curve?: 'linear' | 'sine' | 'cubic' | 'quint' };
+  /**
+   * Bridge-side presets (motion/PresetGlide.ts), keyed by preset number: the
+   * pose read from the head at store time, plus move time and the soft
+   * switch. A recall glides there on an eased stream of absolute positions;
+   * without a pose, or with `soft: false`, the camera's own preset is recalled.
+   */
+  bridgePresets?: Record<string, BridgePreset>;
+  /** Defaults for those moves: time (ms), curve, the head's top pan/tilt speed (°/s). */
+  presetMove?: { timeMs?: number; curve?: EaseCurve; maxDegPerSec?: number };
   /** Robotic head: protocol variant, column axis letter, counts per degree, axis inversion, preset time. */
   roboticHead?: Omit<RoboticHeadOptions, 'dataDir'>;
   /** A name for the panel: "Stage left" instead of a bare number. The plan label wins when a plan is matched. */
@@ -120,6 +131,27 @@ export interface CameraBackend extends EventEmitter {
    * with a sentence instead of guessing.
    */
   readPose?(): Promise<{ pan: number; tilt: number; zoom?: number }>;
+  /**
+   * Present when the head takes a stream of `ptzAbsolute` frames (with a
+   * `speed` 0..1 and `stream: true`) — the interval is the head's, not ours.
+   * Together with `readPose` it is what eased preset recall needs.
+   */
+  readonly poseStream?: { intervalMs: number };
+}
+
+/**
+ * How a preset recall moves on each path. `eased`: the bridge plays a soft
+ * move (PresetGlide, or the robotic head's own keyframes); `camera`: the
+ * camera's own preset, as fast and abrupt as its firmware makes it. Must
+ * agree with the backends (`poseStream` + `readPose`) — a test holds them
+ * together. Sent to the panel per camera as `presetRecall`.
+ */
+export const EASED_PRESET_MODES: readonly ConnectionMode[] = [
+  'visca', 'visca-serial', 'panasonic-ptz', 'http-cgi', 'birddog', 'robotic-head', 'demo',
+];
+
+export function presetRecallFor(mode: ConnectionMode | undefined): 'eased' | 'camera' {
+  return mode && EASED_PRESET_MODES.includes(mode) ? 'eased' : 'camera';
 }
 
 export interface BuiltBackend {
