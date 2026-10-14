@@ -30,6 +30,7 @@ import type { SwitcherConfig } from '../switcher/VisCatcClient.js';
 import type { PlanCamera } from '../plan/cameraPlan.js';
 import { normaliseStudioShots, type StudioShots } from '../motion/studioShots.js';
 import { normaliseFreeDSite, type FreeDSiteConfig } from '../protocol/freeDPose.js';
+import { normaliseInputCalibration, type InputCalibration } from '../input/axisCalibration.js';
 
 export const SITE_KIND = 'lz-site';
 export const SITE_FORMAT_VERSION = 1;
@@ -59,6 +60,8 @@ export interface SiteFile {
   shots?: StudioShots;
   /** FreeD tracking output: targets and rate (protocol/freeDPose.ts). Per camera switch in its config. */
   freed?: FreeDSiteConfig;
+  /** Joystick calibration per panel device (input/axisCalibration.ts). Optional: uncalibrated panels use their binding table. */
+  input?: InputCalibration;
 }
 
 export function emptySite(name = ''): SiteFile {
@@ -113,6 +116,8 @@ function normaliseSite(obj: Record<string, unknown>): SiteFile {
   if (obj.shots && typeof obj.shots === 'object') site.shots = normaliseStudioShots(obj.shots);
   const freed = normaliseFreeDSite(obj.freed);
   if (freed) site.freed = freed;
+  const input = normaliseInputCalibration(obj.input);
+  if (input) site.input = input;
   return site;
 }
 

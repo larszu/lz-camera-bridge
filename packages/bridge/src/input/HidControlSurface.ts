@@ -35,6 +35,15 @@
  * zwei Tasten im selben Byte haben sich damit gegenseitig ausgeloescht.
  */
 import { EventEmitter } from 'events';
+import {
+  CalibrationSession,
+  axisKey,
+  deviceKey,
+  shapeAxis,
+  type CalibrationAxisSpec,
+  type CalibrationResult,
+  type DeviceCalibration,
+} from './axisCalibration.js';
 
 export interface HidDeviceInfo {
   vendorId: number;
@@ -119,6 +128,12 @@ export interface HidSurfaceConfig {
   bindings: HidBinding[];
   /** Rohe Reports mitschicken, damit man die Offsets eines Pultes ausmisst. */
   debug?: boolean;
+  /**
+   * Measured calibration of this device (input/axisCalibration.ts). Where an
+   * axis has one, it replaces the binding's min/max/centre/deadband guesses.
+   * The bridge fills it from the site; a client does not have to send it.
+   */
+  calibration?: DeviceCalibration;
 }
 
 /**
@@ -238,7 +253,14 @@ export function rohWert(buf: Buffer, b: HidBinding): number {
  * Zweiseitig, sobald `centre` gesetzt ist; sonst die alte Fader-Rechnung, die
  * die vorhandenen Pult-Bindungen unveraendert laesst.
  */
-export function achsenWert(b: HidBinding, raw: number): number {
+export function achsenWert(b: HidBinding, raw: number, cal?: DeviceCalibration): number {
+  const gemessen = cal?.axes[axisKey(b.offset)];
+  if (gemessen) {
+    // Gemessen schlaegt geschaetzt. Die Spanne und das Vorzeichen (`gain`)
+    // bleiben Sache der Bindung: sie sagen, was der BEFEHL erwartet, die
+    // Kalibrierung sagt nur, was die ACHSE liefert.
+    return shapeAxis(gemessen, raw, b.span ?? (b.centre !== undefined ? 100 : 255), b.gain ?? 1);
+  }
   const voll = (b.bytes ?? 1) === 2 ? 65535 : 255;
   const min = b.min ?? 0;
   const max = b.max ?? voll;
@@ -284,6 +306,7 @@ export function berechneBefehle(
   bindings: HidBinding[],
   buf: Buffer,
   zustand: ReportZustand,
+  cal?: DeviceCalibration,
 ): EmittedCommand[] {
   const befehle: EmittedCommand[] = [];
   const gruppen = new Map<string, { cmd: string; params: Record<string, unknown>; geaendert: boolean }>();
@@ -302,7 +325,7 @@ export function berechneBefehle(
       return;
     }
 
-    const wert = achsenWert(b, raw);
+    const wert = achsenWert(b, raw, cal);
     const vorher = zustand.get(i);
     const schritt = b.step ?? 1;
     /**
@@ -342,6 +365,63 @@ export function berechneBefehle(
     if (g.geaendert) befehle.push({ cmd: g.cmd, params: g.params });
   }
   return befehle;
+}
+
+/**
+ * Stop every axis that is currently driving, and mark it as at rest.
+ *
+ * Used when the calibration assistant starts: from then on the panel's
+ * reports are measured, not obeyed, and a head that was moving when the
+ * operator pressed "Calibrate" must not keep moving while they sweep the
+ * stick through every corner.
+ */
+export function ruheBefehle(bindings: HidBinding[], zustand: ReportZustand): EmittedCommand[] {
+  const befehle: EmittedCommand[] = [];
+  const gruppen = new Map<string, { cmd: string; params: Record<string, unknown>; aktiv: boolean }>();
+  bindings.forEach((b, i) => {
+    if (b.kind !== 'axis') return;
+    const vorher = zustand.get(i) ?? 0;
+    zustand.set(i, 0);
+    const key = b.paramKey ?? 'value';
+    if (b.group) {
+      const g = gruppen.get(b.group) ?? { cmd: b.command, params: {}, aktiv: false };
+      Object.assign(g.params, b.params ?? {});
+      g.params[key] = 0;
+      if (vorher !== 0) g.aktiv = true;
+      gruppen.set(b.group, g);
+      return;
+    }
+    if (vorher !== 0) befehle.push({ cmd: b.command, params: { [key]: 0, ...(b.params ?? {}) } });
+  });
+  for (const g of gruppen.values()) if (g.aktiv) befehle.push({ cmd: g.cmd, params: g.params });
+  return befehle;
+}
+
+const ACHSEN_NAMEN: Record<string, string> = {
+  'ptz.pan': 'Pan',
+  'ptz.tilt': 'Tilt',
+  setZoom: 'Zoom',
+  setFocus: 'Focus',
+  setIris: 'Iris',
+  setMasterGain: 'Gain',
+  setColorTemp: 'Colour temp.',
+  setMoveTime: 'Move time',
+};
+
+/** The axes of a binding table as the calibration assistant measures them. */
+export function kalibrierAchsen(bindings: readonly HidBinding[]): CalibrationAxisSpec[] {
+  return bindings
+    .filter((b) => b.kind === 'axis')
+    .map((b) => {
+      const name = ACHSEN_NAMEN[b.paramKey && b.paramKey !== 'value' ? `${b.command}.${b.paramKey}` : b.command] ?? b.command;
+      return {
+        key: axisKey(b.offset),
+        offset: b.offset,
+        bytes: (b.bytes ?? 1) === 2 ? 2 : 1,
+        twoSided: b.centre !== undefined,
+        label: `${name} · byte ${b.offset}`,
+      };
+    });
 }
 
 async function loadHid(): Promise<any | null> {
@@ -385,6 +465,9 @@ export class HidControlSurface extends EventEmitter {
   private debug: boolean;
   private zustand: ReportZustand = new Map();
   private running = false;
+  private calibration?: DeviceCalibration;
+  private session: CalibrationSession | null = null;
+  private lastLive = 0;
 
   constructor(config: HidSurfaceConfig) {
     super();
@@ -392,6 +475,7 @@ export class HidControlSurface extends EventEmitter {
     this.productId = config.productId;
     this.path = config.path;
     this.debug = config.debug ?? false;
+    this.calibration = config.calibration;
     this.bindings = config.bindings?.length
       ? config.bindings
       : standardBindungen(config.vendorId, config.productId);
@@ -399,6 +483,56 @@ export class HidControlSurface extends EventEmitter {
 
   get isRunning(): boolean {
     return this.running;
+  }
+
+  /** `054c:0ce6` — the key the calibration is stored under. */
+  get key(): string {
+    return deviceKey(this.vendorId, this.productId);
+  }
+
+  get calibrating(): boolean {
+    return this.session !== null;
+  }
+
+  /** Replace the calibration in use (assistant finished, tuning changed, site imported). */
+  setCalibration(cal: DeviceCalibration | undefined): void {
+    this.calibration = cal;
+    // Re-evaluate from scratch: the last sent values were computed with the old one.
+    this.zustand.clear();
+  }
+
+  /**
+   * Start the assistant. Every moving axis is stopped first (the stop
+   * commands are emitted as usual), then reports are only measured.
+   * Emits 'calibration' with live values, at most every 100 ms.
+   */
+  beginCalibration(): void {
+    for (const befehl of ruheBefehle(this.bindings, this.zustand)) this.emit('command', befehl);
+    this.session = new CalibrationSession(kalibrierAchsen(this.bindings), this.calibration);
+    this.lastLive = 0;
+    this.emit('calibration', { phase: this.session.phase, axes: this.session.live() });
+  }
+
+  /**
+   * The operator has let go. Measures the rest for `restMs`, then derives
+   * and applies the calibration and returns it. Normal operation resumes.
+   */
+  async captureRest(restMs = 800): Promise<CalibrationResult | null> {
+    const session = this.session;
+    if (!session) return null;
+    session.beginRest();
+    this.emit('calibration', { phase: session.phase, axes: session.live() });
+    await new Promise((r) => setTimeout(r, restMs));
+    if (this.session !== session) return null; // cancelled meanwhile
+    const result = session.finish();
+    this.session = null;
+    this.setCalibration(result.calibration);
+    return result;
+  }
+
+  cancelCalibration(): void {
+    this.session = null;
+    this.zustand.clear();
   }
 
   /** Welche Tabelle gerade gilt — die Oberflaeche sagt es dem Bedienenden. */
@@ -431,13 +565,24 @@ export class HidControlSurface extends EventEmitter {
     }
     this.device = null;
     this.running = false;
+    this.session = null;
     this.zustand.clear();
     this.emit('stopped');
   }
 
-  private onReport(buf: Buffer): void {
+  /** Public for tests: what a report from the device does. */
+  onReport(buf: Buffer, now = Date.now()): void {
     if (this.debug) this.emit('report', buf.toString('hex'));
-    for (const befehl of berechneBefehle(this.bindings, buf, this.zustand)) {
+    if (this.session) {
+      // Measuring, not driving: nothing goes to a camera while the stick sweeps.
+      this.session.sample(buf);
+      if (now - this.lastLive >= 100) {
+        this.lastLive = now;
+        this.emit('calibration', { phase: this.session.phase, axes: this.session.live() });
+      }
+      return;
+    }
+    for (const befehl of berechneBefehle(this.bindings, buf, this.zustand, this.calibration)) {
       this.emit('command', befehl);
     }
   }

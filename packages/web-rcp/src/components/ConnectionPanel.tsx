@@ -32,13 +32,15 @@ interface Props {
   onListHidDevices: () => void;
   onEnableControlSurface: (surface: Record<string, unknown>) => void;
   onDisableControlSurface: () => void;
+  /** Shown under the panel controls while a panel is active: the calibration assistant. */
+  surfaceExtra?: React.ReactNode;
   onConnect: () => void;
   onDisconnect: () => void;
   cameraConnected: boolean;
   wsStatus: string;
 }
 
-export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices, sonyNetDevices, errorMsg, onDiscoverSonyNet, hidDevices, controlSurfaceActive, onSetConfig, onListPorts, onDiscoverSonyUsb, onDiscoverSonyMnc, onListHidDevices, onEnableControlSurface, onDisableControlSurface, onConnect, onDisconnect, cameraConnected, wsStatus }: Props) {
+export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices, sonyNetDevices, errorMsg, onDiscoverSonyNet, hidDevices, controlSurfaceActive, onSetConfig, onListPorts, onDiscoverSonyUsb, onDiscoverSonyMnc, onListHidDevices, onEnableControlSurface, onDisableControlSurface, surfaceExtra, onConnect, onDisconnect, cameraConnected, wsStatus }: Props) {
   const [mode, setMode] = useState<ConnMode>(config.connectionMode ?? 'tcp');
   const [host, setHost] = useState(config.tcpHost ?? '192.168.1.10');
   const [port, setPort] = useState(String(config.tcpPort ?? 7700));
@@ -641,6 +643,7 @@ export function ConnectionPanel({ config, ports, sonyUsbDevices, sonyMncDevices,
             </button>
           )}
         </div>
+        {controlSurfaceActive && surfaceExtra}
         <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
           The panel controls the camera currently connected (any brand). Adjust the default
           mapping to your device if needed.

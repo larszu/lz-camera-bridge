@@ -278,7 +278,6 @@
 .scopes--full { flex: 1; min-height: 0; }
 .scopes--full .scopes__view { flex: 1; min-height: 0; aspect-ratio: auto; }
 
-<<<<<<< HEAD
 /* ─── Aim by frame + panorama (AimPanel.tsx) ─────────────────────────── */
 .aim__tabs { display: inline-flex; gap: 4px; }
 .aim__tab--on { background: var(--surface-2); color: var(--text-strong); border-color: var(--text-strong); }
@@ -301,7 +300,8 @@
 .aim__fov summary { cursor: pointer; min-height: 32px; display: flex; align-items: center; }
 @media (pointer: coarse) {
   .aim__tabs .btn { min-height: 44px; }
-=======
+}
+
 /* ─── Studio shots: sets, seating chart, moves ──────────────────────────────
    One big button per recall; the button IS the main action of the view.
    Editing sits below, behind "Edit", and never in the way of a recall. */
@@ -341,5 +341,25 @@
 @media (max-width: 560px) {
   .shot-ref, .shot-ref--step { grid-template-columns: 1fr 1fr; }
   .shot-ref__lead { grid-column: 1 / -1; }
->>>>>>> 4f9eca3 (WIP Studio-Shots)
+}
+
+/* ─── Joystick calibration (InputCalibrationPanel.tsx) ─────────────────────
+   One main action per step; the bars show where each axis is and how far
+   the sweep has reached, so the operator sees which axis still needs a push. */
+.calib { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.calib__step { margin: 0; font-size: 13px; color: var(--text-strong); }
+.calib__axes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.calib__axis { display: grid; grid-template-columns: minmax(110px, 1fr) minmax(120px, 2fr); gap: 8px; align-items: center; }
+.calib__axis--tune { grid-template-columns: minmax(130px, 1.4fr) 96px minmax(80px, 1fr) auto; }
+.calib__axis--tune select { min-height: var(--ziel); }
+.calib__label { font-size: 12px; font-weight: 600; display: flex; flex-direction: column; min-width: 0; }
+.calib__meta { font-weight: 400; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.calib__invert { display: inline-flex; gap: 6px; align-items: center; font-size: 12px; min-height: var(--ziel); }
+.calib__expo { width: 100%; }
+.calib-bar { position: relative; height: 12px; background: var(--bg); border: 1px solid var(--line-3); }
+.calib-bar__reach { position: absolute; top: 0; bottom: 0; background: color-mix(in oklab, var(--success) 45%, transparent); }
+.calib-bar__now { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; background: var(--text-strong); }
+@media (max-width: 560px) {
+  .calib__axis, .calib__axis--tune { grid-template-columns: 1fr 1fr; }
+  .calib__label { grid-column: 1 / -1; }
 }

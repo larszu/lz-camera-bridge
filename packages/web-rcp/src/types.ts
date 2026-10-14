@@ -108,6 +108,30 @@ export interface HidDevice {
   path?: string;
 }
 
+/** Measured calibration of one panel axis (bridge input/axisCalibration.ts). */
+export interface AxisCalibration {
+  min: number;
+  max: number;
+  centre?: number;
+  deadzone: number;
+  curve: 'linear' | 'expo';
+  expo: number;
+  invert: boolean;
+}
+
+/** The active panel's axes, as the bridge reports them. `device` null = no panel. */
+export interface InputCalibrationInfo {
+  device: string | null;
+  axes: { key: string; label: string; twoSided: boolean; calibration?: AxisCalibration }[];
+}
+
+/** The calibration assistant while it runs. */
+export interface InputCalibrationLive {
+  phase: 'sweep' | 'rest' | 'idle';
+  axes?: { key: string; label: string; twoSided: boolean; raw: number | null; min: number | null; max: number | null; full: number }[];
+  skipped?: string[];
+}
+
 export interface SonyUsbDevice {
   id: string;
   model: string;
