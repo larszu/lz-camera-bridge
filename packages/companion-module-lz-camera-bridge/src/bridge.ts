@@ -54,6 +54,7 @@ export const formatTally = (value: boolean | undefined): string =>
 interface StateResponse {
   connected: boolean
   state: BridgeCameraState
+  cameraStates?: Array<{ cameraNumber: number; state: BridgeCameraState }>
 }
 
 interface TallyResponse {
@@ -69,7 +70,8 @@ export class BridgeClient {
 
   onBridgeReachable?: (connected: boolean) => void
   onCameraConnected?: (connected: boolean) => void
-  onState?: (state: BridgeCameraState) => void
+  /** `cameraNumber` is undefined for the bridge's legacy merged state. */
+  onState?: (state: BridgeCameraState, cameraNumber?: number) => void
   onTally?: (tally: BridgeTallyState) => void
   onError?: (message: string) => void
 
@@ -167,7 +169,10 @@ export class BridgeClient {
         if (msg.type === 'connection') {
           this.onCameraConnected?.(Boolean(msg.connected))
         } else if (msg.type === 'state' && msg.state && typeof msg.state === 'object') {
-          this.onState?.(msg.state as BridgeCameraState)
+          this.onState?.(
+            msg.state as BridgeCameraState,
+            typeof msg.cameraNumber === 'number' ? msg.cameraNumber : undefined,
+          )
         } else if (msg.type === 'tally' && msg.tally && typeof msg.tally === 'object') {
           this.onTally?.(msg.tally as BridgeTallyState)
         }
@@ -199,6 +204,9 @@ export class BridgeClient {
     this.onBridgeReachable?.(true)
     this.onCameraConnected?.(Boolean(json.connected))
     this.onState?.(json.state ?? {})
+    for (const entry of json.cameraStates ?? []) {
+      if (typeof entry?.cameraNumber === 'number') this.onState?.(entry.state ?? {}, entry.cameraNumber)
+    }
   }
 
   private async fetchTally(): Promise<void> {

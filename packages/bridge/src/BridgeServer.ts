@@ -672,7 +672,10 @@ export class BridgeServer {
 
       case 'command':
         if (!msg.cmd) break;
-        await this.dispatchCommand(ws, msg.cameraNumber ?? 0, msg.cmd, msg.params ?? {});
+        // The "move anyway" retry of a held preset recall carries `force` on
+        // the message, not in `params` (see `holdOnAir`); without passing it
+        // on, the retry was held again.
+        await this.dispatchCommand(ws, msg.cameraNumber ?? 0, msg.cmd, msg.force ? { ...(msg.params ?? {}), force: true } : msg.params ?? {});
         break;
 
       case 'listPorts': {
