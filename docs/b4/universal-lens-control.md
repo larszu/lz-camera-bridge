@@ -48,7 +48,7 @@ the loop when a position is commanded (the zoom position hold already does this)
 | Heden, Chrosziel | motor protocols | **unknown**, research issue |
 | DJI RS focus motor | via DJI RS 2 / RS 3 Pro gimbal, DJI R SDK over CAN | partly: R SDK is public for the gimbal; focus via R SDK is reported for the Ronin-S by third parties, **not verified** |
 | DJI Focus Pro motor | RF to hand unit, USB-C to DJI devices | **no public protocol found** |
-| Camera ND / iris / focus | camera protocols (Sony, Panasonic, Canon, Blackmagic …) | many are in the Telemetrics protocol extraction (local, see below) |
+| Camera ND / iris / focus | camera protocols (Sony, Panasonic, Canon, Blackmagic …) | many are in the robotics protocol extraction (local, see below) |
 
 ## Inputs (demands)
 
@@ -93,8 +93,7 @@ the loop when a position is commanded (the zoom position hold already does this)
   done there. <https://ianmorrish.wordpress.com/2019/01/19/controlling-fujinon-b4-lens-iris/>
 * DJI: [ArduPilot DJI RS2/RS3-Pro (R SDK over CAN)](https://ardupilot.org/copter/docs/common-djirs2-gimbal.html),
   [RamirosLab Ronin-S CAN notes](https://github.com/videofeedback/RamirosLab/blob/main/20211223_Unreal_Engine_Motion_Control_S-Bus_CAN-Bus.md).
-* Telemetrics robotics software (CF card of a decommissioned system, analysed
-  locally 2026-10-13): drivers for ~31 camera models, ~20 pan/tilt heads incl.
-  Telemetrics S2/S5/RM-1, tally and control panels. Protocol specs are kept
-  **outside this public repo** (derived from decompiled proprietary software;
-  see `telemetrics-protocols.md`).
+* Robotic camera control system (storage card of a decommissioned system,
+  analysed locally): drivers for about 31 camera models, about 20 pan/tilt heads,
+  tally and control panels. Protocol specs are kept **outside this public repo**
+  (see `robotics-protocols.md`).

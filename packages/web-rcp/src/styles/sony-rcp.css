@@ -26,15 +26,7 @@
    MAIN PANEL
    ═══════════════════════════════════════════════════════════════════════════ */
 
-/* Instrument colours stay put in both app themes; the shared slider rules
-   in index.css read these. */
 .rcp-panel {
-  color-scheme: dark;
-  --text-muted: #8b93a1;
-  --accent: #cccccc;
-  --surface-1: #1a1a1a;
-  --surface-2: #333333;
-  --line-strong: #444444;
   background: var(--rcp-bg);
   font-family: 'Segoe UI', 'Arial', sans-serif;
   font-size: 12px;

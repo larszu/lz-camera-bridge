@@ -17,6 +17,7 @@ import { SonyPtpIpClient } from './SonyPtpIpClient.js';
 import { CanonCcapiClient } from './CanonCcapiClient.js';
 import { ZCamClient } from './ZCamClient.js';
 import { PanasonicPtzClient } from './PanasonicPtzClient.js';
+import { RoboticHeadClient, type RoboticHeadOptions } from './RoboticHeadClient.js';
 import { ViscaClient } from './ViscaClient.js';
 import { JvcClient } from './JvcClient.js';
 import { BirddogClient } from './BirddogClient.js';
@@ -44,6 +45,9 @@ export type ConnectionMode =
   // path here whose readback is an independent measurement (pin 7),
   // not an echo of what we sent (pin 5).
   | 'b4-lens'
+  // Robotic pan/tilt head with an ASCII protocol on TCP 3001, directly or a
+  // device-server serial port. Presets are kept by the bridge and played eased.
+  | 'robotic-head'
   // A camera that is not there. Every other mode needs a real address, so
   // without hardware the panel came up empty and every control was inert —
   // you could not see the RCP work on a laptop. See `DemoCameraClient` for
@@ -75,6 +79,8 @@ export interface CameraConfig {
    * `DEFAULT_RAMP` (motion/Easing.ts); `{ attackMs: 0, releaseMs: 0 }` switches it off.
    */
   ease?: { attackMs: number; releaseMs: number; curve?: 'linear' | 'sine' | 'cubic' | 'quint' };
+  /** Robotic head: protocol variant, column axis letter, counts per degree, axis inversion, preset time. */
+  roboticHead?: Omit<RoboticHeadOptions, 'dataDir'>;
   /** A name for the panel: "Stage left" instead of a bare number. The plan label wins when a plan is matched. */
   label?: string;
   /** Which switcher input carries this camera's picture (1-based). 0/empty: none. Drives the per-camera tally. */
@@ -175,7 +181,7 @@ function withUnits(client: ViscaClient, unitsPerDeg?: number): ViscaClient {
   return client;
 }
 
-const GENERIC_PORT: Record<string, number> = { zcam: 80, 'panasonic-ptz': 80, visca: 1259, jvc: 80, birddog: 8080, 'b4-lens': 80, 'http-cgi': 80 };
+const GENERIC_PORT: Record<string, number> = { 'robotic-head': 3001, zcam: 80, 'panasonic-ptz': 80, visca: 1259, jvc: 80, birddog: 8080, 'b4-lens': 80, 'http-cgi': 80 };
 
 /** Build a backend for a camera config. Throws for missing required fields. */
 export function makeBackend(cfg: CameraConfig): BuiltBackend {
@@ -253,6 +259,13 @@ export function makeBackend(cfg: CameraConfig): BuiltBackend {
           presetOffset: cfg.cgiPresetOffset,
           unitsPerDeg: cfg.unitsPerDeg,
         }),
+        mapState: identity,
+      };
+    }
+    case 'robotic-head': {
+      if (!cfg.camHost) throw new Error('Keine Kamera-IP konfiguriert');
+      return {
+        backend: new RoboticHeadClient(cfg.camHost, cfg.camPort ?? 3001, cfg.roboticHead ?? {}),
         mapState: identity,
       };
     }

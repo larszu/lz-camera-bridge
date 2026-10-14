@@ -101,6 +101,7 @@ export function PlannedShots({ cam, connected, pose, progress, onDrive, onStoreA
         {pose && <span className="hint">head: pan {pose.pan}° · tilt {pose.tilt}°{pose.zoom !== undefined ? ` · zoom ${Math.round(pose.zoom * 100)} %` : ''}</span>}
       </div>
       <div className="headline" style={{ marginTop: 16, marginBottom: 8 }}>
+        <span className="headline__kicker" style={{ visibility: 'hidden' }}>Zoom</span>
         <span className="headline__title">Zoom curve</span>
         <span className="headline__meta">
           <span className={`chip ${cam.config.zoomTable?.length ? 'chip--on' : ''}`}>

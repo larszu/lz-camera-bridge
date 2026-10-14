@@ -1,11 +1,11 @@
-/* LZ Camera Bridge — Dashboard. Token-Datei und gemeinsame UI-Schicht.
+/* LZ Camera Bridge Dashboard — dark broadcast-style theme */
 
-   ADR-007 (lz-planner-suite, geaendert 2026-10-13) und Skill `lzm-web`: die
-   Oberflaeche ist neutral (warmes Fast-Weiss hell, Anthrazit dunkel), das
-   Markenblau ist nur Akzent. Rundungen und Schatten kommen AUSSCHLIESSLICH
-   aus den Tokens unten (`--radius-*`, `--shadow-*`); `brand:check` haelt das
-   fest. Dies ist die einzige Datei des Dashboards, in der rohe Farbwerte
-   stehen duerfen.
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; border-radius: var(--radius); }
+
+/* ADR-007 (av-planner-suite) — die Tokens des DASHBOARDS zeigen auf die
+   Marken-Palette der Suite. Die Regelnamen bleiben unveraendert; die
+   Umstellung der Oberflaeche ist dieser Block. Werte und Rollen:
+   `@avplan/ui`, `src/brand.ts` (aus dem Brand Guide 2.0).
 
    WAS AUSDRUECKLICH NICHT DAZUGEHOERT: `styles/sony-rcp.css` und
    `styles/ptz-panel.css`. Die sind Nachbauten — das eine der Sony-
@@ -13,154 +13,104 @@
    Geschmack, sondern Wiedererkennung: wer das Geraet kennt, findet den
    Knopf blind. Eine Marken-Regel fuer Planungswerkzeuge ist kein Grund,
    ein Instrument umzulackieren. */
-
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-/* ── Tokens · Hell (Vorgabe) ──────────────────────────────────────────────── */
 :root {
-  color-scheme: light;
-
-  /* Palette (Brand Guide 2.0) — Kit-Farben, nicht aendern */
-  --navy: #1D324F;
-  --deep-navy: #132040;
-  --off-white: #F6F5F0;
-  /* Das Aufnahmelicht: Fokusring, Live/Tally/REC, Signet-Punkt. Nie Flaeche,
-     nie Text, nie Rahmen. In einer Kamera-Bruecke hat es seine woertliche
-     Bedeutung. Fehlerrot ist --danger. */
-  --signal: #D6402E;
-  --focus: var(--signal);
-
-  /* Flaechen */
-  --surface-0: #FAFAF8;      /* Grund */
-  --surface-1: #FFFFFF;      /* Karten, Panels */
-  --surface-2: #F1F1EE;      /* Felder, Leisten, Hover */
-  --surface-3: #FFFFFF;      /* erhoben: Menues, Dialoge */
-  --surface-sunken: #F4F4F1; /* versenkt */
-  --glass: color-mix(in oklab, var(--surface-0) 72%, transparent);
-  --scrim: rgba(22, 24, 29, 0.40);
-
-  /* Text */
-  --text-strong: #16181D;
-  --text: #2B2E35;
-  --text-muted: #6A6E77;
-
-  /* Linien */
-  --line: rgba(22, 24, 29, 0.08);
-  --line-strong: rgba(22, 24, 29, 0.18);
-
-  /* Akzent: Hauptknopf, Auswahl, Fortschritt, Links. Hoechstens 10 % Flaeche. */
-  --accent: #1D324F;
-  --accent-text: #F6F5F0;
-  --accent-soft: color-mix(in oklab, var(--accent) 10%, transparent);
-
-  /* Logo: nur Kit-Farben, nie an --accent gekoppelt */
-  --logo: var(--navy);
-
-  /* Status */
+  --bg: #132040;          /* Deep Navy — Grund */
+  --surface: #1D324F;     /* Zumpe Navy — Karten */
+  --surface2: color-mix(in oklab, #1D324F, #F6F5F0 6%); /* Stufe 2 */
+  --border: rgba(246, 245, 240, 0.14);
+  --text: #E1ECEF;        /* Eisblau — Fliesstext auf Dunkel */
+  --text-muted: #8C9CB3;  /* Stahlblau — Meta, Platzhalter */
+  /* Aktionsflaeche der Marke: Off-White, darauf Navy — 13:1 statt 4:1. */
+  --accent: #F6F5F0;
+  --accent-text: #132040;
+  /* Status: nur Meldungen. */
+  --danger: #B04A3F;
   --success: #2F7D5C;
   --warning: #C8892B;
-  --danger: #B04A3F;
-  --success-soft: color-mix(in oklab, var(--success) 14%, transparent);
-  --warning-soft: color-mix(in oklab, var(--warning) 14%, transparent);
-  --danger-soft: color-mix(in oklab, var(--danger) 14%, transparent);
+  /* Das Aufnahmelicht: Fokusring und Aufnahme-/Live-Zustand. Nie Flaeche,
+     nie Text, nie zweimal in einem Sichtfeld. In einer Kamera-Bruecke hat
+     es seine woertliche Bedeutung. Fehlerrot ist --danger. */
+  --signal: #D6402E;
+  /* Keine Rundungen (Guide S. 10). Der Name bleibt fuer die Aufrufer. */
+  --radius: 0;
 
-  /* Schein (nur auf Leerflaechen) */
-  --glow-1: rgba(29, 50, 79, 0.10);
-  --glow-2: rgba(200, 137, 43, 0.10);
+  /* Die Mindesthoehe eines Bedienpunkts — dieselbe Zahl wie in den fuenf
+     Planern der Suite (B-77). WCAG 2.2 SC 2.5.8 setzt den Boden bei 24 px,
+     SC 2.5.5 empfiehlt 44; 32 liegt dazwischen und auf dem 8-px-Raster aus
+     ADR-007. Diese Oberflaeche wird im Regieraum auf einem Tablet bedient,
+     nicht mit der Maus am Schreibtisch. */
+  --ziel: 32px;
 
-  /* Tiefe — nur zum Trennen von Ebenen */
-  --shadow-1: 0 1px 2px rgba(22, 24, 29, 0.06);
-  --shadow-2: 0 4px 16px rgba(22, 24, 29, 0.08);
-  --shadow-3: 0 16px 48px rgba(22, 24, 29, 0.14);
-  --shadow-accent: 0 6px 20px var(--glow-1), var(--shadow-1);
-
-  /* Zustandsschicht */
-  --state: #16181D;
+  /* ── lzm-web 2026: Flaechenstufen, Linien, Zustaende, Bewegung ──────────
+     Neue Toene nur als Mischung zweier Palettenfarben. Tiefe kommt aus der
+     Flaechenstufe und der Haarlinie, nicht aus Schatten. */
+  color-scheme: dark;
+  --off-white: #F6F5F0;
+  --schiefer: #5C6B85;
+  --surface-0: var(--bg);
+  --surface-1: var(--surface);
+  --surface-2: color-mix(in oklab, #1D324F, var(--off-white) 6%);
+  --surface-3: color-mix(in oklab, #1D324F, var(--off-white) 10%);
+  --surface-4: color-mix(in oklab, #1D324F, var(--off-white) 14%);
+  --text-strong: var(--off-white);
+  --line-1: color-mix(in oklab, var(--off-white) 10%, transparent);
+  --line-3: color-mix(in oklab, var(--off-white) 32%, transparent);
+  --scrim: color-mix(in oklab, #132040 70%, transparent);
+  --state: var(--off-white);
   --state-hover: 6%;
   --state-press: 10%;
-
-  /* Formen. Logo und Tally-Punkt bleiben eckig. */
-  --radius-s: 6px;
-  --radius-m: 10px;
-  --radius-l: 20px;
-  --radius-xl: 24px;
-  --radius-full: 999px;
-
-  /* Schrift */
   --font: 'Public Sans Variable', 'Public Sans', system-ui, 'Segoe UI', Roboto, Arial, sans-serif;
   --fs-ui: 14px;
   --fs-ui-sm: 13px;
-  --fs-overline: 11px;
-  --track-overline: 0.08em;
-
-  /* Bewegung */
+  --fs-kicker: 11px;
+  --track-kicker: 0.18em;
   --ease: cubic-bezier(.2, .8, .2, 1);
   --dur-1: 120ms;
-  --dur-2: 220ms;
-  --dur-3: 360ms;
-
-  /* Die Mindesthoehe eines Bedienpunkts (B-77). Mit der Maus 40 px; auf
-     einem Tablet am Set 44 px (WCAG 2.2 SC 2.5.5) — siehe unten. */
-  --ziel: 40px;
+  --dur-2: 200ms;
+  --dur-3: 350ms;
+  --dur: var(--dur-1);
 }
 
-/* ── Tokens · Dunkel (Anthrazit, nicht Navy) ─────────────────────────────────
-   Zweimal derselbe Block: einmal fuer die Systemvorgabe, einmal fuer die Wahl
-   im Kopf. `brand:check` prueft, dass beide gleich sind. */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
-    color-scheme: dark;
-    --surface-0: #1E1F23;
-    --surface-1: #28292E;
-    --surface-2: #33343A;
-    --surface-3: #3B3C42;
-    --surface-sunken: #19191D;
-    --scrim: rgba(0, 0, 0, 0.55);
-    --text-strong: #F6F5F0;
-    --text: #E6E6E3;
-    --text-muted: #A9ACB4;
-    --line: rgba(246, 245, 240, 0.09);
-    --line-strong: rgba(246, 245, 240, 0.20);
-    --accent: #B9C7D8;
-    --accent-text: #132040;
-    --accent-soft: color-mix(in oklab, var(--accent) 12%, transparent);
-    --logo: var(--off-white);
-    --glow-1: rgba(185, 199, 216, 0.16);
-    --glow-2: rgba(200, 137, 43, 0.10);
-    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.30);
-    --shadow-2: 0 4px 16px rgba(0, 0, 0, 0.40);
-    --shadow-3: 0 16px 48px rgba(0, 0, 0, 0.55);
-    --state: #F6F5F0;
+/* Hell: Print-Gewichtung -- Grund Off-White, Flaechen Weiss und Eisblau,
+   Text Navy, Sekundaertext Schiefer (Stahlblau nie als Text auf Hell). Die
+   Systemvorgabe gilt, die Wahl im Kopf (`data-theme`) schlaegt sie. */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark']) {
+    color-scheme: light;
+    --bg: var(--off-white);
+    --surface: #FFFFFF;
+    --surface2: #E1ECEF;
+    --surface-2: #E1ECEF;
+    --surface-3: #FFFFFF;
+    --surface-4: #FFFFFF;
+    --border: color-mix(in oklab, #1D324F 18%, transparent);
+    --line-1: color-mix(in oklab, #1D324F 10%, transparent);
+    --line-3: color-mix(in oklab, #1D324F 40%, transparent);
+    --text: #1D324F;
+    --text-strong: #1D324F;
+    --text-muted: var(--schiefer);
+    --accent: #1D324F;
+    --accent-text: var(--off-white);
+    --state: #1D324F;
   }
 }
-:root[data-theme='dark'] {
-    color-scheme: dark;
-    --surface-0: #1E1F23;
-    --surface-1: #28292E;
-    --surface-2: #33343A;
-    --surface-3: #3B3C42;
-    --surface-sunken: #19191D;
-    --scrim: rgba(0, 0, 0, 0.55);
-    --text-strong: #F6F5F0;
-    --text: #E6E6E3;
-    --text-muted: #A9ACB4;
-    --line: rgba(246, 245, 240, 0.09);
-    --line-strong: rgba(246, 245, 240, 0.20);
-    --accent: #B9C7D8;
-    --accent-text: #132040;
-    --accent-soft: color-mix(in oklab, var(--accent) 12%, transparent);
-    --logo: var(--off-white);
-    --glow-1: rgba(185, 199, 216, 0.16);
-    --glow-2: rgba(200, 137, 43, 0.10);
-    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.30);
-    --shadow-2: 0 4px 16px rgba(0, 0, 0, 0.40);
-    --shadow-3: 0 16px 48px rgba(0, 0, 0, 0.55);
-    --state: #F6F5F0;
-}
-
-/* Am Set wird mit dem Finger bedient: 44 px je Ziel. */
-@media (pointer: coarse) {
-  :root { --ziel: 44px; }
+:root[data-theme='light'] {
+  color-scheme: light;
+  --bg: var(--off-white);
+  --surface: #FFFFFF;
+  --surface2: #E1ECEF;
+  --surface-2: #E1ECEF;
+  --surface-3: #FFFFFF;
+  --surface-4: #FFFFFF;
+  --border: color-mix(in oklab, #1D324F 18%, transparent);
+  --line-1: color-mix(in oklab, #1D324F 10%, transparent);
+  --line-3: color-mix(in oklab, #1D324F 40%, transparent);
+  --text: #1D324F;
+  --text-strong: #1D324F;
+  --text-muted: var(--schiefer);
+  --accent: #1D324F;
+  --accent-text: var(--off-white);
+  --state: #1D324F;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -170,11 +120,17 @@
 /* ───────────────────────────────────────────────────────────────────────────
    JEDER BEDIENPUNKT TRAEGT EINEN FINGER (B-77).
 
-   GEMESSEN am 2026-09-15 mit der Sonde aus der Suite (`bedienbar:check`):
-   der Ansichts-Umschalter im Kopf war 25 px hoch, „+ Camera" 29 px. Ein
-   `min-height` ist die einzige Angabe, die die Hoehe ZUSICHERT, statt sie
-   sich aus Schrift und Polsterung ergeben zu lassen. Seit 2026-10-13 sind es
-   40 px mit der Maus und 44 px auf Touch (Tablets am Set).
+   GEMESSEN am 2026-09-15 mit der Sonde aus der Suite (`bedienbar:check`),
+   die diese Oberflaeche zum ersten Mal ueberhaupt angesehen hat: der
+   Ansichts-Umschalter im Kopf war 25 px hoch („Single view" 106x25,
+   „Multiview" 81x25), „+ Camera" 29 px. In allen drei Breiten, also nicht
+   ein Umbruch-Unfall, sondern die Regel.
+
+   Warum das hier und nicht in den Knopf-Regeln steht: `padding` allein
+   entscheidet die Hoehe nicht — die Schriftgroesse tut es mit. `.rcp-btn`
+   setzt `font-size: 10px`, und 6 px Polsterung oben und unten ergeben
+   darueber 25 px. Ein `min-height` ist die einzige Angabe, die die Hoehe
+   ZUSICHERT, statt sie sich ergeben zu lassen.
 
    Schieberegler, Kaestchen und Radioknoepfe sind ausgenommen: sie sind
    flach gebaut und werden ueber ihren Griff bedient (`slider:check` misst
@@ -187,155 +143,136 @@ button, summary, [role='button'] {
   min-width: var(--ziel);
 }
 
-/* AUSGENOMMEN: die beiden Instrumenten-Nachbauten (Sony-Software, AW-RP150).
-   Ihre Dichte ist Teil der Wiedererkennung; ein Boden wuerde ihr Raster
-   auseinanderziehen. Eine ENTSCHEIDUNG (Nachbau schlaegt Raster), keine
-   Messung. */
-/* Specificity 0,0,1 on purpose: it beats the floor above (same weight,
-   later), but loses to the replica's own sizes — `.ptz-preset` sets 52 px,
-   `.ptz-rocker__btn` 56 px. Until 2026-10-13 this read
-   `.ptz-panel button`, which outweighed them and squeezed the AW-RP150
-   preset pad, a touch surface, to about 20 px. */
-:where(.rcp-panel, .ptz-panel) button,
-:where(.rcp-panel, .ptz-panel) select,
-:where(.rcp-panel, .ptz-panel) input {
+/* AUSGENOMMEN: die beiden Instrumenten-Nachbauten.
+
+   `.rcp-panel` ist die Sony-Steuersoftware, `.ptz-panel` die AW-RP150. Der
+   Kopf dieser Datei sagt, warum sie nicht nach Marke aussehen: wer das
+   Geraet kennt, findet den Knopf blind, und ihre Dichte ist Teil dieser
+   Wiedererkennung. Ein 32-px-Boden wuerde ihr Raster auseinanderziehen.
+
+   NICHT GEMESSEN, und das ist der ehrliche Teil: ob ihre Knoepfe einen
+   Finger tragen. Die Sonde sieht sie nicht, weil sie ohne eingerichtete
+   Kamera gar nicht erscheinen — sie misst den Leerzustand. Diese Ausnahme
+   ist also eine ENTSCHEIDUNG (Nachbau schlaegt Raster) und keine Messung.
+   Wer sie umdreht, braucht zuerst einen Lauf, der eine Kamera anlegt. */
+.rcp-panel button, .rcp-panel select, .rcp-panel input,
+.ptz-panel button, .ptz-panel select, .ptz-panel input {
   min-height: 0;
   min-width: 0;
 }
 
-html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 body {
   font-family: var(--font);
   font-synthesis: none;
-  background: var(--surface-0);
+  background: var(--bg);
   color: var(--text);
   min-height: 100vh;
-  min-height: 100dvh;
   font-size: var(--fs-ui-sm);
   line-height: 1.45;
-  -webkit-font-smoothing: antialiased;
 }
 h1, h2, h3 { color: var(--text-strong); text-wrap: balance; }
 p { text-wrap: pretty; }
 ::selection { background: color-mix(in oklab, var(--accent) 25%, transparent); }
 
-/* ─── Schieberegler: Trefferflaeche (WCAG 2.2 SC 2.5.8) ───────────────────
+/* ─── Schieberegler: 24 px Trefferflaeche (WCAG 2.2 SC 2.5.8) ─────────────
  *
  * Nutzer-Meldung 2026-09-09: „Passe auch die Ui von allen slidern an sodass
  * man sie gut bedienen kann."
  *
- * An diesen Reglern haengen Schwenk- und Neige-Geschwindigkeit, Zoom, Blende
- * und Verstaerkung einer Kamera, die im Zweifel gerade auf Sendung ist. Wer
- * danebengreift, verreisst ein Bild, das Zuschauer sehen.
+ * GEMESSEN VORHER: fuer `input[type="range"]` stand in KEINEM der vier
+ * Stilblaetter etwas (index.css, wizard.css, ptz-panel.css, sony-rcp.css).
+ * Die sechs Regler trugen das Standardaussehen des Browsers — in WebKit rund
+ * 16 px hoch. WCAG 2.2, Erfolgskriterium 2.5.8 („Target Size (Minimum)",
+ * Stufe AA), nennt 24 px als Mindestmass fuer eine Trefferflaeche.
  *
- * Das ELEMENT ist die Trefferflaeche, nicht die Bahn: die Regler stehen in
- * Zeilen neben Beschriftung und Wert. Auf Touch waechst es auf 44 px.
- * Firefox braucht seine eigenen Pseudo-Elemente. */
+ * DAS IST HIER KEINE KOSMETIK. An diesen Reglern haengen Schwenk- und
+ * Neige-Geschwindigkeit, Zoom, Blende und Verstaerkung einer Kamera, die im
+ * Zweifel gerade auf Sendung ist. Wer danebengreift, verreisst ein Bild, das
+ * Zuschauer sehen — und ein Regler, der zu klein ist, um ihn ruhig zu fassen,
+ * ist genau das Werkzeug, mit dem einem das passiert.
+ *
+ * Das ELEMENT wird 24 px hoch, nicht die Bahn: die Regler stehen in Zeilen
+ * neben Beschriftung und Wert, und ein 24 px hoher Balken sprengt jede davon.
+ * Der Griff bleibt ECKIG — der Marken-Guide legt „keine Rundungen" fest
+ * (`--radius: 0`), `brand:check` haelt es fest. Den Fokusring zeichnet die
+ * `.app input:focus-visible`-Regel weiter unten mit 3 px Abstand, also
+ * aussen; das passt hier.
+ *
+ * Firefox braucht seine eigenen Pseudo-Elemente; ohne sie bliebe es dort beim
+ * Standardaussehen, und die Messung staende nur fuer einen Browser. */
 input[type="range"] {
   -webkit-appearance: none;
   appearance: none;
-  height: 32px;            /* Trefferflaeche, nicht Bahnhoehe */
+  height: 24px;            /* Trefferflaeche, nicht Bahnhoehe */
   background: transparent; /* die Bahn zeichnen die Pseudo-Elemente */
   cursor: pointer;
   touch-action: manipulation;
 }
 input[type="range"]::-webkit-slider-runnable-track {
   height: 6px;
-  background: var(--surface-2);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius-full);
+  background: var(--surface2);
+  border: 1px solid var(--border);
 }
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 22px;
-  height: 22px;
+  width: 18px;
+  height: 18px;
   background: var(--accent);
-  border: 3px solid var(--surface-1);
-  border-radius: var(--radius-full);
-  box-shadow: var(--shadow-2);
-  /* (6 px Bahn - 22 px Griff) / 2 = -8 px, plus 1 px Rahmen der Bahn. */
-  margin-top: -9px;
+  border: 2px solid var(--surface2);
+  border-radius: 0;
+  /* Der Griff sitzt auf der Bahn, nicht daneben: (6 px Bahn - 18 px Griff)
+     / 2 = -6 px, plus 1 px Rahmen der Bahn. */
+  margin-top: -7px;
   cursor: pointer;
 }
 input[type="range"]::-moz-range-track {
   height: 6px;
-  background: var(--surface-2);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius-full);
+  background: var(--surface2);
+  border: 1px solid var(--border);
 }
 input[type="range"]::-moz-range-thumb {
-  width: 22px;
-  height: 22px;
+  width: 18px;
+  height: 18px;
   background: var(--accent);
-  border: 3px solid var(--surface-1);
-  border-radius: var(--radius-full);
-  box-shadow: var(--shadow-2);
+  border: 2px solid var(--surface2);
+  border-radius: 0;
   cursor: pointer;
-}
-@media (pointer: coarse) {
-  input[type="range"] { height: 44px; }
-  input[type="range"]::-webkit-slider-thumb { width: 28px; height: 28px; margin-top: -12px; }
-  input[type="range"]::-moz-range-thumb { width: 28px; height: 28px; }
 }
 input[type="range"]:disabled {
   cursor: not-allowed;
-  opacity: 0.45;
+  opacity: 0.5;
 }
 
 /* ─── App Layout ──────────────────────────────────────────────────────────── */
 
-.app { display: flex; flex-direction: column; min-height: 100vh; min-height: 100dvh; position: relative; isolation: isolate; }
+.app { display: flex; flex-direction: column; min-height: 100vh; }
 
-/* Weicher Hintergrundschein — nur auf dem Grund, nie hinter Text kontrastmindernd. */
-.app::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background:
-    radial-gradient(56rem 36rem at 8% -12%, var(--glow-1), transparent 62%),
-    radial-gradient(44rem 30rem at 105% 4%, var(--glow-2), transparent 60%);
-}
-
-/* Glas-Kopfzeile: sticky, Grund 72 %, Unschaerfe. */
 .app__header {
-  position: sticky;
-  top: 0;
-  z-index: 50;
-  background: var(--glass);
-  -webkit-backdrop-filter: blur(16px) saturate(1.4);
-  backdrop-filter: blur(16px) saturate(1.4);
-  border-bottom: 1px solid var(--line);
-  padding: 8px 20px;
-  padding-top: max(8px, env(safe-area-inset-top));
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 10px 20px;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
 }
 
-.app__brand { display: inline-flex; align-items: center; gap: 12px; min-width: 0; }
-.app__logo, .app__title { font-weight: 700; font-size: 15px; color: var(--text-strong); white-space: nowrap; }
-
-/* Signet „lz." — eckig, nur Kit-Farben: Buchstaben in --logo, Punkt in --signal. */
-.logo { display: block; flex: none; height: 32px; width: auto; border-radius: 0; }
-.logo__mark { fill: var(--logo); }
-.logo__dot { fill: var(--signal); }
+.app__logo, .app__title { font-weight: 800; font-size: 15px; color: var(--text-strong); }
 
 .app__error {
-  background: var(--danger-soft);
+  background: var(--surface-2);
   color: var(--text-strong);
-  padding: 6px 12px;
-  border-radius: var(--radius-m);
+  border-left: 2px solid var(--danger);
+  padding: 4px 10px;
+  border-radius: 0;
   font-size: 12px;
 }
 
 .app__main {
-  padding: 20px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
   max-width: 1100px;
   margin: 0 auto;
   width: 100%;
@@ -348,7 +285,7 @@ input[type="range"]:disabled {
 }
 
 .app__sidebar {
-  width: 340px;
+  width: 320px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -361,11 +298,13 @@ input[type="range"]:disabled {
 }
 
 .app__error-panel {
-  background: var(--danger-soft);
+  background: var(--surface-2);
   color: var(--text-strong);
-  padding: 12px 14px;
-  border-radius: var(--radius-l);
+  padding: 12px;
+  border-radius: 0;
   font-size: 12px;
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--danger);
 }
 
 @media (max-width: 900px) {
@@ -378,68 +317,93 @@ input[type="range"]:disabled {
   }
 }
 
-/* ─── Karte (Panel) ───────────────────────────────────────────────────────── */
+/* ─── Panel ───────────────────────────────────────────────────────────────── */
 
 .panel {
-  background: var(--surface-1);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-l);
-  box-shadow: var(--shadow-1);
-  padding: 16px 18px;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  padding: 14px 16px;
 }
 
-/* Panel-Kopf: ein normaler Titel in Satzschreibung, ohne Kopflinie. */
+/* Kicker als Panel-Kopf: Versalien nur hier, mit Kopflinie. */
 .panel__title, .rcp__section-title {
-  display: block;
-  font-size: 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: var(--fs-kicker);
   font-weight: 700;
-  color: var(--text-strong);
+  text-transform: uppercase;
+  letter-spacing: var(--track-kicker);
+  color: var(--text-muted);
   margin-bottom: 12px;
 }
-.panel__subtitle { font-size: 12px; color: var(--text-muted); margin: -8px 0 12px; }
+.panel__title::after, .rcp__section-title::after {
+  content: '';
+  height: 1px;
+  background: var(--line-3);
+}
+/* In a head row next to a button the kicker takes the rest of the width, so
+   the head line runs up to the button instead of stopping under the word. */
 .panel__header .panel__title, .camera-list__head .panel__title { flex: 1; margin-right: 12px; margin-bottom: 0; }
 
 /* ─── Connection Panel ────────────────────────────────────────────────────── */
 
-/* Vierzehn Verbindungswege passen nicht in eine Zeile: sie brechen in ein
-   Raster, jede Kachel breit genug fuer ihre Beschriftung. */
+/* Fourteen connection paths do not fit in one row of a 320 px sidebar: they
+   were squeezed to one letter per line. They wrap into a grid instead, each
+   tab wide enough for its label. */
 .mode-tabs {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
-  gap: 4px;
-  margin-bottom: 14px;
-  padding: 4px;
-  border-radius: var(--radius-m);
-  background: var(--surface-2);
+  gap: 1px;
+  margin-bottom: 12px;
+  border-radius: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--border);
 }
 
 .mode-tab {
   text-align: left;
-  padding: 8px 12px;
+  padding: 8px 12px 8px 10px;
   border: none;
-  border-radius: var(--radius-s);
-  background: transparent;
+  border-left: 2px solid transparent;
+  background: var(--bg);
   color: var(--text-muted);
   cursor: pointer;
-  font: inherit;
   font-size: var(--fs-ui-sm);
   font-weight: 600;
-  line-height: 1.25;
   transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
 }
-.mode-tab:hover { color: var(--text-strong); background: color-mix(in oklab, var(--state) var(--state-hover), transparent); }
+.mode-tab:hover { color: var(--text-strong); background: color-mix(in oklab, var(--bg), var(--state) var(--state-hover)); }
 .mode-tab--active {
-  background: var(--surface-1);
+  background: var(--surface-2);
+  border-left-color: var(--text-strong);
   color: var(--text-strong);
-  box-shadow: var(--shadow-1);
 }
 
 .serial-port-row {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
 }
 .serial-port-row select { flex: 1; }
+
+.btn--sm {
+  padding: 5px 10px;
+  border-radius: 0;
+  border: 1px solid var(--line-3);
+  background: transparent;
+  color: var(--text-strong);
+  cursor: pointer;
+  font-size: var(--fs-ui-sm);
+  font-weight: 600;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
+}
+.btn--sm:hover { border-color: var(--accent); background: color-mix(in oklab, var(--state) var(--state-hover), transparent); }
+.btn--sm:active { background: color-mix(in oklab, var(--state) var(--state-press), transparent); }
+.btn--sm:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .connection-row {
   display: flex;
@@ -464,37 +428,26 @@ input[type="range"]:disabled {
   font-weight: 600;
   color: var(--text-strong);
 }
-.field-hint { font-size: 12px; color: var(--text-muted); }
 
-.field input, .select-group__select, .app select:not(.rcp-panel select):not(.ptz-panel select) {
+.field input, .select-group__select {
   background: var(--surface-2);
-  border: 1px solid transparent;
+  border: 1px solid var(--border);
   color: var(--text-strong);
-  border-radius: var(--radius-m);
-  padding: 6px 10px;
+  border-radius: 0;
+  padding: 6px 8px;
   font: inherit;
   font-size: var(--fs-ui-sm);
   width: 100%;
-  transition: border-color var(--dur-1) var(--ease), background var(--dur-1) var(--ease);
+  transition: border-color var(--dur-1) var(--ease);
 }
-.panel input:is([type='text'], [type='number'], :not([type])) {
-  background: var(--surface-2);
-  border: 1px solid transparent;
-  color: var(--text-strong);
-  border-radius: var(--radius-m);
-  padding: 6px 10px;
-  font: inherit;
-  font-size: var(--fs-ui-sm);
-}
-.field input:hover, .select-group__select:hover { border-color: var(--line-strong); }
+.field input:hover, .select-group__select:hover { border-color: var(--line-3); }
 .field input::placeholder { color: var(--text-muted); }
 
-.connection-actions { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+.connection-actions { display: flex; gap: 8px; margin-bottom: 10px; }
 
 .status-row {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
   gap: 6px;
   font-size: 12px;
   color: var(--text-muted);
@@ -505,51 +458,38 @@ input[type="range"]:disabled {
 .status-dot {
   width: 8px;
   height: 8px;
-  border-radius: var(--radius-full);
+  border-radius: 0;
   display: inline-block;
-  flex: none;
 }
-.status-dot--ok { background: var(--success); }
-.status-dot--err { background: var(--line-strong); }
+.status-dot--ok { background: var(--success); box-shadow: none; }
+.status-dot--err { background: var(--border); }
 
-.control-surface { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
-.control-surface__head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+/* ─── Buttons ─────────────────────────────────────────────────────────────── */
 
-/* ─── Knoepfe ─────────────────────────────────────────────────────────────── */
-
-/* Pill-Form. Eine Hauptaktion (gefuellt) je Ansicht; der Rest ist „soft"
-   (Akzent weich) oder Ghost. */
-.btn, .btn--sm {
-  min-height: var(--ziel);
-  padding: 0 18px;
-  text-decoration: none;
-  border-radius: var(--radius-full);
-  border: 0;
-  background: var(--accent-soft);
+.btn {
+  padding: 7px 16px;
+  border-radius: 0;
+  border: 1px solid transparent;
+  background: transparent;
   color: var(--text-strong);
   cursor: pointer;
   font: inherit;
   font-size: var(--fs-ui-sm);
   font-weight: 600;
-  line-height: 1.2;
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-  white-space: nowrap;
-  touch-action: manipulation;
-  transition: background var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease), translate var(--dur-1) var(--ease), scale var(--dur-1) var(--ease);
+  transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
 }
-.btn--sm { padding: 0 14px; }
-.hint code, .wizard-step__hint code { overflow-wrap: anywhere; }
-.btn:hover { background: color-mix(in oklab, var(--accent-soft), var(--state) var(--state-hover)); }
-.btn:active { scale: .97; }
-.btn:disabled { opacity: 0.45; cursor: not-allowed; scale: 1; }
-.btn--primary { background: var(--accent); color: var(--accent-text); box-shadow: var(--shadow-accent); }
-.btn--primary:hover { background: color-mix(in oklab, var(--accent), var(--surface-0) 12%); }
-@media (hover: hover) { .btn--primary:not(:disabled):hover { translate: 0 -1px; } }
-.btn--secondary { background: transparent; }
-.btn--secondary:hover { background: color-mix(in oklab, var(--state) var(--state-hover), transparent); }
-/* Gefaehrlich: Ghost mit Statusrot-Text, nie Tally-Rot. */
-.btn--danger { background: transparent; color: color-mix(in oklab, var(--danger), var(--text-strong) 25%); }
-.btn--danger:hover { background: var(--danger-soft); }
+.btn:hover { background: color-mix(in oklab, var(--state) var(--state-hover), transparent); }
+.btn:active { background: color-mix(in oklab, var(--state) var(--state-press), transparent); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+/* Werkzeug-Modus (lzm-web): der Primaerknopf ist Off-White ohne Punkt.
+   Rot erscheint im Werkzeug nur als Fokusring und als echter Tally-Zustand. */
+.btn--primary { background: var(--accent); color: var(--accent-text); }
+.btn--primary:hover { background: color-mix(in oklab, var(--accent), var(--bg) 10%); }
+.btn--secondary { border-color: var(--line-3); }
+.btn--secondary:hover { border-color: var(--accent); }
+/* Gefaehrlich: Ghost mit Text in der Statusrot-Mischung, nie Tally-Rot. */
+.btn--danger { background: transparent; border-color: var(--line-3); color: color-mix(in oklab, var(--danger), var(--text-strong) 35%); }
 
 /* ─── RCP Dashboard ───────────────────────────────────────────────────────── */
 
@@ -562,11 +502,10 @@ input[type="range"]:disabled {
 }
 
 .rcp__section {
-  background: var(--surface-1);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-l);
-  box-shadow: var(--shadow-1);
-  padding: 16px 18px;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  padding: 14px 16px;
 }
 
 .rcp__grid {
@@ -578,9 +517,10 @@ input[type="range"]:disabled {
 /* ─── Dial ────────────────────────────────────────────────────────────────── */
 
 .dial {
-  background: var(--surface-2);
-  border-radius: var(--radius-m);
-  padding: 10px 12px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 0;
+  padding: 10px;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -606,7 +546,7 @@ input[type="range"]:disabled {
   accent-color: var(--accent);
   cursor: pointer;
 }
-.dial__slider:disabled { opacity: 0.45; cursor: not-allowed; }
+.dial__slider:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .dial__pct {
   font-size: 11px;
@@ -618,10 +558,10 @@ input[type="range"]:disabled {
 /* ─── Toggle ──────────────────────────────────────────────────────────────── */
 
 .toggle {
-  padding: 0 18px;
-  border-radius: var(--radius-full);
-  border: 0;
-  background: var(--surface-2);
+  padding: 8px 18px;
+  border-radius: 0;
+  border: 1px solid var(--line-3);
+  background: transparent;
   color: var(--text-strong);
   cursor: pointer;
   font: inherit;
@@ -629,17 +569,17 @@ input[type="range"]:disabled {
   font-weight: 600;
   min-width: 100px;
   text-align: center;
-  transition: background var(--dur-1) var(--ease);
+  transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
 }
-.toggle:hover { background: color-mix(in oklab, var(--surface-2), var(--state) var(--state-hover)); }
-.toggle--on { background: var(--accent-soft); }
-.toggle:disabled { opacity: 0.45; cursor: not-allowed; }
+.toggle:hover { border-color: var(--accent); background: color-mix(in oklab, var(--state) var(--state-hover), transparent); }
+.toggle:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* ─── Select ──────────────────────────────────────────────────────────────── */
 
 .select-group {
-  background: var(--surface-2);
-  border-radius: var(--radius-m);
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 0;
   padding: 10px;
   display: flex;
   flex-direction: column;
@@ -654,6 +594,8 @@ input[type="range"]:disabled {
 
 /* ─── WIZnet Panel ────────────────────────────────────────────────────────── */
 
+.panel--wiznet { }
+
 .panel__header {
   display: flex;
   align-items: center;
@@ -666,7 +608,7 @@ input[type="range"]:disabled {
 .wiznet-empty {
   color: var(--text-muted);
   font-size: 12px;
-  padding: 4px 0;
+  padding: 8px 0;
 }
 
 .wiznet-list {
@@ -676,8 +618,9 @@ input[type="range"]:disabled {
 }
 
 .wiznet-card {
-  background: var(--surface-2);
-  border-radius: var(--radius-m);
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 0;
   padding: 10px 12px;
 }
 
@@ -717,7 +660,7 @@ input[type="range"]:disabled {
   gap: 6px;
 }
 
-/* ─── Config Wizard Dialog (WIZnet) ───────────────────────────────────────── */
+/* ─── Config Wizard Overlay ───────────────────────────────────────────────── */
 
 .wizard-overlay {
   position: fixed;
@@ -727,30 +670,29 @@ input[type="range"]:disabled {
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  -webkit-backdrop-filter: blur(6px);
-  backdrop-filter: blur(6px);
-  padding: 16px;
+  backdrop-filter: blur(4px);
 }
 
 .wizard {
-  background: var(--surface-3);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-3);
-  width: 100%;
+  background: var(--surface-4);
+  border: 1px solid var(--border);
+  border-radius: 0;
+  width: 90%;
   max-width: 520px;
   max-height: 90vh;
-  max-height: 90dvh;
   overflow-y: auto;
+  box-shadow: none;
 }
 
 .wizard__header {
-  padding: 22px 24px 8px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
 }
 
 .wizard__header h2 {
   margin: 0 0 4px;
   font-size: 20px;
-  font-weight: 700;
+  font-weight: 800;
   color: var(--text-strong);
 }
 
@@ -759,11 +701,13 @@ input[type="range"]:disabled {
   color: var(--text-muted);
 }
 
-/* Fortschritt */
+/* Progress steps */
 .wizard__progress {
   display: flex;
   justify-content: space-between;
-  padding: 12px 24px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface2);
 }
 
 .wizard__step {
@@ -777,8 +721,9 @@ input[type="range"]:disabled {
 .wizard__step-dot {
   width: 28px;
   height: 28px;
-  border-radius: var(--radius-full);
-  background: var(--surface-2);
+  border-radius: 0;
+  background: var(--bg);
+  border: 1px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -786,16 +731,17 @@ input[type="range"]:disabled {
   font-weight: 700;
   color: var(--text-muted);
   margin-bottom: 4px;
-  transition: background var(--dur-2) var(--ease), color var(--dur-2) var(--ease);
+  transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
 }
 
 .wizard__step--active .wizard__step-dot {
   background: var(--accent);
+  border-color: var(--accent);
   color: var(--accent-text);
 }
 
 .wizard__step--done .wizard__step-dot {
-  background: var(--success-soft);
+  border-color: var(--success);
   color: var(--text-strong);
 }
 
@@ -810,15 +756,16 @@ input[type="range"]:disabled {
   font-weight: 600;
 }
 
+/* Content area */
 .wizard__content {
-  padding: 12px 24px 20px;
+  padding: 20px;
   min-height: 200px;
 }
 
 .wizard__section h3 {
   margin: 0 0 12px;
   font-size: 16px;
-  font-weight: 700;
+  font-weight: 800;
   color: var(--text-strong);
 }
 
@@ -833,6 +780,7 @@ input[type="range"]:disabled {
   color: var(--text);
 }
 
+/* Mode selection buttons */
 .wizard__mode-select {
   display: flex;
   gap: 12px;
@@ -840,9 +788,10 @@ input[type="range"]:disabled {
 
 .wizard__mode-btn {
   flex: 1;
-  background: var(--surface-2);
-  border: 1px solid transparent;
-  border-radius: var(--radius-l);
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  border-left: 2px solid transparent;
+  border-radius: 0;
   padding: 16px;
   cursor: pointer;
   text-align: center;
@@ -851,12 +800,12 @@ input[type="range"]:disabled {
 }
 
 .wizard__mode-btn:hover {
-  border-color: var(--line-strong);
+  border-color: var(--line-3);
 }
 
 .wizard__mode-btn--active {
-  background: var(--accent-soft);
-  border-color: var(--accent);
+  background: var(--surface-2);
+  border-left-color: var(--text-strong);
 }
 
 .wizard__mode-icon {
@@ -879,6 +828,7 @@ input[type="range"]:disabled {
   color: var(--text-muted);
 }
 
+/* Form fields */
 .wizard__field {
   display: flex;
   flex-direction: column;
@@ -895,8 +845,8 @@ input[type="range"]:disabled {
 .wizard__field input[type="number"],
 .wizard__field select {
   background: var(--surface-2);
-  border: 1px solid transparent;
-  border-radius: var(--radius-m);
+  border: 1px solid var(--border);
+  border-radius: 0;
   padding: 8px 10px;
   font: inherit;
   font-size: var(--fs-ui);
@@ -904,10 +854,9 @@ input[type="range"]:disabled {
 }
 
 .wizard__field input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   margin-right: 8px;
-  accent-color: var(--accent);
 }
 
 .wizard__field:has(input[type="checkbox"]) {
@@ -915,10 +864,12 @@ input[type="range"]:disabled {
   align-items: center;
 }
 
+/* Summary */
 .wizard__summary {
-  background: var(--surface-2);
-  border-radius: var(--radius-m);
-  padding: 8px 14px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 0;
+  padding: 12px;
   margin-bottom: 16px;
 }
 
@@ -927,7 +878,7 @@ input[type="range"]:disabled {
   justify-content: space-between;
   padding: 6px 0;
   font-size: 13px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--border);
 }
 
 .wizard__summary-row:last-child {
@@ -942,11 +893,14 @@ input[type="range"]:disabled {
   color: var(--text);
 }
 
+/* Footer */
 .wizard__footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 24px 20px;
+  padding: 16px 20px;
+  border-top: 1px solid var(--border);
+  background: var(--surface2);
 }
 
 .wizard__nav {
@@ -954,7 +908,8 @@ input[type="range"]:disabled {
   gap: 8px;
 }
 
-/* ── Tastatur-Fokus ─────────────────────────────────────────────────────────
+
+/* ── ADR-007: Tastatur-Fokus ────────────────────────────────────────────────
    2 px Tally-Rot, 3 px Abstand. Gilt fuer das Dashboard; die Nachbauten in
    styles/sony-rcp.css und styles/ptz-panel.css behalten ihre eigenen
    Zustaende. */
@@ -967,48 +922,20 @@ input[type="range"]:disabled {
   outline-offset: 3px;
 }
 
-/* LZ Scopes bringt eigenes Panel-CSS mit; der Rahmen folgt den Tokens. */
+/* LZ Scopes injects its own panel CSS with a 3 px radius; ADR-007 says none. */
 .scopes .lzs-panel,
-.scopes .lzs-head select { border-radius: var(--radius-s); }
+.scopes .lzs-head select { border-radius: 0; }
 
-/* ── Zustaende, die jede Flaeche teilt ─────────────────────────────────── */
-.skeleton { background: var(--surface-2); border-radius: var(--radius-m); animation: puls 1.6s var(--ease) infinite; }
+/* ── lzm-web: Zustaende, die jede Flaeche teilt ────────────────────────── */
+.skeleton { background: var(--surface-2); animation: puls 1.6s var(--ease) infinite; }
 @keyframes puls { 50% { opacity: 0.55; } }
 @media (prefers-reduced-motion: reduce) { .skeleton { animation: none; } }
-.app :is(button, a, input, select, textarea) { scroll-margin-top: 120px; }
-.icon { display: block; flex: none; }
-
-/* ── Theme-Umschalter: Auto · Hell · Dunkel ─────────────────────────────── */
-.themes {
-  display: inline-flex;
-  gap: 2px;
-  padding: 3px;
-  border-radius: var(--radius-full);
-  background: var(--surface-2);
-  flex: none;
-}
-.themes button {
-  width: 40px;
-  min-width: 0;
-  min-height: 34px;
-  border: 0;
-  border-radius: var(--radius-full);
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  display: grid;
-  place-items: center;
-  transition: background var(--dur-2) var(--ease), color var(--dur-2) var(--ease), box-shadow var(--dur-2) var(--ease);
-}
-.themes button:hover { color: var(--text-strong); }
-.themes button[aria-pressed='true'] { background: var(--surface-1); color: var(--accent); box-shadow: var(--shadow-1); }
-@media (pointer: coarse) { .themes button { width: 44px; min-height: 44px; } }
-
+.app :is(button, a, input, select, textarea) { scroll-margin-top: 72px; }
+.theme-toggle { margin-left: 8px; }
 @media (max-width: 640px) {
-  .app__header { padding: 8px 16px; flex-wrap: wrap; row-gap: 8px; }
+  .app__header { padding: 8px 16px; }
   .app__header .nav { order: 3; width: 100%; margin-left: 0; overflow-x: auto; }
-  .app__header .nav__tab { flex: 1 1 auto; padding: 0 6px; }
-  .app__site { display: none; }
-  .themes { margin-left: auto; }
-  .app__main { padding: 16px; }
+  .app__header .nav__tab { flex: 1; padding: 0 8px; }
+  .theme-toggle { margin-left: auto; }
 }
+.icon { display: block; flex: none; }

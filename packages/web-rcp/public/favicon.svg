@@ -1,7 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <!-- Icon from the brand kit: "lz" on Navy. Under 48 px without the dot (Brand Guide 2.0). -->
-  <rect width="32" height="32" fill="#1D324F"/>
-  <g transform="translate(5.2 9.2) scale(0.0805)">
-    <path transform="translate(-478.129 -455.570)" fill="#F6F5F0" d="M478.129 595.445L505.285 455.570H540.207L513.047 595.445ZM638.277 595.445L555.828 595.445L561.062 568.285L610.922 521.727L570.183 521.727L575.422 494.566L657.871 494.566L652.633 521.727L602.773 568.285L643.515 568.285Z"/>
-  </g>
+  <rect width="32" height="32" fill="#132040"/>
+  <circle cx="16" cy="16" r="8" fill="none" stroke="#E1ECEF" stroke-width="2.6"/>
+  <circle cx="24" cy="8" r="3" fill="#D6402E"/>
 </svg>

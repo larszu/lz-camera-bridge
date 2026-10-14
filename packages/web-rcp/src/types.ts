@@ -33,6 +33,8 @@ export type ConnectionMode =
   // Iris only -- the Hirose 12-pin connector has no analog drive input for
   // zoom or focus at all, so there is nothing else to offer.
   | 'b4-lens'
+  // Robotic pan/tilt head over TCP 3001 (directly or a device-server port).
+  | 'robotic-head'
   // A camera that is not there — the only mode that needs no address. Every
   // other one wants a host, a port or a USB device, so on a laptop the panel
   // came up empty and every control was inert. The state carries `isDemo`,
