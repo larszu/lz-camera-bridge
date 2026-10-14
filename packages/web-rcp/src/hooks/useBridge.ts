@@ -97,6 +97,28 @@ export interface PlannedProgress {
   at: number;
 }
 
+/** Studio shots — mirrors `motion/studioShots.ts` in the bridge. */
+export type RecallMode = 'cut' | 'fade';
+export type ShotSource = 'head' | 'plan';
+export interface ShotRef { cameraNumber: number; preset: number; source?: ShotSource }
+export interface ShotSet { id: string; name: string; shots: ShotRef[]; mode?: RecallMode; timeMs?: number }
+export interface Seat { id: string; label?: string; row: number; col: number; shots: ShotRef[] }
+export interface MoveStep { preset: number; source?: ShotSource; timeMs?: number; holdMs?: number }
+export interface ShotMove { id: string; name: string; cameraNumber: number; steps: MoveStep[] }
+export interface StudioShots {
+  defaultMode: RecallMode;
+  defaultTimeMs: number;
+  sets: ShotSet[];
+  seats: { rows: number; cols: number; seats: Seat[] };
+  moves: ShotMove[];
+}
+export const EMPTY_STUDIO_SHOTS: StudioShots = { defaultMode: 'fade', defaultTimeMs: 3000, sets: [], seats: { rows: 0, cols: 0, seats: [] }, moves: [] };
+
+/** A recall the bridge held back because the camera is on air; `retry` moves it anyway. */
+export interface ShotHeld { cameras: number[]; label: string; retry: Record<string, unknown>; at: number }
+export interface ShotRecalled { cameraNumber: number; presetNumber: number; source: ShotSource; mode: RecallMode; timeMs: number; note?: string; at: number }
+export interface MoveProgress { id: string; cameraNumber: number; step: number; of: number; state: 'playing' | 'done' | 'stopped' }
+
 /** Wie eine Zuordnung belegt ist. Ein Vorschlag darf nicht wie eine Tatsache aussehen. */
 export type PlanMatchedBy = 'model' | 'number' | 'manual';
 
@@ -176,6 +198,10 @@ export function useBridge() {
   const [panoramas, setPanoramas] = useState<Record<number, PanoramaMeta | null>>({});
   const [panoramaProgress, setPanoramaProgress] = useState<Record<number, JobProgress>>({});
   const [fovProgress, setFovProgress] = useState<Record<number, JobProgress>>({});
+  const [studioShots, setStudioShotsState] = useState<StudioShots>(EMPTY_STUDIO_SHOTS);
+  const [shotHeld, setShotHeld] = useState<ShotHeld | null>(null);
+  const [lastRecall, setLastRecall] = useState<ShotRecalled | null>(null);
+  const [moveProgress, setMoveProgress] = useState<Record<string, MoveProgress>>({});
 
   const connect = useCallback(() => {
     if (ws.current?.readyState === WebSocket.OPEN) return;
@@ -339,6 +365,18 @@ export function useBridge() {
               },
             }));
             break;
+          case 'studioShots':
+            setStudioShotsState({ ...EMPTY_STUDIO_SHOTS, ...(msg.shots as StudioShots) });
+            break;
+          case 'shotHeld':
+            setShotHeld({ cameras: msg.cameras as number[], label: String(msg.label ?? ''), retry: msg.retry as Record<string, unknown>, at: Date.now() });
+            break;
+          case 'shotRecalled':
+            setLastRecall({ ...(msg as Omit<ShotRecalled, 'at'>), at: Date.now() });
+            break;
+          case 'moveProgress':
+            setMoveProgress((prev) => ({ ...prev, [msg.id as string]: msg as MoveProgress }));
+            break;
           case 'site': {
             const s = msg.site as { cameras: unknown[]; switchers: unknown[] };
             setSite({ name: String(msg.name ?? ''), path: (msg.path as string | null) ?? null, cameras: s.cameras.length, switchers: s.switchers.length });
@@ -434,7 +472,27 @@ export function useBridge() {
   const calibrateFov = useCallback((cameraNumber: number) => send('calibrateFov', { cameraNumber }), [send]);
   const setPoseOffset = useCallback((cameraNumber: number, offset: { pan: number; tilt: number } | null) => send('setPoseOffset', { cameraNumber, offset }), [send]);
 
+  // ── Studio shots ─────────────────────────────────────────────────────────
+  const setStudioShots = useCallback((shots: StudioShots) => {
+    setStudioShotsState(shots);
+    send('setStudioShots', { shots });
+  }, [send]);
+  const recallShotSet = useCallback((id: string) => { setShotHeld(null); send('recallShotSet', { id }); }, [send]);
+  const recallSeat = useCallback((id: string) => { setShotHeld(null); send('recallSeat', { id }); }, [send]);
+  const playMove = useCallback((id: string) => { setShotHeld(null); send('playMove', { id }); }, [send]);
+  const stopMove = useCallback((cameraNumber: number) => send('stopMove', { cameraNumber }), [send]);
+  /** "Move anyway": the bridge's own retry message, which carries `force: true`. */
+  const moveAnyway = useCallback(() => {
+    if (!shotHeld) return;
+    const { type, ...rest } = shotHeld.retry;
+    send(String(type), rest);
+    setShotHeld(null);
+  }, [send, shotHeld]);
+  const dismissHeld = useCallback(() => setShotHeld(null), []);
+
   return {
+    studioShots, shotHeld, lastRecall, moveProgress,
+    setStudioShots, recallShotSet, recallSeat, playMove, stopMove, moveAnyway, dismissHeld,
     status, cameras, cameraStates, cameraOrigins, cameraConfirmations, ports, wiznetDevices, sonyUsbDevices, sonyMncDevices, sonyNetDevices,
     hidDevices, controlSurfaceActive, tally, errorMsg, planMatch,
     switchers, cameraTally, site,

@@ -73,6 +73,8 @@ export interface BridgeConfig {
   label?: string;
   /** Eingang am Mischer, 1-basiert; 0/leer: keiner. Daraus entsteht das Tally je Kamera. */
   switcherInput?: number;
+  /** On-air lock: no shot recall while on programme unless forced. Default on; only `false` switches it off. */
+  tallyProtect?: boolean;
   /** Geplante Shots → Kopf-Pose: Montagefehler vor Ort, Heimat-Richtung, gemessene Zoomkurve, VISCA-Skala. */
   poseOffset?: { pan: number; tilt: number };
   homeHeading?: number;

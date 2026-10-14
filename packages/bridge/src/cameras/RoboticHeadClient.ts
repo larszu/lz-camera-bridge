@@ -222,6 +222,9 @@ export class RoboticHeadClient extends EventEmitter implements GenericCameraClie
     return { pan: p.pan / k, tilt: p.tilt / k, zoom: p.zoom / 65535 };
   }
 
+  /** Takes `timeMs` with `recallPreset` and `ptzAbsolute` and plays the eased move itself. */
+  readonly timedMoves = true;
+
   async handleRcpCommand(cmd: string, params: Record<string, unknown>): Promise<boolean> {
     const num = (k: string, d = 0) => Number(params[k] ?? d);
     switch (cmd) {

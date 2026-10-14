@@ -97,6 +97,11 @@ export interface CameraConfig {
   /** Which switcher input carries this camera's picture (1-based). 0/empty: none. Drives the per-camera tally. */
   switcherInput?: number;
   /**
+   * On-air lock: while this camera is on programme, a shot recall does not
+   * move it unless forced. Default on — only `false` switches it off.
+   */
+  tallyProtect?: boolean;
+  /**
    * Planned shots → head poses (protocol/ptzPose.ts). `poseOffset` is the
    * mounting error measured on site; `homeHeading` overrides the plan's
    * camera heading as the room direction of the head's pan 0; `zoomTable`
@@ -147,6 +152,12 @@ export interface CameraBackend extends EventEmitter {
    * Together with `readPose` it is what eased preset recall needs.
    */
   readonly poseStream?: { intervalMs: number };
+  /**
+   * The camera plays a timed move itself: `recallPreset` and `ptzAbsolute`
+   * take `timeMs` (the robotic head's keyframes). A studio-shot fade then
+   * hands it the time instead of streaming positions (motion/studioShots.ts).
+   */
+  readonly timedMoves?: boolean;
 }
 
 /**

@@ -28,6 +28,7 @@
 import type { CameraConfig } from '../cameras/backendFactory.js';
 import type { SwitcherConfig } from '../switcher/VisCatcClient.js';
 import type { PlanCamera } from '../plan/cameraPlan.js';
+import { normaliseStudioShots, type StudioShots } from '../motion/studioShots.js';
 
 export const SITE_KIND = 'lz-site';
 export const SITE_FORMAT_VERSION = 1;
@@ -53,6 +54,8 @@ export interface SiteFile {
   name: string;
   cameras: SiteCamera[];
   switchers: SiteSwitcher[];
+  /** Shot sets, seating chart and moves (motion/studioShots.ts). Optional: a room without them has none. */
+  shots?: StudioShots;
 }
 
 export function emptySite(name = ''): SiteFile {
@@ -104,6 +107,7 @@ function normaliseSite(obj: Record<string, unknown>): SiteFile {
   }
   site.cameras.sort((a, b) => a.cameraNumber - b.cameraNumber);
   site.switchers.sort((a, b) => a.switcherNumber - b.switcherNumber);
+  if (obj.shots && typeof obj.shots === 'object') site.shots = normaliseStudioShots(obj.shots);
   return site;
 }
 

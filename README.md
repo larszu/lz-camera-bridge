@@ -153,6 +153,27 @@ device stays silent, is in [`docs/dji-gimbal.md`](docs/dji-gimbal.md).
   drawn on the map drives the head there, also while it stands at full tele;
   the live picture is shown in its place on the map. The map is a still —
   scan again when the room has changed.
+- **Studio shots** (view *Shots*) — for every camera on the bridge:
+  - *Cut* or *Fade*: cut recalls at the camera's own top speed; fade is a
+    timed move with ease-in/out, pan, tilt and zoom arriving together —
+    the same preset glide as above, with the move time of the recall. A
+    planned shot glides from the pose the head reports; robotic heads play
+    the time themselves. Where neither works the shot cuts, and the panel
+    says so.
+  - *Shot sets* — one button recalls a shot on several cameras with one
+    common move time.
+  - *On-air lock* — a camera whose switcher input is on programme does not
+    move on a shot recall (sets, seats, moves, preset keys, Companion
+    presets, planned shots); the banner offers *Move anyway*. Per camera,
+    on by default.
+  - *Seats* — a seating chart (rows × seats); each seat lists shots on one
+    or more cameras, best first. A tap takes the first camera that is
+    connected and not on air.
+  - *Moves* — shots of one camera in a row, each with its own move time and
+    an optional hold; any joystick touch stops the move.
+
+  Shot sets, seats and moves live in the site file. Untested on real heads:
+  so far all of it has only run against the demo camera.
 
 ## Control room: switcher, video wall, site
 

@@ -62,6 +62,19 @@
  *       Bildwinkel je Zoomstellung messen (kleiner Schwenk, Bildverschiebung);
  *       Fortschritt als { type: 'fovProgress', … }, Ergebnis in `fovTable`.
  *   { type: 'getSite' } | { type: 'importSite', site } | { type: 'setSiteName', name }
+ *   Studio shots (motion/studioShots.ts) -- shot sets, seat shots, moves:
+ *   { type: 'setStudioShots', shots }                        replaces all of them, kept in the site
+ *   { type: 'recallShot', cameraNumber, presetNumber, source?, mode?, timeMs?, force? }
+ *   { type: 'recallShotSet', id, force?, cameras? }          every camera of a set, one common move time
+ *   { type: 'recallSeat', id, force? }                       the best camera for this seat
+ *   { type: 'playMove', id, force? } | { type: 'stopMove', cameraNumber }
+ *       -> { type: 'studioShots', shots }
+ *        | { type: 'shotRecalled', cameraNumber, presetNumber, source, mode, timeMs, note? }
+ *        | { type: 'shotHeld', cameras, label, retry }   the camera is on air; `retry` is the
+ *          message that, sent again (it carries `force: true`), moves it anyway. Also for
+ *          `recallPreset`, `drivePlannedPreset` and `storePlannedPresets`.
+ *        | { type: 'seatRecalled', id, cameraNumber }
+ *        | { type: 'moveProgress', id, cameraNumber, step, of, state }
  *       Die Anlage als Datei (site/siteFile.ts): Kameras + Mischer. Wird
  *       bei eingeschalteter Persistenz (index.ts, Electron) auf Platte
  *       gehalten und beim Start wiederhergestellt.
@@ -127,6 +140,10 @@ import { EasedDrive, isRamped } from './motion/EasedDrive.js';
 import { DEFAULT_RAMP } from './motion/Easing.js';
 import { DEFAULT_GLIDE, PresetGlide, clampGlideTime, glideFrames, type BridgePreset } from './motion/PresetGlide.js';
 import {
+  clampTime, emptyStudioShots, heldByOnAir, normaliseStudioShots, pickSeatShot,
+  type RecallMode, type ShotRef, type ShotSource, type StudioShots,
+} from './motion/studioShots.js';
+import {
   matchCameraPlan, parseCameraPlan,
   type CameraPlan, type PlanCamera, type SlotFacts,
 } from './plan/cameraPlan.js';
@@ -177,7 +194,11 @@ interface CameraSlot {
   eased?: EasedDrive;
   /** The running eased preset recall, if any (motion/PresetGlide.ts). */
   glide?: PresetGlide;
+  /** Bumped by every new move; a running shot move (motion/studioShots.ts) stops when it changes. */
+  moveToken?: number;
 }
+
+type RecallOutcome = { outcome: 'moved' | 'held' | 'failed'; ms: number };
 
 interface SwitcherSlot {
   num: number;
@@ -207,7 +228,8 @@ interface ClientMessage {
     | 'getSite' | 'importSite' | 'setSiteName'
     | 'readPose' | 'drivePlannedPreset' | 'storePlannedPresets' | 'calibratePose' | 'setPoseOffset'
     | 'zoomTo' | 'captureZoomPoint' | 'clearZoomTable' | 'setPresetMotion'
-    | 'aimFrame' | 'scanPanorama' | 'cancelPanorama' | 'getPanorama' | 'calibrateFov';
+    | 'aimFrame' | 'scanPanorama' | 'cancelPanorama' | 'getPanorama' | 'calibrateFov'
+    | 'setStudioShots' | 'recallShot' | 'recallShotSet' | 'recallSeat' | 'playMove' | 'stopMove';
   cameraNumber?: number;
   presetNumber?: number;
   presetNumbers?: number[];
@@ -217,8 +239,8 @@ interface ClientMessage {
   focalMm?: number;
   timeMs?: number;
   soft?: boolean;
-  /** aimFrame: where the frame was drawn, the frame itself (0..1) and the picture's width/height. */
-  source?: 'picture' | 'panorama';
+  /** aimFrame: where the frame was drawn ('picture' | 'panorama'), the frame itself (0..1) and the picture's width/height. recallShot: 'head' | 'plan'. */
+  source?: 'picture' | 'panorama' | ShotSource;
   frame?: Frame;
   aspect?: number;
   scan?: Partial<ScanSettings>;
@@ -239,6 +261,13 @@ interface ClientMessage {
   plan?: string | Record<string, unknown>;
   /** Fuer `assignPlanCamera`: leer laesst die Zuordnung fallen. */
   planCameraId?: string | null;
+  /** Studio shots. */
+  shots?: unknown;
+  id?: string;
+  mode?: RecallMode;
+  /** Move a camera that is on air anyway. */
+  force?: boolean;
+  cameras?: number[];
 }
 
 export class BridgeServer {
@@ -273,6 +302,7 @@ export class BridgeServer {
   private readonly hub: RtspHub;
   private readonly persistence: SitePersistence | null;
   private siteName = '';
+  private studioShots: StudioShots = emptyStudioShots();
   private readonly allowAnyStreamHost: boolean;
   private readonly panoramas: PanoramaStore;
   /** One head job (panorama scan, field-of-view calibration) per camera at a time. */
@@ -378,6 +408,7 @@ export class BridgeServer {
     this.sendSwitchers(ws);
     ws.send(JSON.stringify({ type: 'tally', tally: this.tally }));
     ws.send(JSON.stringify({ type: 'cameraTally', tally: this.cameraTally() }));
+    ws.send(JSON.stringify({ type: 'studioShots', shots: this.studioShots }));
     this.sendSite(ws);
     for (const [cameraNumber, state] of this.cameraStates.entries()) {
       ws.send(
@@ -478,7 +509,7 @@ export class BridgeServer {
 
       // ─── Aim by frame, panorama ─────────────────────────────────────────
       case 'aimFrame':
-        await this.aimFrame(ws, msg.cameraNumber ?? 0, msg.source ?? 'picture', msg.frame, msg.aspect);
+        await this.aimFrame(ws, msg.cameraNumber ?? 0, msg.source === 'panorama' ? 'panorama' : 'picture', msg.frame, msg.aspect);
         break;
 
       case 'scanPanorama':
@@ -503,13 +534,52 @@ export class BridgeServer {
 
       case 'drivePlannedPreset': {
         const num = msg.cameraNumber ?? 0;
+        if (this.holdOnAir(num, msg.force, `Planned shot ${msg.presetNumber}`, { ...msg })) break;
         await this.drivePlanned(ws, num, msg.presetNumber ?? -1);
         break;
       }
 
       case 'storePlannedPresets': {
         const num = msg.cameraNumber ?? 0;
+        if (this.holdOnAir(num, msg.force, 'Store all shots in head', { ...msg })) break;
         await this.storePlanned(ws, num, msg.presetNumbers, msg.settleMs);
+        break;
+      }
+
+      // ─── Studio shots ───────────────────────────────────────────────────
+      case 'setStudioShots':
+        this.studioShots = normaliseStudioShots(msg.shots);
+        this.broadcast({ type: 'studioShots', shots: this.studioShots });
+        this.siteChanged();
+        break;
+
+      case 'recallShot': {
+        const ref: ShotRef = { cameraNumber: msg.cameraNumber ?? 0, preset: msg.presetNumber ?? -1, source: msg.source === 'plan' ? 'plan' : 'head' };
+        const mode = msg.mode ?? this.studioShots.defaultMode;
+        const timeMs = clampTime(msg.timeMs, this.studioShots.defaultTimeMs);
+        const r = await this.recallShot(ws, ref, { mode, timeMs, force: msg.force });
+        if (r.outcome === 'held') this.announceHeld([ref.cameraNumber], `Shot ${ref.preset}`, { ...msg });
+        break;
+      }
+
+      case 'recallShotSet':
+        await this.recallShotSet(ws, String(msg.id ?? ''), msg.force, msg.cameras);
+        break;
+
+      case 'recallSeat':
+        await this.recallSeat(ws, String(msg.id ?? ''), msg.force);
+        break;
+
+      case 'playMove':
+        await this.playMove(ws, String(msg.id ?? ''), msg.force);
+        break;
+
+      case 'stopMove': {
+        const num = msg.cameraNumber ?? 0;
+        const slot = this.cameras.get(num);
+        if (!slot) break;
+        this.beginMove(slot);
+        if (slot.connected) await this.dispatchCommand(ws, num, 'ptz', { pan: 0, tilt: 0 }, { raw: true });
         break;
       }
 
@@ -928,6 +998,18 @@ export class BridgeServer {
     if (!slot?.backend || !slot.connected) {
       this.sendError(ws, `Kamera ${num} ist nicht verbunden`, num);
       return;
+    }
+
+    // A hand on the joystick, a preset or an absolute move ends any timed
+    // move the bridge is playing on this camera (motion/studioShots.ts).
+    if (GLIDE_BREAKERS.has(cmd) || cmd === 'recallPreset') this.beginMove(slot);
+
+    // On-air lock: a preset recall does not move a camera on programme
+    // unless it comes back with `force` ("move anyway").
+    if (cmd === 'recallPreset') {
+      const { force, ...rest } = params;
+      if (this.holdOnAir(num, force === true, `Preset ${String(rest.value)}`, { type: 'command', cameraNumber: num, cmd, params: rest })) return;
+      params = rest;
     }
 
     // BEDARF 129 — relativ trimmen. Die Aufloesung passiert HIER, einmal, und
@@ -1353,6 +1435,180 @@ export class BridgeServer {
     this.broadcast({ type: 'cameraTally', tally: this.cameraTally() });
   }
 
+  // ─── Studio shots: recall modes, on-air lock, sets, seats, moves ──────────
+
+  private onAir(num: number): boolean {
+    return this.cameraTally()[num] === 'program';
+  }
+
+  /**
+   * True (and every panel told) when the camera is on air, its lock is on
+   * and nobody forced the move. `retry` is the message that, sent again
+   * with `force: true`, moves it anyway.
+   */
+  private holdOnAir(num: number, force: boolean | undefined, label: string, retry: Record<string, unknown>): boolean {
+    const slot = this.cameras.get(num);
+    if (!slot || !heldByOnAir(this.onAir(num), slot.config, force)) return false;
+    this.announceHeld([num], label, retry);
+    return true;
+  }
+
+  private announceHeld(cameras: number[], label: string, retry: Record<string, unknown>): void {
+    this.broadcast({ type: 'shotHeld', cameras, label, retry: { ...retry, force: true } });
+  }
+
+  private beginMove(slot: CameraSlot): number {
+    slot.moveToken = (slot.moveToken ?? 0) + 1;
+    return slot.moveToken;
+  }
+
+  /**
+   * One shot on one camera.
+   *
+   * `cut`: the camera's own preset, or an absolute move at full speed.
+   * `fade`: a head preset goes through `presetCommand` with the move time --
+   * a pose the bridge stored glides (motion/PresetGlide.ts), the robotic head
+   * plays the time itself, anything else recalls the camera's preset. A
+   * planned shot glides from the pose the head reports, or gets the time on a
+   * head that plays timed moves; where neither works it cuts, and the answer
+   * says so.
+   */
+  private async recallShot(
+    ws: WebSocket,
+    ref: ShotRef,
+    opts: { mode: RecallMode; timeMs: number; force?: boolean; token?: number },
+  ): Promise<RecallOutcome> {
+    const num = ref.cameraNumber;
+    const slot = this.cameras.get(num);
+    if (!slot?.backend || !slot.connected) {
+      this.sendError(ws, `Camera ${num} is not connected`, num);
+      return { outcome: 'failed', ms: 0 };
+    }
+    if (heldByOnAir(this.onAir(num), slot.config, opts.force)) return { outcome: 'held', ms: 0 };
+    if (opts.token === undefined) this.beginMove(slot);
+    slot.glide?.cancel();
+    const backend = slot.backend;
+    const source = ref.source ?? 'head';
+    const streams = Boolean(backend.poseStream && backend.readPose);
+    let mode: RecallMode = 'cut';
+    let note: string | undefined;
+    let ok = false;
+    try {
+      if (source === 'head') {
+        if (opts.mode === 'fade') {
+          const stored = slot.config.bridgePresets?.[String(ref.preset)];
+          const glides = streams && stored?.pan !== undefined && stored?.tilt !== undefined && stored?.soft !== false;
+          if (glides || backend.timedMoves) mode = 'fade';
+          else note = 'No eased move stored for this preset; the camera recalled it at its own speed.';
+          // Not awaited: a glide resolves only when the head has landed.
+          void this.presetCommand(ws, slot, 'recallPreset', { value: ref.preset, timeMs: opts.timeMs }).catch((err) =>
+            this.sendError(ws, `Camera ${num}: ${(err as Error).message}`, num));
+          ok = true;
+        } else {
+          ok = await backend.handleRcpCommand('recallPreset', { value: ref.preset, cameraNumber: num });
+        }
+      } else {
+        const planned = this.plannedPose(slot, ref.preset);
+        if (typeof planned === 'string') {
+          this.sendError(ws, planned, num);
+          return { outcome: 'failed', ms: 0 };
+        }
+        const target = { pan: planned.pose.pan, tilt: planned.pose.tilt, ...(planned.pose.zoom !== undefined ? { zoom: planned.pose.zoom } : {}) };
+        this.broadcast({ type: 'plannedProgress', cameraNumber: num, presetNumber: ref.preset, step: 'driving', message: planned.name, fit: planned.fit });
+        if (opts.mode === 'fade' && backend.timedMoves) {
+          ok = await backend.handleRcpCommand('ptzAbsolute', { ...target, timeMs: opts.timeMs, cameraNumber: num });
+          mode = 'fade';
+        } else if (opts.mode === 'fade' && streams) {
+          const from = await backend.readPose!();
+          const move = slot.config.presetMove ?? {};
+          const intervalMs = backend.poseStream!.intervalMs;
+          const frames = glideFrames(from, target, {
+            timeMs: opts.timeMs,
+            curve: move.curve ?? DEFAULT_GLIDE.curve,
+            intervalMs,
+            maxDegPerSec: move.maxDegPerSec ?? DEFAULT_GLIDE.maxDegPerSec,
+          });
+          slot.glide ??= new PresetGlide();
+          void slot.glide.run((c, p) => backend.handleRcpCommand(c, { ...p, cameraNumber: num }), frames, intervalMs).then((r) => {
+            if (r === 'failed') this.sendError(ws, `Camera ${num}: eased move to planned shot ${ref.preset} broke off`, num);
+          });
+          ok = true;
+          mode = 'fade';
+        } else {
+          ok = await backend.handleRcpCommand('ptzAbsolute', { ...target, cameraNumber: num });
+          if (opts.mode === 'fade') note = 'This camera does not report its position; the shot was cut.';
+        }
+      }
+    } catch (err) {
+      this.sendError(ws, `Camera ${num}: ${(err as Error).message}`, num);
+      return { outcome: 'failed', ms: 0 };
+    }
+    if (!ok) {
+      this.sendError(ws, `Camera ${num} cannot recall ${source === 'plan' ? 'planned shot' : 'preset'} ${ref.preset}`, num);
+      return { outcome: 'failed', ms: 0 };
+    }
+    const ms = mode === 'fade' ? opts.timeMs : 0;
+    this.broadcast({ type: 'shotRecalled', cameraNumber: num, presetNumber: ref.preset, source, mode, timeMs: ms, ...(note ? { note } : {}) });
+    return { outcome: 'moved', ms };
+  }
+
+  private async recallShotSet(ws: WebSocket, id: string, force?: boolean, only?: number[]): Promise<void> {
+    const set = this.studioShots.sets.find((s) => s.id === id);
+    if (!set) { this.sendError(ws, `There is no shot set '${id}'`); return; }
+    const mode = set.mode ?? this.studioShots.defaultMode;
+    const timeMs = set.timeMs ?? this.studioShots.defaultTimeMs;
+    const shots = Array.isArray(only) ? set.shots.filter((s) => only.includes(s.cameraNumber)) : set.shots;
+    const results = await Promise.all(shots.map((s) => this.recallShot(ws, s, { mode, timeMs, force })));
+    const held = shots.filter((_, i) => results[i].outcome === 'held').map((s) => s.cameraNumber);
+    if (held.length) this.announceHeld(held, set.name, { type: 'recallShotSet', id, cameras: held });
+  }
+
+  private async recallSeat(ws: WebSocket, id: string, force?: boolean): Promise<void> {
+    const seat = this.studioShots.seats.seats.find((s) => s.id === id);
+    if (!seat) { this.sendError(ws, `There is no seat '${id}'`); return; }
+    const facts = [...this.cameras.values()].map((c) => ({
+      cameraNumber: c.num, connected: c.connected, onAir: this.onAir(c.num), tallyProtect: c.config.tallyProtect,
+    }));
+    const pick = pickSeatShot(seat, facts);
+    const label = seat.label ?? `Row ${seat.row + 1}, seat ${seat.col + 1}`;
+    if (!pick) { this.sendError(ws, `${label}: no connected camera has a shot for this seat`); return; }
+    if (pick.held && !force) { this.announceHeld([pick.shot.cameraNumber], label, { type: 'recallSeat', id }); return; }
+    const r = await this.recallShot(ws, pick.shot, { mode: this.studioShots.defaultMode, timeMs: this.studioShots.defaultTimeMs, force: true });
+    if (r.outcome === 'moved') this.broadcast({ type: 'seatRecalled', id, cameraNumber: pick.shot.cameraNumber });
+  }
+
+  /**
+   * A move: the shots of one camera in a row, each an eased move of its own
+   * time, with an optional hold in between. The on-air lock is asked once,
+   * at the start -- a move started on air on purpose runs through.
+   */
+  private async playMove(ws: WebSocket, id: string, force?: boolean): Promise<void> {
+    const move = this.studioShots.moves.find((m) => m.id === id);
+    if (!move) { this.sendError(ws, `There is no move '${id}'`); return; }
+    const num = move.cameraNumber;
+    const slot = this.cameras.get(num);
+    if (!slot?.backend || !slot.connected) { this.sendError(ws, `Camera ${num} is not connected`, num); return; }
+    if (move.steps.length === 0) { this.sendError(ws, `${move.name} has no steps`, num); return; }
+    if (this.holdOnAir(num, force, move.name, { type: 'playMove', id })) return;
+    const token = this.beginMove(slot);
+    const of = move.steps.length;
+    const progress = (step: number, state: 'playing' | 'done' | 'stopped') =>
+      this.broadcast({ type: 'moveProgress', id, cameraNumber: num, step, of, state });
+    for (let i = 0; i < of; i++) {
+      if (slot.moveToken !== token) return progress(i, 'stopped');
+      const st = move.steps[i];
+      progress(i + 1, 'playing');
+      const timeMs = st.timeMs ?? this.studioShots.defaultTimeMs;
+      const r = await this.recallShot(ws, { cameraNumber: num, preset: st.preset, source: st.source }, { mode: 'fade', timeMs, force: true, token });
+      if (r.outcome !== 'moved') return progress(i + 1, 'stopped');
+      const until = Date.now() + Math.max(r.ms, timeMs) + (st.holdMs ?? 0);
+      while (Date.now() < until && slot.moveToken === token) {
+        await new Promise((res) => setTimeout(res, Math.min(50, until - Date.now())));
+      }
+    }
+    progress(of, slot.moveToken === token ? 'done' : 'stopped');
+  }
+
 
   // ─── Planned shots ────────────────────────────────────────────────────────
 
@@ -1486,6 +1742,7 @@ export class BridgeServer {
         timeMs, curve: move.curve ?? DEFAULT_GLIDE.curve, intervalMs, maxDegPerSec: move.maxDegPerSec ?? DEFAULT_GLIDE.maxDegPerSec,
       });
       slot.glide?.cancel();
+      this.beginMove(slot); // a running shot move stops here too
       slot.glide ??= new PresetGlide();
       void slot.glide.run((c, p) => backend.handleRcpCommand(c, { ...p, cameraNumber: num }), frames, intervalMs).then((r) => {
         if (r === 'failed') this.sendError(ws, `Camera ${num}: eased move to the frame broke off`, num);
@@ -1611,6 +1868,8 @@ export class BridgeServer {
     for (const s of [...this.switchers.values()].sort((a, b) => a.num - b.num)) {
       site.switchers.push({ switcherNumber: s.num, config: s.config, autoConnect: s.connected || Boolean(s.client) });
     }
+    const sh = this.studioShots;
+    if (sh.sets.length || sh.moves.length || sh.seats.seats.length || sh.seats.rows) site.shots = sh;
     return site;
   }
 
@@ -1654,6 +1913,8 @@ export class BridgeServer {
       if (c.plan) { slot.plan = c.plan; slot.planMatchedBy = c.planMatchedBy ?? 'manual'; }
     }
     for (const s of site.switchers) this.getOrCreateSwitcher(s.switcherNumber).config = { ...s.config };
+    this.studioShots = normaliseStudioShots(site.shots);
+    this.broadcast({ type: 'studioShots', shots: this.studioShots });
     this.broadcastCameras();
     this.sendSwitchers();
     this.sendSite();
