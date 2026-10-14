@@ -88,5 +88,7 @@ seats or moves, open the presets again.
 
 Loaded in Companion 5.0.5 against a bridge with demo cameras (connection,
 dropdowns, variables and button pages); the actions themselves are tested
-against the bridge outside Companion. Not tried on real heads. A pan/tilt or column button that is released
-while the connection drops leaves the head moving until the next command.
+against the bridge outside Companion. Not tried on real heads.
+
+If the connection to the bridge drops while a pan/tilt, zoom, focus or column
+button is held, the bridge stops that axis itself.

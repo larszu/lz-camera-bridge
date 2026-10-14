@@ -175,6 +175,14 @@ import {
 } from './protocol/valueOrigin.js';
 
 /** Commands that take the head over from a running preset glide. */
+/**
+ * Speed commands whose last value keeps the head moving. If the client that
+ * sent a non-zero one goes away (Companion restarted, network gone, panel
+ * closed while a key is held), nobody will ever send the release — so the
+ * bridge sends it: the axis stops instead of driving into its end stop.
+ */
+const HELD_SPEEDS: Record<string, string[]> = { ptz: ['pan', 'tilt'], setZoom: ['value'], setFocus: ['value'], setColumn: ['value'] };
+
 const GLIDE_BREAKERS = new Set(['ptz', 'setZoom', 'home', 'ptzAbsolute', 'zoomAbsolute', 'stop', 'gotoAngle', 'recenter']);
 
 /** Was der Nutzer liest, wenn die Datei kein Kamera-Plan ist. */
@@ -285,6 +293,7 @@ export class BridgeServer {
   private scopeWss: WebSocketServer;
   private httpServer: ReturnType<typeof createServer>;
   private cameras = new Map<number, CameraSlot>();
+  private held = new WeakMap<WebSocket, Map<number, Set<string>>>();
   private cameraStates = new Map<number, CameraState>();
   /**
    * BEDARF 46 — woher jeder Wert in `cameraStates` stammt.
@@ -447,8 +456,38 @@ export class BridgeServer {
         this.sendError(ws, 'Invalid JSON message');
       }
     });
-    ws.on('close', () => console.log('[BridgeServer] Web client disconnected'));
+    ws.on('close', () => {
+      console.log('[BridgeServer] Web client disconnected');
+      this.releaseHeld(ws);
+    });
     ws.on('error', (err) => console.error('[BridgeServer] WS error:', err));
+  }
+
+  /** Remembers which speed axes a client left moving (see HELD_SPEEDS). */
+  private trackHeld(ws: WebSocket, num: number, cmd: string, params: Record<string, unknown>): void {
+    const keys = HELD_SPEEDS[cmd];
+    if (!keys) return;
+    let perCam = this.held.get(ws);
+    if (!perCam) this.held.set(ws, (perCam = new Map()));
+    let cmds = perCam.get(num);
+    if (!cmds) perCam.set(num, (cmds = new Set()));
+    if (keys.some((k) => Number(params[k] ?? 0) !== 0)) cmds.add(cmd);
+    else cmds.delete(cmd);
+  }
+
+  private releaseHeld(ws: WebSocket): void {
+    const perCam = this.held.get(ws);
+    this.held.delete(ws);
+    if (!perCam) return;
+    const quietWs = { readyState: WebSocket.OPEN, send: () => {} } as unknown as WebSocket;
+    for (const [num, cmds] of perCam) {
+      for (const cmd of cmds) {
+        console.log(`[BridgeServer] Client gone while camera ${num} ${cmd} was held — stopping it`);
+        const zero = Object.fromEntries(HELD_SPEEDS[cmd].map((k) => [k, 0]));
+        // Not raw: a running ease ramp must get target 0 too, or it keeps sending.
+        void this.dispatchCommand(quietWs, num, cmd, zero).catch(() => {});
+      }
+    }
   }
 
   private async handleClientMessage(ws: WebSocket, msg: ClientMessage): Promise<void> {
@@ -1046,6 +1085,8 @@ export class BridgeServer {
       this.sendError(ws, `Kamera ${num} ist nicht verbunden`, num);
       return;
     }
+
+    this.trackHeld(ws, num, cmd, params);
 
     // A hand on the joystick, a preset or an absolute move ends any timed
     // move the bridge is playing on this camera (motion/studioShots.ts).
