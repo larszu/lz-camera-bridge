@@ -172,6 +172,9 @@ export const MODE_READBACK: Readonly<Record<ConnectionMode, readonly PaintField[
   // NICHT hier: `CameraState` hat keine Felder dafuer, und zwei erfundene
   // Paint-Felder, die niemand kommandieren kann, waeren zwei tote Regler.
   'b4-lens': ['iris'],
+  // The head reports its position (ptzfxymi every 250 ms) but no picture
+  // state: `CameraState` has no pose fields, so nothing is read back here.
+  'robotic-head': [],
   // HTTP-CGI: pan/tilt/zoom/fokus/preset gehen hinaus, das Geraet gibt
   // darueber keinen Bildzustand zurueck. Power wird GEFRAGT (Sony
   // `inquiry.cgi?inq=sysinfo`, Vissonic VISCA-Inquiry ueber TCP 5678) --
@@ -341,6 +344,8 @@ export const MODE_CADENCE: Readonly<Record<ConnectionMode, ConfirmCadence>> = {
   // waehrend der Aufnahme anschaut. Ein Zwei-Sekunden-Takt zeigte eine
   // Blende, die vor zwei Sekunden dort stand.
   'b4-lens': { kind: 'poll', everyMs: 250 },
+  // Polls positions, not picture state (see MODE_READBACK).
+  'robotic-head': { kind: 'none' },
   // Nichts zurueckgelesen (MODE_READBACK leer), also kein Takt -- 'none'.
   // `HttpCgiClient.readPower` every 10 s, plus 1.5 s and 10 s after a power command.
   'http-cgi': { kind: 'poll', everyMs: 10000 },

@@ -40,7 +40,7 @@ connector, and for reading zoom/focus demands as input devices.
 | [`axis.md`](axis.md) | The axis state machine: setpoint, feedback, limits, homing, status — and the order in which a stop engages the brake and cuts torque. |
 | [`universal-lens-control.md`](universal-lens-control.md) | Goal and architecture: focus, iris, zoom and a filter channel over the network, for B4 lens servos, external motors (Tilta, ARRI, Heden, Chrosziel, DJI) and mixed setups; demand stations; what is known and what is not. |
 | [`carrier-v2-notes.md`](carrier-v2-notes.md) | Carrier board v2: which connector does what and why, design decisions (D+/D− tied, hand-laid charger core, B.Cu power trunks), layout lessons, open points. |
-| [`Robotics-protocols.md`](Robotics-protocols.md) | Protocol extraction from a Robotics robotics system: what it drives, where the (local, unpublished) specs are, and the publication rule. |
+| [`robotics-protocols.md`](robotics-protocols.md) | Protocol extraction from a robotic camera control system: what it drives, where the (local, unpublished) specs are, and the publication rule. |
 | [`device-profiles.md`](device-profiles.md) | Profile format for retro-fitted foreign heads: what a profile holds, what is rejected outright, and why an unstated figure costs capability instead of getting a default. |
 | [`../reuse-audit.md`](../reuse-audit.md) | What already exists in this repository and the other repositories, with a reuse verdict per criterion. |
 

@@ -10,7 +10,7 @@
  *    release when slowing down, never a step.
  * 2. `easedTrajectory` — a preset move from pose A to pose B, sampled at a
  *    fixed interval, every axis on the same eased time line. Heads that take
- *    a stream of absolute positions (Robotics S5 keyframes) play it as is.
+ *    a stream of absolute positions (keyframe heads) play it as is.
  *
  * The cubic ease-in/out is the one the multicam planner already uses for its
  * camera transitions (`apps/multicam-planner/src/utils/cameraTransition.ts`),
