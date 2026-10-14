@@ -70,6 +70,11 @@ export interface CameraConfig {
   sshFingerprint?: string;
   /** HTTP-CGI: welche Firmware-Familie (Vissonic/PTZOptics oder Sony SRG/BRC). */
   cgiFamily?: CgiFamily; cgiPresetOffset?: number;
+  /**
+   * Ease-in/out for pan/tilt, zoom and focus speed demands. Default
+   * `DEFAULT_RAMP` (motion/Easing.ts); `{ attackMs: 0, releaseMs: 0 }` switches it off.
+   */
+  ease?: { attackMs: number; releaseMs: number; curve?: 'linear' | 'sine' | 'cubic' | 'quint' };
   /** A name for the panel: "Stage left" instead of a bare number. The plan label wins when a plan is matched. */
   label?: string;
   /** Which switcher input carries this camera's picture (1-based). 0/empty: none. Drives the per-camera tally. */
