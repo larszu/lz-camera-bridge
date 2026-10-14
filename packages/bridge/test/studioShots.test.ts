@@ -177,6 +177,11 @@ test('sets, on-air lock with "move anyway", seats, moves and the site round trip
     c.send({ type: 'command', cameraNumber: 1, cmd: 'recallPreset', params: { value: 3 } });
     const heldPreset = await c.waitFor<{ retry: Record<string, unknown> }>((m) => m.type === 'shotHeld');
     assert.deepEqual(heldPreset.retry, { type: 'command', cameraNumber: 1, cmd: 'recallPreset', params: { value: 3 }, force: true });
+    // ... and its retry ("move anyway") goes through instead of being held again.
+    c.inbox = [];
+    c.send(heldPreset.retry);
+    await new Promise((r) => setTimeout(r, 150));
+    assert.equal(c.inbox.some((m) => m.type === 'shotHeld'), false);
 
     // The seat: camera 1 is listed first but on air → camera 2 takes it.
     c.inbox = [];

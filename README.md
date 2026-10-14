@@ -120,8 +120,14 @@ device stays silent, is in [`docs/dji-gimbal.md`](docs/dji-gimbal.md).
   ease‑in/out: all axes start and land together, move time per preset, *Soft*
   switch per preset. Other paths recall the camera's own preset, and the
   panel says so.
-- **Bitfocus Companion** — HTTP + WebSocket module; Streamdeck actions route to
-  whichever camera is connected.
+- **Bitfocus Companion** — module in `packages/companion-module-lz-camera-bridge`
+  (v0.2.0): paint, pan/tilt/zoom/focus and the elevation column, soft presets
+  (move time, *Soft* per preset), studio shots (cut/fade, shot sets, seats,
+  moves, *move anyway*, on-air lock per camera), panorama aim and the switcher,
+  with dropdowns, feedbacks, variables and ready-made button pages built from
+  the bridge's cameras and studio shots. It talks to the Companion API
+  (9701/9702) and the panel's port (9700). See its
+  [`HELP.md`](packages/companion-module-lz-camera-bridge/companion/HELP.md).
 - **USB HID control panel** — a data-driven adapter maps a hardware panel's
   axes/buttons onto the command bus, so one panel controls any brand.
 - **Keyboard** — on the PTZ panel the arrow keys drive while held, `1`–`9`

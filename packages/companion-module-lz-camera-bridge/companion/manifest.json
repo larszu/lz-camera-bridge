@@ -4,7 +4,7 @@
   "name": "LZ Camera Bridge",
   "shortname": "lz-camera-bridge",
   "description": "Native Bitfocus Companion module for the Sony/Blackmagic camera bridge",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "license": "UNLICENSED",
   "repository": "https://github.com/local/sony-camera-bridge",
   "bugs": "https://github.com/local/sony-camera-bridge/issues",
