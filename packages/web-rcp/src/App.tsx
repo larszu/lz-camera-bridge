@@ -12,6 +12,7 @@ import { VideoWall } from './components/VideoWall.tsx';
 import { SitePanel } from './components/SitePanel.tsx';
 import { PlannedShots } from './components/PlannedShots.tsx';
 import { AimPanel } from './components/AimPanel.tsx';
+import { StudioShotsPanel } from './components/StudioShotsPanel.tsx';
 import { FirstStartWizard, isWizardDone } from './components/FirstStartWizard.tsx';
 import { capabilitiesForMode, isPtzMode } from './capabilities.ts';
 import type { BridgeConfig, WiznetDevice } from './types.ts';
@@ -24,13 +25,14 @@ import './styles/dashboard.css';
 import { Icon, type IconName } from './components/Icon.tsx';
 
 type PanelView = 'rcp' | 'ptz';
-/** The five views. `single`/`multi` are the panel; the other three came with the control room. */
-type ViewMode = 'single' | 'multi' | 'switcher' | 'video' | 'site';
+/** The views. `single`/`multi` are the panel; the others came with the control room. */
+type ViewMode = 'single' | 'multi' | 'shots' | 'switcher' | 'video' | 'site';
 
 const VIEW_KEY = 'lz-bridge.view';
 const VIEWS: { id: ViewMode; label: string }[] = [
   { id: 'single', label: 'Cameras' },
   { id: 'multi', label: 'Wall' },
+  { id: 'shots', label: 'Shots' },
   { id: 'switcher', label: 'Switcher' },
   { id: 'video', label: 'Video' },
   { id: 'site', label: 'Site' },
@@ -123,6 +125,8 @@ export default function App() {
     poses, plannedProgress, readPose, drivePlannedPreset, storePlannedPresets, calibratePose, setPoseOffset,
     zoomTo, captureZoomPoint, clearZoomTable, setPresetMotion,
     panoramas, panoramaProgress, fovProgress, aimFrame, scanPanorama, cancelPanorama, getPanorama, calibrateFov,
+    studioShots, shotHeld, lastRecall, moveProgress,
+    setStudioShots, recallShotSet, recallSeat, playMove, stopMove, moveAnyway, dismissHeld,
   } = bridge;
 
   const camNumbers = useMemo(
@@ -288,6 +292,17 @@ export default function App() {
         </button>
       </header>
 
+      {shotHeld && (
+        <div className="error-line held-line" role="alert">
+          <span>
+            {shotHeld.cameras.map((n) => cameras[n]?.plan?.label ?? cameras[n]?.config.label ?? `CAM ${n}`).join(', ')}
+            {shotHeld.cameras.length === 1 ? ' is' : ' are'} on air — {shotHeld.label} was not moved.
+          </span>
+          <button className="btn btn--sm" onClick={moveAnyway}>Move anyway</button>
+          <button className="btn btn--sm" style={{ marginLeft: 0 }} onClick={dismissHeld}>Dismiss</button>
+        </div>
+      )}
+
       {errorMsg && viewMode !== 'single' && (
         <div className="error-line" role="alert">
           <span>{errorMsg}</span>
@@ -314,6 +329,24 @@ export default function App() {
           onEdit={(num) => { setSelected(num); setViewMode('single'); }}
         />
         </>
+      )}
+
+      {viewMode === 'shots' && (
+        <main className="view">
+          <StudioShotsPanel
+            shots={studioShots}
+            cameras={cameras}
+            cameraTally={cameraTally}
+            moveProgress={moveProgress}
+            lastRecall={lastRecall}
+            onChange={setStudioShots}
+            onRecallSet={recallShotSet}
+            onRecallSeat={recallSeat}
+            onPlayMove={playMove}
+            onStopMove={stopMove}
+            onSetCameraConfig={(num, cfg) => setCameraConfig(num, cfg)}
+          />
+        </main>
       )}
 
       {viewMode === 'switcher' && (
