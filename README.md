@@ -138,6 +138,21 @@ device stays silent, is in [`docs/dji-gimbal.md`](docs/dji-gimbal.md).
   drive the zoom to 0/25/50/75/100 %, read the focal length off the lens or
   the camera menu, *Record point*. Details in
   [`docs/camera-plan.md`](docs/camera-plan.md).
+- **Aim by frame** — on the PTZ panel, drag a 16:9 frame in the camera's live
+  picture: the bridge turns it into pan/tilt from the pose the head reports
+  and into a zoom position from the field of view per zoom (datasheet wide/tele
+  angles, sensor width + focal length, or measured by *Measure*: the head pans
+  a little at five zoom positions and the bridge measures how far the picture
+  moved). Heads that take a stream of positions glide there like a soft preset;
+  the robotic head plays its own eased keyframes; the others drive their
+  own absolute move. Needs a head that reports its pose and a stream address.
+- **Panorama map** — *Scan panorama* steps the head through a pan/tilt grid at
+  wide zoom, takes a picture at every stop and stitches an equirectangular map
+  from the known poses (no feature matching). It is stored in the config
+  directory (`panorama/cam-<n>.jpg`) and served at `/panorama/<n>.jpg`. A frame
+  drawn on the map drives the head there, also while it stands at full tele;
+  the live picture is shown in its place on the map. The map is a still —
+  scan again when the room has changed.
 
 ## Control room: switcher, video wall, site
 

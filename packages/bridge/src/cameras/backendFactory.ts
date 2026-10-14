@@ -107,6 +107,16 @@ export interface CameraConfig {
   homeHeading?: number;
   zoomTable?: { position: number; focalMm: number }[];
   unitsPerDeg?: number;
+  /**
+   * Field of view per zoom position (protocol/frameAim.ts) for "aim by frame"
+   * and the panorama scan: measured points (`fovTable`, from the automatic
+   * calibration), the datasheet's wide/tele values, or the sensor width that
+   * turns a focal length into an angle.
+   */
+  fovTable?: { position: number; hfovDeg: number }[];
+  hfovWideDeg?: number;
+  hfovTeleDeg?: number;
+  sensorWidthMm?: number;
   /** VISCA ueber RS-232: Port, Baudrate und Adresse in der Kette (1..7). */
   viscaSerialPath?: string; viscaBaudRate?: number; viscaAddress?: number;
   /** DJI-Gimbals: serieller Pfad (Osmo: CDC, Ronin: SLCAN-Stecker). */

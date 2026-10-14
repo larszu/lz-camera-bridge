@@ -49,6 +49,18 @@
  *       `storePreset`/`recallPreset` als `command` laufen ueber die Bruecke:
  *       wo der Kopf absolut positioniert und seine Pose meldet, wird die Pose
  *       gemerkt und weich angefahren; sonst das Preset der Kamera.
+ *   { type: 'aimFrame', cameraNumber, source: 'picture' | 'panorama', frame: {x,y,w,h}, aspect? }
+ *       Rahmen im Bild (0..1) → Pan/Tilt/Zoom (protocol/frameAim.ts). 'picture'
+ *       ist das Livebild an der Pose, die der Kopf JETZT meldet; 'panorama'
+ *       die gespeicherte Karte. Antwort an alle: { type: 'aim', cameraNumber, pose, hfovDeg, fit }.
+ *   { type: 'scanPanorama', cameraNumber, scan? } | { type: 'cancelPanorama', cameraNumber }
+ *       Raster abfahren, je Stopp ein Bild, zur Karte zusammensetzen
+ *       (panorama/). Fortschritt { type: 'panoramaProgress', cameraNumber,
+ *       step, index?, total?, message? }, danach { type: 'panorama', cameraNumber, meta }.
+ *   { type: 'getPanorama', cameraNumber }                  → { type: 'panorama', cameraNumber, meta | null }
+ *   { type: 'calibrateFov', cameraNumber, zooms? }
+ *       Bildwinkel je Zoomstellung messen (kleiner Schwenk, Bildverschiebung);
+ *       Fortschritt als { type: 'fovProgress', … }, Ergebnis in `fovTable`.
  *   { type: 'getSite' } | { type: 'importSite', site } | { type: 'setSiteName', name }
  *       Die Anlage als Datei (site/siteFile.ts): Kameras + Mischer. Wird
  *       bei eingeschalteter Persistenz (index.ts, Electron) auf Platte
@@ -63,6 +75,7 @@
  *                                     von LZ Scopes (multiview/ScopeStream.ts),
  *                                     ein eigener ffmpeg je offenem Scope.
  *   GET /site.json                    die Anlage zum Herunterladen.
+ *   GET /panorama/<cameraNumber>.jpg  die Panorama-Karte, `.json` ihre Ausdehnung.
  *
  * Server → Client messages:
  *   { type: 'cameras', cameras: [{ cameraNumber, config, connected,
@@ -119,6 +132,14 @@ import {
 } from './plan/cameraPlan.js';
 import { NUDGE_ACTIONS, NUDGE_REFUSAL_LABEL, resolveNudge } from './protocol/paintNudge.js';
 import { calibrateOffset, shotToPose, type Pose } from './protocol/ptzPose.js';
+import { aimFromMap, aimFromPicture, hfovAt, moveTimeMs, zoomForHfov, type FovModel, type Frame } from './protocol/frameAim.js';
+import { PanoramaStore } from './panorama/PanoramaStore.js';
+import { ffmpegCodec, jpegSize } from './panorama/jpegCodec.js';
+import {
+  DEFAULT_CALIBRATION_ZOOMS, isCancelled, mergeFovTable, runFovCalibration, runScan, scanSettings,
+  type JobDeps, type ScanSettings,
+} from './panorama/PanoramaScan.js';
+import { configDir } from './site/persistence.js';
 import {
   applyOrigins,
   applyConfirmations,
@@ -185,7 +206,8 @@ interface ClientMessage {
     | 'switcherCommand'
     | 'getSite' | 'importSite' | 'setSiteName'
     | 'readPose' | 'drivePlannedPreset' | 'storePlannedPresets' | 'calibratePose' | 'setPoseOffset'
-    | 'zoomTo' | 'captureZoomPoint' | 'clearZoomTable' | 'setPresetMotion';
+    | 'zoomTo' | 'captureZoomPoint' | 'clearZoomTable' | 'setPresetMotion'
+    | 'aimFrame' | 'scanPanorama' | 'cancelPanorama' | 'getPanorama' | 'calibrateFov';
   cameraNumber?: number;
   presetNumber?: number;
   presetNumbers?: number[];
@@ -195,6 +217,12 @@ interface ClientMessage {
   focalMm?: number;
   timeMs?: number;
   soft?: boolean;
+  /** aimFrame: where the frame was drawn, the frame itself (0..1) and the picture's width/height. */
+  source?: 'picture' | 'panorama';
+  frame?: Frame;
+  aspect?: number;
+  scan?: Partial<ScanSettings>;
+  zooms?: number[];
   config?: CameraConfig;
   switcherNumber?: number;
   switcherConfig?: SwitcherConfig;
@@ -246,6 +274,9 @@ export class BridgeServer {
   private readonly persistence: SitePersistence | null;
   private siteName = '';
   private readonly allowAnyStreamHost: boolean;
+  private readonly panoramas: PanoramaStore;
+  /** One head job (panorama scan, field-of-view calibration) per camera at a time. */
+  private readonly jobs = new Map<number, { kind: 'scan' | 'calibration'; cancel: boolean }>();
 
   /**
    * `companionPorts` ist da, damit eine zweite Bruecke im selben Prozess
@@ -264,6 +295,7 @@ export class BridgeServer {
     this.hub = new RtspHub();
     this.persistence = opts.persist ? new SitePersistence(opts.configDir) : null;
     this.allowAnyStreamHost = opts.allowAnyStreamHost ?? false;
+    this.panoramas = new PanoramaStore(opts.persist ? opts.configDir ?? configDir() : null);
     this.httpServer = createServer((req, res) => this.handleHttp(req, res));
     this.wss = new WebSocketServer({ noServer: true });
     this.wss.on('connection', (ws) => this.onClient(ws));
@@ -440,7 +472,32 @@ export class BridgeServer {
       case 'readPose': {
         const num = msg.cameraNumber ?? 0;
         const pose = await this.readPose(ws, num);
-        if (pose) ws.send(JSON.stringify({ type: 'pose', cameraNumber: num, pose }));
+        if (pose) ws.send(JSON.stringify({ type: 'pose', cameraNumber: num, pose, ...this.viewOf(num, pose) }));
+        break;
+      }
+
+      // ─── Aim by frame, panorama ─────────────────────────────────────────
+      case 'aimFrame':
+        await this.aimFrame(ws, msg.cameraNumber ?? 0, msg.source ?? 'picture', msg.frame, msg.aspect);
+        break;
+
+      case 'scanPanorama':
+        await this.scanPanorama(ws, msg.cameraNumber ?? 0, msg.scan);
+        break;
+
+      case 'calibrateFov':
+        await this.calibrateFov(ws, msg.cameraNumber ?? 0, msg.zooms);
+        break;
+
+      case 'cancelPanorama': {
+        const job = this.jobs.get(msg.cameraNumber ?? 0);
+        if (job) job.cancel = true;
+        break;
+      }
+
+      case 'getPanorama': {
+        const num = msg.cameraNumber ?? 0;
+        ws.send(JSON.stringify({ type: 'panorama', cameraNumber: num, meta: this.panoramas.get(num)?.meta ?? null }));
         break;
       }
 
@@ -1373,6 +1430,174 @@ export class BridgeServer {
     this.siteChanged();
   }
 
+  // ─── Aim by frame and the panorama map (#137, #138) ────────────────────────
+
+  /** Everything this slot knows about its field of view (protocol/frameAim.ts). */
+  private fovModel(slot: CameraSlot): FovModel {
+    const c = slot.config;
+    return {
+      fovTable: c.fovTable, hfovWideDeg: c.hfovWideDeg, hfovTeleDeg: c.hfovTeleDeg, sensorWidthMm: c.sensorWidthMm,
+      zoomTable: c.zoomTable, focalMinMm: slot.plan?.lens?.focalMinMm, focalMaxMm: slot.plan?.lens?.focalMaxMm,
+    };
+  }
+
+  /** The field of view at a pose's zoom, when it can be named — the panel places the live picture with it. */
+  private viewOf(num: number, pose: Pose): { hfovDeg?: number; fit?: string } {
+    const slot = this.cameras.get(num);
+    if (!slot || pose.zoom === undefined) return {};
+    const v = hfovAt(pose.zoom, this.fovModel(slot));
+    return v ? { hfovDeg: v.hfovDeg, fit: v.fit } : {};
+  }
+
+  private async aimFrame(ws: WebSocket, num: number, source: 'picture' | 'panorama', frame: Frame | undefined, aspect?: number): Promise<void> {
+    const slot = this.cameras.get(num);
+    if (!slot?.backend || !slot.connected) { this.sendError(ws, `Camera ${num} is not connected`, num); return; }
+    if (!frame) { this.sendError(ws, 'aimFrame needs a frame', num); return; }
+    const busy = this.jobs.get(num);
+    if (busy) { this.sendError(ws, `Camera ${num} is busy with a ${busy.kind}`, num); return; }
+    const model = this.fovModel(slot);
+    let current: Pose | null;
+    let aim: ReturnType<typeof aimFromMap>;
+    if (source === 'panorama') {
+      const pano = this.panoramas.get(num);
+      if (!pano) { this.sendError(ws, `Camera ${num} has no panorama yet — scan one first`, num); return; }
+      aim = aimFromMap(frame, pano.meta);
+      current = slot.backend.readPose ? await slot.backend.readPose().catch(() => null) : null;
+    } else {
+      // The picture shows the head where it stands NOW; the frame is measured from there.
+      current = await this.readPose(ws, num);
+      if (!current) return;
+      if (current.zoom === undefined) { this.sendError(ws, `Camera ${num} does not report its zoom position`, num); return; }
+      const view = hfovAt(current.zoom, model);
+      if (!view) { this.sendError(ws, `The field of view of camera ${num} is unknown — enter the wide/tele values or calibrate`, num); return; }
+      aim = aimFromPicture(frame, Number(aspect) > 0 ? Number(aspect) : 16 / 9, view.hfovDeg, current);
+    }
+    if (typeof aim === 'string') { this.sendError(ws, aim, num); return; }
+    const zoom = zoomForHfov(aim.hfovDeg, model);
+    const target = { pan: aim.pan, tilt: aim.tilt, ...(zoom ? { zoom: zoom.zoom } : {}) };
+    const timeMs = moveTimeMs(current ?? undefined, aim);
+    const backend = slot.backend;
+    if (current && backend.poseStream) {
+      // Same eased stream of absolute positions as a soft preset recall
+      // (motion/PresetGlide.ts): all axes start and land together.
+      const move = slot.config.presetMove ?? {};
+      const intervalMs = backend.poseStream.intervalMs;
+      const frames = glideFrames(current, target, {
+        timeMs, curve: move.curve ?? DEFAULT_GLIDE.curve, intervalMs, maxDegPerSec: move.maxDegPerSec ?? DEFAULT_GLIDE.maxDegPerSec,
+      });
+      slot.glide?.cancel();
+      slot.glide ??= new PresetGlide();
+      void slot.glide.run((c, p) => backend.handleRcpCommand(c, { ...p, cameraNumber: num }), frames, intervalMs).then((r) => {
+        if (r === 'failed') this.sendError(ws, `Camera ${num}: eased move to the frame broke off`, num);
+      });
+    } else {
+      // The robotic head plays `timeMs` as its own eased keyframes; the rest drive their absolute move.
+      await this.dispatchCommand(ws, num, 'ptzAbsolute', { ...target, timeMs });
+    }
+    this.broadcast({
+      type: 'aim', cameraNumber: num, pose: { pan: aim.pan, tilt: aim.tilt, ...(zoom ? { zoom: zoom.zoom } : {}) },
+      hfovDeg: aim.hfovDeg, fit: zoom?.fit ?? 'none',
+    });
+  }
+
+  /**
+   * A picture from the camera's stream that arrived at least `settleMs` from
+   * now — the head has stopped and the encoder delay has passed.
+   */
+  private grabFrame(num: number, settleMs: number, timeoutMs = 8000): Promise<Buffer> {
+    const url = this.cameras.get(num)?.config.streamUrl;
+    if (!url) return Promise.reject(new Error(`Camera ${num} has no stream address — this needs its picture`));
+    const refusal = checkStreamUrl(url, this.allowAnyStreamHost);
+    if (refusal) return Promise.reject(new Error(refusal));
+    return new Promise((resolve, reject) => {
+      const notBefore = Date.now() + settleMs;
+      let done = false;
+      let unsubscribe: (() => void) | null = null;
+      const finish = (err: Error | null, jpeg?: Buffer) => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        unsubscribe?.();
+        if (err) reject(err);
+        else resolve(jpeg!);
+      };
+      const timer = setTimeout(() => finish(new Error(`No picture from camera ${num}'s stream`)), settleMs + timeoutMs);
+      unsubscribe = this.hub.subscribe(url, {
+        frame: (jpeg) => { if (Date.now() >= notBefore) finish(null, jpeg); },
+        error: () => { /* the hub retries; the timeout decides */ },
+      });
+      if (done) unsubscribe();
+    });
+  }
+
+  /** Start a head job, or say why not. */
+  private startJob(ws: WebSocket, num: number, kind: 'scan' | 'calibration'): { slot: CameraSlot; deps: JobDeps; release: () => void } | null {
+    const slot = this.cameras.get(num);
+    const backend = slot?.backend;
+    if (!slot || !backend || !slot.connected) { this.sendError(ws, `Camera ${num} is not connected`, num); return null; }
+    const busy = this.jobs.get(num);
+    if (busy) { this.sendError(ws, `Camera ${num} is busy with a ${busy.kind}`, num); return null; }
+    const url = slot.config.streamUrl;
+    if (!url) { this.sendError(ws, `Camera ${num} has no stream address — this needs its picture`, num); return null; }
+    slot.glide?.cancel();
+    const job = { kind, cancel: false };
+    this.jobs.set(num, job);
+    // Hold the stream open for the whole job, so ffmpeg is not restarted between two pictures.
+    const keep = checkStreamUrl(url, this.allowAnyStreamHost) ? null : this.hub.subscribe(url, { frame: () => {}, error: () => {} });
+    const deps: JobDeps = {
+      drive: (p) => backend.handleRcpCommand('ptzAbsolute', {
+        pan: p.pan, tilt: p.tilt, ...(p.zoom !== undefined ? { zoom: p.zoom } : {}), timeMs: 800, cameraNumber: num,
+      }),
+      readPose: backend.readPose ? () => backend.readPose!() : undefined,
+      grab: (ms) => this.grabFrame(num, ms),
+      codec: ffmpegCodec,
+      cancelled: () => job.cancel || !slot.connected,
+    };
+    return { slot, deps, release: () => { this.jobs.delete(num); keep?.(); } };
+  }
+
+  private async scanPanorama(ws: WebSocket, num: number, raw?: Partial<ScanSettings>): Promise<void> {
+    const job = this.startJob(ws, num, 'scan');
+    if (!job) return;
+    const progress = (m: Record<string, unknown>) => this.broadcast({ type: 'panoramaProgress', cameraNumber: num, ...m });
+    const last = this.hub.lastFrame(job.slot.config.streamUrl!);
+    const size = last ? jpegSize(last) : null;
+    try {
+      progress({ step: 'starting' });
+      const result = await runScan(num, scanSettings(raw), this.fovModel(job.slot), job.deps,
+        (p) => progress({ step: 'picture', ...p }), size ? size.width / size.height : 16 / 9);
+      this.panoramas.save(result.meta, result.jpeg);
+      progress({ step: 'done', message: `${result.meta.pictures} pictures` });
+      this.broadcast({ type: 'panorama', cameraNumber: num, meta: result.meta });
+    } catch (err) {
+      progress({ step: isCancelled(err) ? 'cancelled' : 'failed', message: (err as Error).message });
+    } finally {
+      job.release();
+    }
+  }
+
+  private async calibrateFov(ws: WebSocket, num: number, zooms?: number[]): Promise<void> {
+    const job = this.startJob(ws, num, 'calibration');
+    if (!job) return;
+    const progress = (m: Record<string, unknown>) => this.broadcast({ type: 'fovProgress', cameraNumber: num, ...m });
+    const list = Array.isArray(zooms) && zooms.length ? zooms.map(Number).filter(Number.isFinite) : DEFAULT_CALIBRATION_ZOOMS;
+    try {
+      progress({ step: 'starting', total: list.length });
+      const points = await runFovCalibration(list, this.fovModel(job.slot), job.deps, 1200,
+        (r, index, total) => progress({ step: 'point', index, total, ...r }));
+      if (points.length) {
+        job.slot.config.fovTable = mergeFovTable(job.slot.config.fovTable, points);
+        this.broadcastCameras();
+        this.siteChanged();
+      }
+      progress({ step: points.length ? 'done' : 'failed', message: `${points.length} of ${list.length} zoom positions measured` });
+    } catch (err) {
+      progress({ step: isCancelled(err) ? 'cancelled' : 'failed', message: (err as Error).message });
+    } finally {
+      job.release();
+    }
+  }
+
   // ─── Site ─────────────────────────────────────────────────────────────────
 
   currentSite(): SiteFile {
@@ -1469,6 +1694,21 @@ export class BridgeServer {
         'Cache-Control': 'no-store',
       });
       res.end(JSON.stringify(this.currentSite(), null, 2));
+      return;
+    }
+    const pano = /^\/panorama\/(\d+)\.(jpg|json)$/.exec(url.pathname);
+    if (pano) {
+      const entry = this.panoramas.get(Number(pano[1]));
+      if (!entry) {
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        res.end(`Camera ${pano[1]} has no panorama yet`);
+      } else if (pano[2] === 'jpg') {
+        res.writeHead(200, { 'Content-Type': 'image/jpeg', 'Cache-Control': 'no-cache' });
+        res.end(entry.jpeg);
+      } else {
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' });
+        res.end(JSON.stringify(entry.meta));
+      }
       return;
     }
     const video = /^\/video\/(\d+)\.(mjpeg|jpg)$/.exec(url.pathname);
