@@ -278,7 +278,6 @@
 .scopes--full { flex: 1; min-height: 0; }
 .scopes--full .scopes__view { flex: 1; min-height: 0; aspect-ratio: auto; }
 
-<<<<<<< HEAD
 /* ─── Aim by frame + panorama (AimPanel.tsx) ─────────────────────────── */
 .aim__tabs { display: inline-flex; gap: 4px; }
 .aim__tab--on { background: var(--surface-2); color: var(--text-strong); border-color: var(--text-strong); }
@@ -301,7 +300,8 @@
 .aim__fov summary { cursor: pointer; min-height: 32px; display: flex; align-items: center; }
 @media (pointer: coarse) {
   .aim__tabs .btn { min-height: 44px; }
-=======
+}
+
 /* ─── Studio shots: sets, seating chart, moves ──────────────────────────────
    One big button per recall; the button IS the main action of the view.
    Editing sits below, behind "Edit", and never in the way of a recall. */
@@ -333,6 +333,23 @@
   text-transform: uppercase; color: var(--text-muted); border-bottom: 1px solid var(--border);
   padding-bottom: 4px; margin-bottom: 8px;
 }
+/* Room plan: seats anywhere, stage on top. Seats are centred on their spot. */
+.room-plan {
+  position: relative; width: 100%; aspect-ratio: 16 / 10; min-height: 260px; max-height: 70vh;
+  background: var(--bg); border: 1px solid var(--border); overflow: hidden;
+  user-select: none;
+}
+.room-plan--edit { touch-action: none; }
+.room-plan__stage {
+  position: absolute; left: 20%; right: 20%; top: 0; height: 9%; min-height: 20px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: var(--fs-kicker); font-weight: 700; letter-spacing: var(--track-kicker); text-transform: uppercase;
+  color: var(--text-muted); background: var(--surface-2); border: 1px solid var(--border); border-top: 0;
+  pointer-events: none;
+}
+.room-plan__floor { position: absolute; inset: 22px 44px; }
+.room-plan__seat { position: absolute; transform: translate(-50%, -50%); max-width: 96px; }
+.room-plan__seat--drag { z-index: 2; outline: 2px solid var(--accent); cursor: grabbing; }
 .error-line.held-line { border-left-color: var(--warning); }
 .shot-ref { display: grid; grid-template-columns: minmax(90px, 1fr) minmax(120px, 1fr) minmax(90px, 1.4fr) auto; gap: 6px; align-items: center; }
 .shot-ref--step { grid-template-columns: 56px minmax(110px, 1fr) minmax(80px, 1fr) 72px 72px auto; }
@@ -341,5 +358,4 @@
 @media (max-width: 560px) {
   .shot-ref, .shot-ref--step { grid-template-columns: 1fr 1fr; }
   .shot-ref__lead { grid-column: 1 / -1; }
->>>>>>> 4f9eca3 (WIP Studio-Shots)
 }

@@ -15,9 +15,9 @@ import WebSocket from 'ws';
 
 import { BridgeServer } from '../src/BridgeServer.js';
 import {
-  heldByOnAir, moveDurationMs, normaliseStudioShots, pickSeatShot,
+  heldByOnAir, moveDurationMs, normaliseStudioShots, pickSeatShot, seatLabel, seatPosition,
 } from '../src/motion/studioShots.js';
-import { parseSite } from '../src/site/siteFile.js';
+import { emptySite, parseSite, serialiseSite } from '../src/site/siteFile.js';
 
 test('normalise: broken entries are dropped, times clamped, seats stay inside the chart', () => {
   const s = normaliseStudioShots({
@@ -44,6 +44,39 @@ test('normalise: broken entries are dropped, times clamped, seats stay inside th
   assert.deepEqual(s.moves, [{ id: 'm', name: 'Push', cameraNumber: 2, steps: [{ preset: 1, timeMs: 2000 }, { preset: 2, source: 'plan', holdMs: 500 }] }]);
   assert.equal(moveDurationMs(s.moves[0], 1000), 2000 + 1000 + 500);
   assert.deepEqual(normaliseStudioShots(undefined).sets, []);
+});
+
+test('free seats: a spot on the room plan replaces the grid cell; old grid charts stay as they were', () => {
+  const s = normaliseStudioShots({
+    seats: { rows: 1, cols: 2, layout: 'free', seats: [
+      { id: 'a', row: 0, col: 0, x: 20, y: 30, shots: [{ cameraNumber: 1, preset: 1 }] },
+      { id: 'b', x: 140, y: '-5', label: 'Lectern', shots: [] },
+      { id: 'c', row: 7, col: 0, x: 50.04, y: 50, shots: [] },
+      { id: 'd', x: 'left', y: 10, shots: [] },
+      { id: 'e', row: 0, col: 1, shots: [] },
+    ] },
+  });
+  assert.equal(s.seats.layout, 'free');
+  assert.deepEqual(s.seats.seats, [
+    { id: 'a', row: 0, col: 0, x: 20, y: 30, shots: [{ cameraNumber: 1, preset: 1 }] },
+    { id: 'b', x: 100, y: 0, shots: [], label: 'Lectern' },
+    { id: 'c', x: 50, y: 50, shots: [] },
+    { id: 'e', row: 0, col: 1, shots: [] },
+  ]);
+  // Grid seat without a spot: centre of its cell, below the stage strip.
+  assert.deepEqual(seatPosition(s.seats.seats[3], s.seats), { x: 75, y: 56 });
+  assert.deepEqual(seatPosition(s.seats.seats[0], s.seats), { x: 20, y: 30 });
+  assert.equal(seatLabel(s.seats.seats[1]), 'Lectern');
+  assert.equal(seatLabel(s.seats.seats[2]), 'Seat c');
+  assert.equal(seatLabel(s.seats.seats[3]), 'Row 1, seat 2');
+
+  // An old chart (no layout, no x/y) comes back unchanged — no new keys.
+  const old = { rows: 1, cols: 1, seats: [{ id: 's', row: 0, col: 0, shots: [] }] };
+  assert.deepEqual(normaliseStudioShots({ seats: old }).seats, old);
+
+  // Site file round trip keeps layout and spots.
+  const site = { ...emptySite('Room'), shots: s };
+  assert.deepEqual(parseSite(serialiseSite(site)).shots?.seats, s.seats);
 });
 
 test('on-air lock: on by default, off only on an explicit false, force overrides', () => {

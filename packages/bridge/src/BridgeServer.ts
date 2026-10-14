@@ -146,7 +146,7 @@ import { EasedDrive, isRamped } from './motion/EasedDrive.js';
 import { DEFAULT_RAMP } from './motion/Easing.js';
 import { DEFAULT_GLIDE, PresetGlide, clampGlideTime, glideFrames, type BridgePreset } from './motion/PresetGlide.js';
 import {
-  clampTime, emptyStudioShots, heldByOnAir, normaliseStudioShots, pickSeatShot,
+  clampTime, emptyStudioShots, heldByOnAir, normaliseStudioShots, pickSeatShot, seatLabel,
   type RecallMode, type ShotRef, type ShotSource, type StudioShots,
 } from './motion/studioShots.js';
 import {
@@ -1660,7 +1660,7 @@ export class BridgeServer {
       cameraNumber: c.num, connected: c.connected, onAir: this.onAir(c.num), tallyProtect: c.config.tallyProtect,
     }));
     const pick = pickSeatShot(seat, facts);
-    const label = seat.label ?? `Row ${seat.row + 1}, seat ${seat.col + 1}`;
+    const label = seatLabel(seat);
     if (!pick) { this.sendError(ws, `${label}: no connected camera has a shot for this seat`); return; }
     if (pick.held && !force) { this.announceHeld([pick.shot.cameraNumber], label, { type: 'recallSeat', id }); return; }
     const r = await this.recallShot(ws, pick.shot, { mode: this.studioShots.defaultMode, timeMs: this.studioShots.defaultTimeMs, force: true });

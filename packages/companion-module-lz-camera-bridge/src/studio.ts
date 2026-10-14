@@ -26,7 +26,7 @@ export interface StudioShots {
   defaultMode: RecallMode;
   defaultTimeMs: number;
   sets: Array<{ id: string; name: string; shots: ShotRef[]; mode?: RecallMode; timeMs?: number }>;
-  seats: { rows: number; cols: number; seats: Array<{ id: string; label?: string; row: number; col: number; shots: ShotRef[] }> };
+  seats: { rows: number; cols: number; layout?: 'grid' | 'free'; seats: Array<{ id: string; label?: string; row?: number; col?: number; x?: number; y?: number; shots: ShotRef[] }> };
   moves: Array<{ id: string; name: string; cameraNumber: number; steps: Array<{ preset: number; source?: ShotSource; timeMs?: number; holdMs?: number }> }>;
 }
 
@@ -364,8 +364,11 @@ export function setChoices(s: StudioState): Choice[] {
   return (s.shots?.sets ?? []).map((x) => ({ id: x.id, label: x.name }));
 }
 
-export function seatLabel(seat: { label?: string; row: number; col: number }): string {
-  return seat.label ?? `Row ${seat.row + 1}, seat ${seat.col + 1}`;
+/** A seat placed only on the room plan has no grid cell. */
+export function seatLabel(seat: { id: string; label?: string; row?: number; col?: number }): string {
+  if (seat.label) return seat.label;
+  if (seat.row !== undefined && seat.col !== undefined) return `Row ${seat.row + 1}, seat ${seat.col + 1}`;
+  return `Seat ${seat.id}`;
 }
 
 export function seatChoices(s: StudioState): Choice[] {
