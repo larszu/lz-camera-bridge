@@ -57,7 +57,8 @@ jobs:
 
       # Nutzer-Rueckmeldung 2026-09-07: "die ui ist nicht konsistent. lege
       # globale ui regeln fest die fuer alle repos gelten." Die Regeln stehen
-      # in ADR-007 der av-planner-suite; dieser Check haelt sie hier — fuer
+      # in ADR-007 (seit 2026-10-13 in der lz-planner-suite: Hell + Dunkel,
+      # Rundung/Schatten nur ueber Tokens); dieser Check haelt sie hier — fuer
       # das Dashboard. Die Nachbauten der Sony-Steuersoftware und der
       # AW-RP150 bleiben ausdruecklich draussen.
       - name: Oberflaechen-Regeln (ADR-007)

@@ -1,6 +1,17 @@
 /* ── AW-RP150-style touch PTZ panel ─────────────────────────────────── */
 
+/* A replica keeps its own instrument colours in both app themes: the
+   dashboard's light-mode --text would otherwise land dark-on-dark here. */
 .ptz-panel {
+  --panel-bg: #1b1d22;
+  --border: #33363d;
+  --text: #e8e8e8;
+  --text-muted: #9aa0a6;
+  --accent: #e8e8e8;
+  --surface-1: #1b1d22;
+  --surface-2: #33363d;
+  --line-strong: #4a4d55;
+  color-scheme: dark;
   background: var(--panel-bg, #1b1d22);
   border: 1px solid var(--border, #33363d);
   border-radius: 10px;
