@@ -42,7 +42,7 @@ import { createConnection } from 'net';
 import { CameraState } from '../protocol/CcuClient.js';
 import {
   parseSonyCgiPose, sonyCgiAbsolutePanTilt, sonyCgiAbsoluteZoom,
-  viscaAbsolutePanTilt, viscaZoomDirect, VISCA_INQ_PAN_TILT, VISCA_INQ_ZOOM,
+  viscaAbsolutePanTilt, viscaZoomDirect, VISCA_INQ_PAN_TILT, VISCA_INQ_ZOOM, VISCA_INQ_FOCUS, parseViscaFocus,
   parseViscaPanTilt, parseViscaZoom, VISCA_UNITS_PER_DEG, type Pose,
 } from '../protocol/ptzPose.js';
 
@@ -316,7 +316,7 @@ export class HttpCgiClient extends EventEmitter {
   }
 
   /** Where the head is. Sony: `inquiry.cgi?inq=ptzf`; Vissonic: VISCA inquiries over TCP. */
-  async readPose(): Promise<Pose> {
+  async readPose(opts: { focus?: boolean } = {}): Promise<Pose> {
     if (this.family === 'sony') {
       const pose = parseSonyCgiPose(await this.request('/command/inquiry.cgi?inq=ptzf'), this.unitsPerDeg);
       if (!pose) throw new Error('Sony CGI: AbsolutePTZF missing in the answer');
@@ -328,7 +328,13 @@ export class HttpCgiClient extends EventEmitter {
     try {
       zoom = parseViscaZoom(Buffer.from(await viscaTcp(this.host, this.viscaPort, hex(VISCA_INQ_ZOOM), 3000), 'hex')) ?? undefined;
     } catch { /* pose without zoom */ }
-    return { ...pt, ...(zoom !== undefined ? { zoom } : {}) };
+    let focus: number | undefined;
+    if (opts.focus) {
+      try {
+        focus = parseViscaFocus(Buffer.from(await viscaTcp(this.host, this.viscaPort, hex(VISCA_INQ_FOCUS), 3000), 'hex')) ?? undefined;
+      } catch { /* focus stays unknown */ }
+    }
+    return { ...pt, ...(zoom !== undefined ? { zoom } : {}), ...(focus !== undefined ? { focus } : {}) };
   }
 
   /** Sony: read the white balance gains back. Emits `stateChanged` only with an answer. */

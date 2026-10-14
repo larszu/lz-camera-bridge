@@ -215,11 +215,20 @@ export class RoboticHeadClient extends EventEmitter implements GenericCameraClie
     });
   }
 
-  /** Pan/tilt in degrees, zoom 0..1 (0 = wide end of the 0..65535 range). */
-  async readPose(): Promise<{ pan: number; tilt: number; zoom: number }> {
+  /**
+   * Pan/tilt in degrees, zoom and focus 0..1 of their 0..65535 counters
+   * (0 = wide end). `column`: the raw counts of the elevation column, from the
+   * aux position the column axis drives (`x` or `y`); absent for `Q`, which
+   * the position reply does not carry.
+   */
+  async readPose(): Promise<{ pan: number; tilt: number; zoom: number; focus: number; column?: number }> {
     const p = await this.nextPosition();
     const k = this.opts.countsPerDegree;
-    return { pan: p.pan / k, tilt: p.tilt / k, zoom: p.zoom / 65535 };
+    const col = this.opts.columnAxis === 'X' ? p.x : this.opts.columnAxis === 'Y' ? p.y : undefined;
+    return {
+      pan: p.pan / k, tilt: p.tilt / k, zoom: p.zoom / 65535, focus: p.focus / 65535,
+      ...(col !== undefined ? { column: col } : {}),
+    };
   }
 
   /** Takes `timeMs` with `recallPreset` and `ptzAbsolute` and plays the eased move itself. */

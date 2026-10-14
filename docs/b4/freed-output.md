@@ -3,6 +3,10 @@
 Tracking data leaves the bridge as FreeD D1 datagrams over UDP. FreeD comes
 from BBC R&D and is read by, among others, Unreal Engine through Live Link.
 
+This page covers the encoder and the sender. Streaming the pose of PTZ and
+robotic-head cameras, with targets, rate and per-camera settings in the panel,
+is described in [`docs/freed-tracking.md`](../freed-tracking.md).
+
 Two files, deliberately separate:
 
 | File | Does | Does not |
@@ -60,6 +64,12 @@ in.
 
 A rate that is not a positive finite number, and a port outside 1..65535, are
 rejected instead of repaired.
+
+Instead of `host`/`port`, `targets: [{ host, port }, …]` sends every packet to
+several receivers, and `sampleAt(now)` draws the sample at tick time (used by
+the pose output to interpolate between slow reads). The panel pre-fills port
+40000 for a new target because that is Unreal's FreeD default — a suggestion
+in the UI, not a default of the sender.
 
 ### A tick with nothing to say sends nothing
 

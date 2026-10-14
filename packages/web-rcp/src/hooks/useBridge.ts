@@ -11,6 +11,7 @@ import type {
   CameraState, CameraStatesByNumber, BridgeConfig, WiznetDevice,
   SonyUsbDevice, SonyMncDevice, SonyNetDevice, HidDevice, TallyState,
   SwitcherSlot, SwitcherState, SwitcherConfig, CameraTally, SiteInfo,
+  FreeDInfo, FreeDSiteConfig, FreeDCameraConfig,
 } from '../types.ts';
 import type {
   CameraConfirmationsByNumber,
@@ -153,6 +154,8 @@ export interface CameraSlot {
   freshnessLimits?: { agingAfterMs: number; staleAfterMs: number } | null;
   /** Wie ein Preset-Abruf faehrt: weich ueber die Bruecke oder das Preset der Kamera. Fertig von der Bruecke. */
   presetRecall?: 'eased' | 'camera';
+  /** The camera reports its pose and can feed the FreeD output. Computed by the bridge. */
+  freedCapable?: boolean;
   /** Die geplante Kamera auf diesem Slot, samt Beleg. */
   plan?: PlanCamera;
   planMatchedBy?: PlanMatchedBy;
@@ -193,6 +196,7 @@ export function useBridge() {
   const [switchers, setSwitchers] = useState<Record<number, SwitcherSlot>>({});
   const [cameraTally, setCameraTally] = useState<CameraTally>({});
   const [site, setSite] = useState<SiteInfo>({ name: '', path: null, cameras: 0, switchers: 0 });
+  const [freed, setFreeDInfo] = useState<FreeDInfo>({ config: null, status: { active: false, cameras: [] } });
   const [poses, setPoses] = useState<Record<number, Pose>>({});
   const [plannedProgress, setPlannedProgress] = useState<Record<number, PlannedProgress>>({});
   const [panoramas, setPanoramas] = useState<Record<number, PanoramaMeta | null>>({});
@@ -382,6 +386,9 @@ export function useBridge() {
             setSite({ name: String(msg.name ?? ''), path: (msg.path as string | null) ?? null, cameras: s.cameras.length, switchers: s.switchers.length });
             break;
           }
+          case 'freed':
+            setFreeDInfo({ config: (msg.config as FreeDSiteConfig | null) ?? null, status: msg.status as FreeDInfo['status'] });
+            break;
         }
       } catch { /* ignore malformed */ }
     };
@@ -451,6 +458,9 @@ export function useBridge() {
     send('switcherCommand', { switcherNumber, cmd, params }), [send]);
   const importSite = useCallback((text: string) => send('importSite', { site: text }), [send]);
   const setSiteName = useCallback((name: string) => send('setSiteName', { name }), [send]);
+  const setFreeD = useCallback((cfg: FreeDSiteConfig | null) => send('setFreeD', { freed: cfg }), [send]);
+  const setCameraFreeD = useCallback((cameraNumber: number, cfg: FreeDCameraConfig | null) =>
+    send('setCameraFreeD', { cameraNumber, freed: cfg }), [send]);
   const clearError = useCallback(() => setErrorMsg(null), []);
   const readPose = useCallback((cameraNumber: number) => send('readPose', { cameraNumber }), [send]);
   const drivePlannedPreset = useCallback((cameraNumber: number, presetNumber: number) => send('drivePlannedPreset', { cameraNumber, presetNumber }), [send]);
@@ -502,6 +512,7 @@ export function useBridge() {
     matchCameraPlan, applyCameraPlan, assignPlanCamera,
     setSwitcherConfig, connectSwitcher, disconnectSwitcher, removeSwitcher, switcherCommand,
     importSite, setSiteName, clearError,
+    freed, setFreeD, setCameraFreeD,
     poses, plannedProgress, readPose, drivePlannedPreset, storePlannedPresets, calibratePose, setPoseOffset,
     zoomTo, captureZoomPoint, clearZoomTable, setPresetMotion,
     panoramas, panoramaProgress, fovProgress, aimFrame, scanPanorama, cancelPanorama, getPanorama, calibrateFov,

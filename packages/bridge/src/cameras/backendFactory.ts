@@ -28,6 +28,7 @@ import { DjiOsmoClient } from './DjiOsmoClient.js';
 import { DjiRoninClient } from './DjiRoninClient.js';
 import type { EaseCurve } from '../motion/Easing.js';
 import type { BridgePreset } from '../motion/PresetGlide.js';
+import type { FreeDCameraConfig } from '../protocol/freeDPose.js';
 
 export type ConnectionMode =
   | 'tcp' | 'serial' | 'lumix-http' | 'sony-usb' | 'blackmagic' | 'sony-mnc' | 'canon-ccapi'
@@ -92,6 +93,8 @@ export interface CameraConfig {
   presetMove?: { timeMs?: number; curve?: EaseCurve; maxDegPerSec?: number };
   /** Robotic head: protocol variant, column axis letter, counts per degree, axis inversion, preset time. */
   roboticHead?: Omit<RoboticHeadOptions, 'dataDir'>;
+  /** FreeD tracking out of this camera's pose (protocol/freeDPose.ts). Needs a path in POSE_READ_MODES. */
+  freed?: FreeDCameraConfig;
   /** A name for the panel: "Stage left" instead of a bare number. The plan label wins when a plan is matched. */
   label?: string;
   /** Which switcher input carries this camera's picture (1-based). 0/empty: none. Drives the per-camera tally. */
@@ -145,7 +148,7 @@ export interface CameraBackend extends EventEmitter {
    * position inquiry have it; the bridge refuses a calibration on the others
    * with a sentence instead of guessing.
    */
-  readPose?(): Promise<{ pan: number; tilt: number; zoom?: number }>;
+  readPose?(opts?: { focus?: boolean }): Promise<{ pan: number; tilt: number; zoom?: number; focus?: number; column?: number }>;
   /**
    * Present when the head takes a stream of `ptzAbsolute` frames (with a
    * `speed` 0..1 and `stream: true`) — the interval is the head's, not ours.
@@ -168,6 +171,15 @@ export interface CameraBackend extends EventEmitter {
  * together. Sent to the panel per camera as `presetRecall`.
  */
 export const EASED_PRESET_MODES: readonly ConnectionMode[] = [
+  'visca', 'visca-serial', 'panasonic-ptz', 'http-cgi', 'birddog', 'robotic-head', 'demo',
+];
+
+/**
+ * The paths whose backend reports a pose (`readPose`) — the cameras that can
+ * feed the FreeD tracking output (transport/FreeDOutput.ts). Sent to the
+ * panel per camera as `freedCapable`; a test holds it against the backends.
+ */
+export const POSE_READ_MODES: readonly ConnectionMode[] = [
   'visca', 'visca-serial', 'panasonic-ptz', 'http-cgi', 'birddog', 'robotic-head', 'demo',
 ];
 

@@ -42,9 +42,19 @@ import { encodeFreeD, type FreeDSample } from '../protocol/FreeD.js';
 
 export interface FreeDSenderOptions {
   /** Destination host or IPv4 address. Unicast, broadcast or multicast. */
-  host: string;
+  host?: string;
   /** Destination UDP port. Required — see the module comment. */
-  port: number;
+  port?: number;
+  /**
+   * Several destinations instead of `host`/`port`: every packet goes to each.
+   * One of the two forms is required.
+   */
+  targets?: readonly { host: string; port: number }[];
+  /**
+   * Draw the sample at tick time instead of using the stored one — for an
+   * output that interpolates between slow reads. `null` counts as no sample.
+   */
+  sampleAt?: (nowMs: number) => FreeDSample | null;
   /** Packets per second. Required — see the module comment. */
   rateHz: number;
   /**
@@ -64,7 +74,7 @@ export interface FreeDSenderOptions {
 export type SendeAbbruch = 'no-sample' | 'incomplete' | 'not-open';
 
 export interface FreeDSenderStats {
-  /** Datagrams handed to the socket. */
+  /** Packets handed to the socket (one datagram per target each). */
   sent: number;
   /** Ticks skipped because the sample was incomplete. */
   skippedIncomplete: number;
@@ -96,10 +106,14 @@ export interface FreeDSender {
 }
 
 export function createFreeDSender(options: FreeDSenderOptions): FreeDSender {
-  const { host, port, rateHz } = options;
-  if (!host) throw new Error('FreeD sender: host is required');
-  if (!Number.isInteger(port) || port < 1 || port > 65535) {
-    throw new Error(`FreeD sender: port must be 1..65535, got ${String(port)}`);
+  const { rateHz } = options;
+  const targets = options.targets ?? [{ host: options.host ?? '', port: options.port as number }];
+  if (targets.length === 0) throw new Error('FreeD sender: at least one target is required');
+  for (const { host, port } of targets) {
+    if (!host) throw new Error('FreeD sender: host is required');
+    if (!Number.isInteger(port) || port < 1 || port > 65535) {
+      throw new Error(`FreeD sender: port must be 1..65535, got ${String(port)}`);
+    }
   }
   if (!Number.isFinite(rateHz) || rateHz <= 0) {
     throw new Error(`FreeD sender: rateHz must be a positive number, got ${String(rateHz)}`);
@@ -125,11 +139,12 @@ export function createFreeDSender(options: FreeDSenderOptions): FreeDSender {
   const tick = (
     afterSend?: () => void,
   ): { ok: true } | { ok: false; reason: SendeAbbruch } => {
-    if (!sample) {
+    const current = options.sampleAt ? options.sampleAt(Date.now()) : sample;
+    if (!current) {
       stats.skippedNoSample += 1;
       return { ok: false, reason: 'no-sample' };
     }
-    const encoded = encodeFreeD(sample);
+    const encoded = encodeFreeD(current);
     if (!encoded.ok) {
       stats.skippedIncomplete += 1;
       options.onIncomplete?.(encoded.missing);
@@ -140,10 +155,14 @@ export function createFreeDSender(options: FreeDSenderOptions): FreeDSender {
       fail(new Error('FreeD sender: socket is not open'));
       return { ok: false, reason: 'not-open' };
     }
-    sock.send(encoded.packet, port, host, (err) => {
-      if (err) fail(err);
-      afterSend?.();
-    });
+    let pending = targets.length;
+    for (const { host, port } of targets) {
+      sock.send(encoded.packet, port, host, (err) => {
+        if (err) fail(err);
+        pending -= 1;
+        if (pending === 0) afterSend?.();
+      });
+    }
     stats.sent += 1;
     return { ok: true };
   };
@@ -156,6 +175,8 @@ export function createFreeDSender(options: FreeDSenderOptions): FreeDSender {
       if (timer) return;
       socket = dgram.createSocket('udp4');
       socket.on('error', fail);
+      // Broadcast targets (x.x.x.255) need the flag; it is harmless for unicast.
+      socket.bind(0, () => { try { socket?.setBroadcast(true); } catch { /* closed meanwhile */ } });
       timer = setInterval(tick, intervalMs);
       // The tick must not hold the process open: a bridge that is otherwise
       // finished should exit, not linger because tracking is still ticking.

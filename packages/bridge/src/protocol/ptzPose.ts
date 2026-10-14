@@ -38,6 +38,14 @@ export interface Pose {
   tilt: number;
   /** 0..1 of the head's zoom range; undefined when unknown. */
   zoom?: number;
+  /**
+   * 0..1 of the focus counter, where the camera reports one. A raw position
+   * scaled to the counter's range, NOT a distance — the curve to metres is per
+   * lens. Only asked for when a caller wants it (FreeD output).
+   */
+  focus?: number;
+  /** Raw counts of an elevation column, where the head reports one. */
+  column?: number;
 }
 
 export interface PoseOffset {
@@ -164,6 +172,10 @@ export function viscaZoomDirect(zoom01: number): number[] {
 
 export const VISCA_INQ_PAN_TILT = [0x81, 0x09, 0x06, 0x12, 0xff];
 export const VISCA_INQ_ZOOM = [0x81, 0x09, 0x04, 0x47, 0xff];
+/** CAM_FocusPosInq: answer y0 50 0p 0q 0r 0s FF. */
+export const VISCA_INQ_FOCUS = [0x81, 0x09, 0x04, 0x48, 0xff];
+/** The focus counter is 16 bits; how much of it a lens uses is the lens's business. */
+export const VISCA_FOCUS_MAX = 0xffff;
 
 /** Reply y0 50 0w 0w 0w 0w 0z 0z 0z 0z FF → degrees. Null when the frame is not that reply. */
 export function parseViscaPanTilt(frame: Uint8Array | number[], unitsPerDeg = VISCA_UNITS_PER_DEG): { pan: number; tilt: number } | null {
@@ -184,6 +196,15 @@ export function parseViscaZoom(frame: Uint8Array | number[]): number | null {
   return clamp01(raw / VISCA_ZOOM_MAX);
 }
 
+/** Reply y0 50 0p 0q 0r 0s FF → 0..1 of the 16-bit focus counter. */
+export function parseViscaFocus(frame: Uint8Array | number[]): number | null {
+  const b = Array.from(frame);
+  const i = b.findIndex((x, k) => (x & 0xf0) === 0x90 && b[k + 1] === 0x50 && b.length >= k + 7 && b[k + 6] === 0xff);
+  if (i < 0) return null;
+  const raw = ((b[i + 2] & 0xf) << 12) | ((b[i + 3] & 0xf) << 8) | ((b[i + 4] & 0xf) << 4) | (b[i + 5] & 0xf);
+  return clamp01(raw / VISCA_FOCUS_MAX);
+}
+
 // ── Sony CGI (SRG/BRC) ────────────────────────────────────────────────────────
 
 /** `ptzf.cgi?AbsolutePanTilt=<pan>,<tilt>,<speed>` — 4-digit hex, VISCA units. */
@@ -195,12 +216,13 @@ export function sonyCgiAbsoluteZoom(zoom01: number): string {
 }
 /** `inquiry.cgi?inq=ptzf` → `AbsolutePTZF=pppp,tttt,zzzz,ffff`. */
 export function parseSonyCgiPose(body: string, unitsPerDeg = VISCA_UNITS_PER_DEG): Pose | null {
-  const m = /AbsolutePTZF=([0-9a-fA-F]{1,4}),([0-9a-fA-F]{1,4}),([0-9a-fA-F]{1,4})/.exec(body);
+  const m = /AbsolutePTZF=([0-9a-fA-F]{1,4}),([0-9a-fA-F]{1,4}),([0-9a-fA-F]{1,4})(?:,([0-9a-fA-F]{1,4}))?/.exec(body);
   if (!m) return null;
   return {
     pan: round1(signed16(parseInt(m[1], 16)) / unitsPerDeg),
     tilt: round1(signed16(parseInt(m[2], 16)) / unitsPerDeg),
     zoom: clamp01(parseInt(m[3], 16) / VISCA_ZOOM_MAX),
+    ...(m[4] ? { focus: clamp01(parseInt(m[4], 16) / VISCA_FOCUS_MAX) } : {}),
   };
 }
 
@@ -269,9 +291,13 @@ export function parseAwPanTilt(body: string): { pan: number; tilt: number } | nu
 }
 /** Reply `pTV[pan 4][tilt 4][zoom 3][focus 3][iris 3]` (UE150/UE100/UE80). */
 export function parseAwPtv(body: string): Pose | null {
-  const m = /pTV([0-9a-fA-F]{4})([0-9a-fA-F]{4})([0-9a-fA-F]{3})/.exec(body);
+  const m = /pTV([0-9a-fA-F]{4})([0-9a-fA-F]{4})([0-9a-fA-F]{3})([0-9a-fA-F]{3})?/.exec(body);
   if (!m) return null;
-  return { pan: awPan(parseInt(m[1], 16)), tilt: awTilt(parseInt(m[2], 16)), zoom: awZoom(parseInt(m[3], 16)) };
+  return {
+    pan: awPan(parseInt(m[1], 16)), tilt: awTilt(parseInt(m[2], 16)), zoom: awZoom(parseInt(m[3], 16)),
+    // Focus shares the 0x555..0xFFF span of `#AXF`.
+    ...(m[4] ? { focus: awZoom(parseInt(m[4], 16)) } : {}),
+  };
 }
 export function parseAwZoom(body: string): number | null {
   const m = /(?:a[xg]z|gz)([0-9a-fA-F]{3})/i.exec(body);
