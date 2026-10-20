@@ -9,6 +9,7 @@ stays **unklar**.
 | Manufacturer | Type | Serial no. | Group | How determined | Date |
 |---|---|---|---|---|---|
 | Canon | J15ax8B4 IRS SX12 | *(read off the barrel)* | **C (analog) — probable** | Pin 11 stays at ground level while focus is turned (no focus sensor on this IRS SX12, so pin 11 cannot settle it); iris drives over the analog pin 5 and reports on pin 7 1:1 ([`20261010-canon-j15ax8b4-first-drive.md`](measurements/20261010-canon-j15ax8b4-first-drive.md)). Pin 12 and a logic analyser on 11/12 not yet done. | 2026-10-10 |
+| Canon | PJ20x7.5B IE (Super20 box, large lens adapter) | *(not read)* | **C (analog) — probable** | Iris drives over Hirose 5 and reports on 7, zoom position on 10; no serial seen; power via the adapter's DE-9, not Hirose 6 ([`20261020-canon-pj20x75b-box-adapter.md`](measurements/20261020-canon-pj20x75b-box-adapter.md)). Focus position not routed to pin 11 by the adapter. | 2026-10-20 |
 
 ## Measuring procedure (passive, drives nothing)
 
