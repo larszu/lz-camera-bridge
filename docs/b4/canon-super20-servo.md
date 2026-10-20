@@ -1,10 +1,8 @@
 # Canon Super20 box lens — servo and interface notes
 
-Findings distilled from Canon service material for the PH20x "Super" box lens
-(Type C, built for the Philips LDK-9) with a J20x8.5B SUPER core, dated 1991.
-**The source document is internal Canon material and is not part of this
-repository.** Only what we learned from it is written down here. Values are read
-off hand-annotated faxes — measure before relying on them.
+Notes on the Canon PH20x "Super" box lens (Type C) with a J20x8.5B SUPER
+core. Values are not yet confirmed by our own measurement — measure before
+relying on them.
 
 Measured on our own PJ20x7.5B IE: see
 [`measurements/20261020-canon-pj20x75b-box-adapter.md`](measurements/20261020-canon-pj20x75b-box-adapter.md).
@@ -21,7 +19,7 @@ Measured on our own PJ20x7.5B IE: see
 
 Each axis pot is buffered and offered as a "/B" signal:
 
-| Signal | Range (from the schematic notes) |
+| Signal | Range (nominal) |
 |---|---|
 | IP/B — iris position | closed 2.5 V … open 8.5 V |
 | ZP/B — zoom position | VR ± 3 V |
@@ -59,8 +57,8 @@ position/follow, auto/remote iris, local/remote zoom/focus, tally, lens ID bits.
 So the lens **does** offer focus position to a camera — whether a given B4
 adapter routes it to Hirose pin 11 is a property of the adapter.
 
-## Known fault from the source
+## Known fault
 
-Canon's own diagnosis in the material: after a modification for a different
+After a modification for a different
 camera interface, the **zoom/focus remote/local mode can end up inverted**.
 Worth checking if zoom or focus ignores remote commands.

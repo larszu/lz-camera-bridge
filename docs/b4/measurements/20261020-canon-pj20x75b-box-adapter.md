@@ -1,7 +1,7 @@
 # 2026-10-20 · Canon PJ20x7.5B IE (Super20 box lens) · adapter pinout, iris drive, readback
 
 Second lens on the bench. An old Canon studio box lens (housing label
-"Super20"; per the service notes in [`../canon-super20-servo.md`](../canon-super20-servo.md)
+"Super20"; per [`../canon-super20-servo.md`](../canon-super20-servo.md)
 the optical/servo core is a J20x8.5B SUPER) on a *large lens adapter* that
 breaks the lens connector out to B4-style plugs.
 
@@ -37,8 +37,8 @@ stayed dead with 12 V on Hirose 6 only.
 
 ## Power
 
-With +12 V on DE-9 (bench supply) the lens comes up. Canon's service notes
-give +15 V as the design supply; 12 V is enough for iris and zoom servo on the
+With +12 V on DE-9 (bench supply) the lens comes up. The nominal supply
+is +15 V as the design supply; 12 V is enough for iris and zoom servo on the
 bench. Not tested: 15 V, current draw.
 
 ## Iris drive
